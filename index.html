@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="home">
+
+  <!-- Шапка с меню заполняется из js/main.js -->
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <!-- Главный экран -->
+    <section class="hero">
+      <div class="container">
+        <h1>Опора</h1>
+        <p class="slogan">Поддержка семьи, когда специалист далеко</p>
+        <div class="buttons">
+          <a href="lessons.html" class="btn btn-primary">Начать обучение</a>
+          <a href="reference.html" class="btn btn-secondary">Найти информацию по теме</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Три раздела помощи (берутся из js/data.js) -->
+    <section class="block">
+      <div class="container">
+        <h2>Разделы помощи</h2>
+        <div id="sections-list" class="grid-3"></div>
+      </div>
+    </section>
+
+    <!-- Как это работает -->
+    <section class="block">
+      <div class="container">
+        <h2>Как это работает</h2>
+        <ol class="grid-3 steps">
+          <li class="card step">
+            <span class="step-number">1</span>
+            <h3>Выбери тему</h3>
+            <p>Найдите то, что важно вашей семье сейчас.</p>
+          </li>
+          <li class="card step">
+            <span class="step-number">2</span>
+            <h3>Посмотри</h3>
+            <p>Короткое видео и памятка: что делать и чего нельзя.</p>
+          </li>
+          <li class="card step">
+            <span class="step-number">3</span>
+            <h3>Проверь себя</h3>
+            <p>Три вопроса, чтобы закрепить главное.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <!-- Подвал заполняется из js/main.js -->
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <!-- Сначала данные, потом скрипт, который их использует -->
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

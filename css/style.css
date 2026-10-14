@@ -1,0 +1,523 @@
+/* ===== Цвета и общие настройки (меняются в одном месте) ===== */
+:root {
+  --bg: #fbf8f3;        /* фон */
+  --text: #1f2a44;      /* текст */
+  --accent: #b4472f;    /* акцент */
+  --accent-dark: #933823;
+  --card: #ffffff;      /* карточки */
+  --border: #d9d0c0;    /* рамки */
+  --muted: #5b6478;     /* второстепенный текст */
+  --radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 20px;      /* крупный текст */
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;              /* подвал всегда внизу */
+}
+
+h1, h2, h3 {
+  line-height: 1.25;
+  margin: 0 0 0.6em;
+}
+h1 { font-size: 2.2rem; }
+h2 { font-size: 1.7rem; }
+h3 { font-size: 1.3rem; }
+
+p { margin: 0 0 1em; }
+
+a { color: var(--accent); }
+
+img { max-width: 100%; }
+
+[hidden] { display: none !important; }
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+.narrow { max-width: 560px; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.9rem; }
+
+/* Видимая рамка при навигации с клавиатуры */
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ===== Кнопки ===== */
+.btn {
+  display: inline-block;
+  padding: 16px 28px;
+  min-height: 56px;
+  border-radius: var(--radius);
+  border: 2px solid var(--accent);
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-secondary {
+  background: var(--card);
+  color: var(--accent);
+}
+.btn-secondary:hover { background: #f6ece6; }
+.btn-full { width: 100%; }
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* ===== Карточки ===== */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* ===== Шапка и меню ===== */
+.site-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  flex-wrap: wrap;
+}
+.logo {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: var(--text);
+  text-decoration: none;
+}
+.logo span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: normal;
+  color: var(--muted);
+}
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.menu a {
+  display: block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1.05rem;
+}
+.menu a:hover { background: var(--bg); }
+.menu a.active {
+  background: var(--accent);
+  color: #fff;
+}
+.menu-toggle {
+  display: none;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: bold;
+  padding: 12px 18px;
+  min-height: 48px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* Предупреждение для Firefox при открытии из файла */
+.file-warning {
+  background: #fff6e8;
+  border-bottom: 2px solid #e8cfa4;
+  padding: 14px 0;
+  font-size: 1rem;
+}
+
+/* ===== Главный экран ===== */
+.hero {
+  padding: 64px 0 48px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: 3.4rem;
+  color: var(--accent);
+  margin-bottom: 0.2em;
+}
+.slogan {
+  font-size: 1.5rem;
+  margin-bottom: 1.6em;
+}
+.hero .buttons { justify-content: center; }
+
+/* ===== Блоки на главной ===== */
+.block { padding: 40px 0; }
+
+.section-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.3rem;
+  margin-bottom: 14px;
+}
+
+/* ===== Формы входа ===== */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.tab {
+  flex: 1;
+  font-family: inherit;
+  font-size: 1.1rem;
+  padding: 14px;
+  min-height: 52px;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+}
+label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+input {
+  width: 100%;
+  font-family: inherit;
+  font-size: 1.1rem;
+  padding: 14px;
+  min-height: 54px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+input:focus { border-color: var(--accent); outline: none; }
+.error {
+  color: var(--accent-dark);
+  font-weight: bold;
+  min-height: 1em;
+}
+
+/* ===== Общие элементы уроков ===== */
+.lead {
+  font-size: 1.2rem;
+  color: var(--muted);
+}
+.hint {
+  background: #fff6e8;
+  border: 1px solid #e8cfa4;
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+.success {
+  color: #2e7d32;
+  font-weight: bold;
+  font-size: 1.15rem;
+}
+.fail {
+  color: var(--accent-dark);
+  font-weight: bold;
+  font-size: 1.15rem;
+}
+.btn:disabled {
+  background: #ddd8cf;
+  border-color: #ddd8cf;
+  color: #6b6b6b;
+  cursor: not-allowed;
+}
+
+/* ===== Страница «Уроки» ===== */
+.progress-card { margin-bottom: 20px; }
+.progress-text { font-size: 1.2rem; margin-bottom: 10px; }
+.progress {
+  height: 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s;
+}
+
+.lessons-section-title { margin-top: 40px; }
+
+.lessons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+.lesson-card {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.lesson-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(31, 42, 68, 0.1);
+}
+.lesson-card.is-passed { border-left: 6px solid #2e7d32; }
+.lesson-card p { flex: 1; }
+.lesson-num {
+  display: block;
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+.lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  font-size: 0.95rem;
+}
+.status {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.status-done {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1b5e20;
+  font-weight: bold;
+}
+
+/* ===== Страница урока ===== */
+.lesson-container { max-width: 900px; }
+
+.breadcrumbs {
+  font-size: 1rem;
+  margin-bottom: 20px;
+  color: var(--muted);
+}
+
+.lesson-h2 { margin-top: 40px; }
+
+.video-box {
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+}
+.video-box iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.video-placeholder {
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+  border-radius: var(--radius);
+  background: #e4e1dc;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.memo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.memo ul { margin: 0; padding-left: 1.2em; }
+.memo li { margin-bottom: 0.4em; }
+.memo-do h3 { color: #2e7d32; }
+.memo-dont h3 { color: var(--accent); }
+.memo-urgent {
+  border: 3px solid #c62828;
+}
+.memo-urgent h3 { color: #c62828; }
+
+/* Тест */
+.question {
+  border: 0;
+  padding: 0;
+  margin: 0 0 24px;
+}
+.question legend {
+  font-weight: bold;
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+  padding: 0;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: normal;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.option:hover { border-color: var(--accent); }
+.option input {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.option.is-right {
+  border-color: #2e7d32;
+  background: #e8f5e9;
+}
+.option.is-wrong {
+  border-color: #c62828;
+  background: #fdecea;
+}
+
+.quiz-result {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.score {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+.mistakes { padding-left: 1.2em; }
+.mistakes li { margin-bottom: 12px; }
+
+.finish-card { margin-top: 24px; }
+.finish-card .muted { margin: 10px 0 0; }
+
+.consult-box {
+  margin-top: 32px;
+  text-align: center;
+}
+
+/* ===== Подвал ===== */
+.site-footer {
+  background: var(--text);
+  color: #fff;
+  padding: 28px 0;
+  text-align: center;
+  margin-top: 40px;
+}
+.site-footer p { margin: 0.3em 0; }
+
+/* ===== Телефон и планшет ===== */
+@media (max-width: 860px) {
+  .grid-3 { grid-template-columns: 1fr; }
+  .memo-grid { grid-template-columns: 1fr; }
+
+  .menu-toggle { display: block; }
+  .site-header nav { width: 100%; }
+  .menu {
+    display: none;           /* меню скрыто, пока не нажали «Меню» */
+    flex-direction: column;
+    padding-bottom: 8px;
+  }
+  .menu.open { display: flex; }
+  .menu a { padding: 14px; font-size: 1.15rem; }
+}
+
+@media (max-width: 480px) {
+  body { font-size: 18px; }
+  .hero { padding: 40px 0 32px; }
+  .hero h1 { font-size: 2.6rem; }
+  .slogan { font-size: 1.25rem; }
+  .buttons .btn { width: 100%; }
+  .card { padding: 22px; }
+  .lessons-grid { grid-template-columns: 1fr; }
+  .finish-card .btn,
+  .consult-box .btn { width: 100%; }
+}
