@@ -161,6 +161,41 @@ img { max-width: 100%; }
   background: var(--accent);
   color: #fff;
 }
+/* Пункт меню с выпадающим списком («Справочник») */
+.has-sub { position: relative; }
+.sub-head {
+  display: flex;
+  align-items: center;
+}
+.sub-toggle {
+  font-family: inherit;
+  font-size: 1.1rem;
+  min-width: 44px;
+  min-height: 44px;
+  background: none;
+  color: var(--text);
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.sub-toggle:hover { background: var(--bg); }
+.submenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  min-width: 230px;
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(31, 42, 68, 0.12);
+}
+.has-sub.open .submenu { display: block; }
+
 .menu-toggle {
   display: none;
   font-family: inherit;
@@ -379,7 +414,10 @@ input:focus { border-color: var(--accent); outline: none; }
   color: var(--muted);
 }
 
-.lesson-h2 { margin-top: 40px; }
+.lesson-h2 {
+  margin-top: 40px;
+  scroll-margin-top: 110px; /* чтобы при переходе по якорю заголовок не прятался под шапкой */
+}
 
 .video-box {
   aspect-ratio: 16 / 9;
@@ -408,12 +446,14 @@ input:focus { border-color: var(--accent); outline: none; }
   padding: 20px;
 }
 
-.memo-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+/* Памятка: блоки друг под другом на всю ширину */
+.memo-stack {
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
-.memo ul { margin: 0; padding-left: 1.2em; }
+.memo ul,
+.memo ol { margin: 0; padding-left: 1.4em; }
 .memo li { margin-bottom: 0.4em; }
 .memo-do h3 { color: #2e7d32; }
 .memo-dont h3 { color: var(--accent); }
@@ -421,6 +461,14 @@ input:focus { border-color: var(--accent); outline: none; }
   border: 3px solid #c62828;
 }
 .memo-urgent h3 { color: #c62828; }
+
+/* «Подробнее» и «Источники» */
+.details p:last-child { margin-bottom: 0; }
+.sources {
+  margin: 0;
+  padding-left: 2.6em;
+}
+.sources li { margin-bottom: 0.4em; }
 
 /* Тест */
 .question {
@@ -533,6 +581,132 @@ input:focus { border-color: var(--accent); outline: none; }
 
 .article-actions { margin-top: 32px; }
 
+.filters-label {
+  font-weight: bold;
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+/* ===== Общая карточка (тайл): справочник, памятки, видео, статьи ===== */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.tile:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(31, 42, 68, 0.1);
+}
+.tile-media { position: relative; }
+.tile-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+}
+.tile-cover-label {
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+.tile-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tile-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--accent);
+  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 5px; /* треугольник визуально по центру */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.tile-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: var(--card);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+.tile-body {
+  flex: 1;
+  padding: 20px 22px 24px;
+}
+.tile-body h3 { margin-bottom: 0.4em; }
+.tile-section {
+  display: block;
+  color: var(--accent);
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+}
+.tile-text {
+  margin: 0;
+  color: var(--muted);
+  /* не больше трёх строк, дальше многоточие */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== Частые вопросы ===== */
+.faq-topic { margin-top: 32px; }
+.faq-topic .tile-section { margin: 0; }
+.faq-topic h2 { font-size: 1.4rem; }
+.faq-topic h2 a { color: var(--text); text-decoration: none; }
+.faq-topic h2 a:hover { color: var(--accent); }
+.faq-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+.faq-item summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 16px 20px;
+  min-height: 56px;
+  list-style-position: inside;
+}
+.faq-item[open] summary { border-bottom: 1px solid var(--border); }
+.faq-answer { padding: 16px 20px 4px; }
+.faq-more {
+  margin-top: 40px;
+  font-size: 1.15rem;
+  text-align: center;
+}
+
 /* ===== Подвал ===== */
 .site-footer {
   background: var(--text);
@@ -546,7 +720,6 @@ input:focus { border-color: var(--accent); outline: none; }
 /* ===== Телефон и планшет ===== */
 @media (max-width: 860px) {
   .grid-3 { grid-template-columns: 1fr; }
-  .memo-grid { grid-template-columns: 1fr; }
 
   .menu-toggle { display: block; }
   .site-header nav { width: 100%; }
@@ -557,6 +730,25 @@ input:focus { border-color: var(--accent); outline: none; }
   }
   .menu.open { display: flex; }
   .menu a { padding: 14px; font-size: 1.15rem; }
+
+  /* Подменю на телефоне — внутри списка, с отступом, открывается стрелкой */
+  .sub-head a { flex: 1; }
+  .submenu {
+    position: static;
+    border: 0;
+    box-shadow: none;
+    padding: 0 0 0 20px;
+    min-width: 0;
+  }
+}
+
+/* Подменю на компьютере открывается и при наведении мыши */
+@media (hover: hover) and (min-width: 861px) {
+  .has-sub:hover .submenu { display: block; }
+}
+
+@media (max-width: 600px) {
+  .tile-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {

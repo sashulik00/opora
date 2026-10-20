@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Частые вопросы — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="faq">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <div class="container lesson-container">
+        <h1>Частые вопросы</h1>
+        <p class="lead">Нажмите на вопрос, чтобы увидеть ответ</p>
+
+        <!-- Фильтр по разделам и вопросы заполняются из js/main.js по данным из js/data.js -->
+        <div id="faq-filters" class="filters" role="group" aria-label="Раздел"></div>
+        <div id="faq-list"></div>
+
+        <p class="card faq-more">
+          Не нашли ответ? <a href="consultant.html">Спросите консультанта</a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -130,19 +130,48 @@ function renderHeader() {
   const user = getCurrentUser();
   const page = document.body.dataset.page; // какая страница открыта (для подсветки пункта меню)
 
-  // Страницы, кроме главной и входа, появятся позже
+  // Страницы «Консультант» и «Помощь» появятся позже
   const links = [
     { href: "index.html", text: "Главная", page: "home" },
     { href: "lessons.html", text: "Уроки", page: "lessons" },
-    { href: "reference.html", text: "Справочник", page: "reference" },
+    {
+      href: "reference.html", text: "Справочник", page: "reference",
+      children: [
+        { href: "reference.html", text: "Поиск", page: "reference" },
+        { href: "memos.html", text: "Памятки", page: "memos" },
+        { href: "videos.html", text: "Видео", page: "videos" },
+        { href: "articles.html", text: "Статьи", page: "articles" },
+        { href: "faq.html", text: "Частые вопросы", page: "faq" }
+      ]
+    },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
     { href: "help.html", text: "Помощь", page: "help" },
     { href: "login.html", text: user ? user.name : "Кабинет / Войти", page: "login" }
   ];
 
+  function linkHtml(link, active) {
+    return '<a href="' + link.href + '"' + (active ? ' class="active" aria-current="page"' : "") + ">" +
+      escapeHtml(link.text) + "</a>";
+  }
+
   const items = links.map(function (link) {
-    const active = link.page === page ? ' class="active" aria-current="page"' : "";
-    return '<li><a href="' + link.href + '"' + active + ">" + escapeHtml(link.text) + "</a></li>";
+    if (!link.children) return "<li>" + linkHtml(link, link.page === page) + "</li>";
+
+    // Пункт с выпадающим списком: сам пункт — ссылка, стрелка рядом — кнопка «раскрыть»
+    const inside = link.children.some(function (c) { return c.page === page; });
+    const sub = link.children.map(function (c) {
+      return "<li>" + linkHtml(c, c.page === page) + "</li>";
+    }).join("");
+    return (
+      '<li class="has-sub">' +
+        '<div class="sub-head">' +
+          '<a href="' + link.href + '"' + (inside ? ' class="active"' : "") + ">" + escapeHtml(link.text) + "</a>" +
+          '<button type="button" class="sub-toggle" aria-expanded="false" aria-label="Открыть подменю «' +
+            escapeHtml(link.text) + '»">▾</button>' +
+        "</div>" +
+        '<ul class="submenu">' + sub + "</ul>" +
+      "</li>"
+    );
   }).join("");
 
   header.innerHTML =
@@ -160,6 +189,38 @@ function renderHeader() {
     toggle.setAttribute("aria-expanded", open);
     toggle.textContent = open ? "✕ Закрыть" : "☰ Меню";
   });
+
+  // Стрелка у «Справочника» открывает и закрывает подменю (на компьютере оно ещё открывается при наведении)
+  header.querySelectorAll(".has-sub").forEach(function (item) {
+    const button = item.querySelector(".sub-toggle");
+    button.addEventListener("click", function () {
+      setSubmenu(item, !item.classList.contains("open"));
+    });
+  });
+
+  // Закрывать подменю при щелчке мимо него и по клавише Esc (подключаем один раз)
+  if (!renderHeader.listenersAdded) {
+    renderHeader.listenersAdded = true;
+    document.addEventListener("click", function (e) {
+      document.querySelectorAll(".has-sub.open").forEach(function (item) {
+        if (!item.contains(e.target)) setSubmenu(item, false);
+      });
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      document.querySelectorAll(".has-sub.open").forEach(function (item) {
+        setSubmenu(item, false);
+        item.querySelector(".sub-toggle").focus();
+      });
+    });
+  }
+}
+
+function setSubmenu(item, open) {
+  item.classList.toggle("open", open);
+  const button = item.querySelector(".sub-toggle");
+  button.setAttribute("aria-expanded", open);
+  button.textContent = open ? "▴" : "▾";
 }
 
 /* Firefox при открытии сайта двойным щелчком (адрес file:///) по умолчанию
@@ -370,20 +431,64 @@ function renderVideo(topic) {
   return '<div class="video-placeholder">Видео скоро появится</div>';
 }
 
-function renderList(items) {
-  return "<ul>" + items.map(function (item) {
-    return "<li>" + escapeHtml(item) + "</li>";
-  }).join("") + "</ul>";
+/* Есть ли в списке хотя бы один непустой пункт */
+function hasItems(list) {
+  return Array.isArray(list) && list.some(function (item) { return item; });
 }
 
-/* Памятка из трёх блоков — общая для урока и статьи справочника */
+function renderList(items, tag) {
+  tag = tag || "ul";
+  return "<" + tag + ">" + items.filter(Boolean).map(function (item) {
+    return "<li>" + escapeHtml(item) + "</li>";
+  }).join("") + "</" + tag + ">";
+}
+
+/* Памятка из трёх блоков друг под другом — общая для урока и статьи.
+   Пустые блоки не показываются; если пусто всё — нет и заголовка «Памятка». */
 function renderMemo(topic, section) {
+  const memo = topic.memo || {};
+  const blocks = [
+    { list: memo.doList, cls: "memo-do", title: "Что делать", tag: "ol" },
+    { list: memo.dontList, cls: "memo-dont", title: "Чего нельзя" },
+    { list: memo.urgentList, cls: "memo-urgent", title: section.urgentTitle }
+  ].filter(function (b) { return hasItems(b.list); });
+
+  if (!blocks.length) return "";
   return (
-    '<div class="memo-grid">' +
-      '<div class="card memo memo-do"><h3>Что делать</h3>' + renderList(topic.memo.doList) + "</div>" +
-      '<div class="card memo memo-dont"><h3>Чего нельзя</h3>' + renderList(topic.memo.dontList) + "</div>" +
-      '<div class="card memo memo-urgent"><h3>' + escapeHtml(section.urgentTitle) + "</h3>" + renderList(topic.memo.urgentList) + "</div>" +
+    '<h2 class="lesson-h2" id="memo">Памятка</h2>' +
+    '<div class="memo-stack">' +
+      blocks.map(function (b) {
+        return '<div class="card memo ' + b.cls + '"><h3>' + escapeHtml(b.title) + "</h3>" + renderList(b.list, b.tag) + "</div>";
+      }).join("") +
     "</div>"
+  );
+}
+
+/* «Подробнее» — абзацы из поля details */
+function renderDetails(topic) {
+  if (!hasItems(topic.details)) return "";
+  return (
+    '<h2 class="lesson-h2" id="details">Подробнее</h2>' +
+    '<div class="card details">' +
+      topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
+    "</div>"
+  );
+}
+
+/* «Источники» — ссылки из поля sources (только адреса http/https) */
+function renderSources(topic) {
+  const sources = (topic.sources || []).filter(function (s) {
+    return s && s.url && /^https?:\/\//i.test(s.url);
+  });
+  if (!sources.length) return "";
+  return (
+    '<h2 class="lesson-h2">Источники</h2>' +
+    '<ul class="card sources">' +
+      sources.map(function (s) {
+        return '<li><a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">' +
+          escapeHtml(s.title || s.url) + "</a></li>";
+      }).join("") +
+    "</ul>"
   );
 }
 
@@ -439,8 +544,7 @@ function renderLessonPage() {
     '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
 
     renderVideo(topic) +
-
-    '<h2 class="lesson-h2">Памятка</h2>' +
+    renderDetails(topic) +
     renderMemo(topic, section) +
 
     '<h2 class="lesson-h2">Проверь себя</h2>' +
@@ -474,6 +578,8 @@ function renderLessonPage() {
         "</div>" +
       "</div>" +
     "</div>" +
+
+    renderSources(topic) +
 
     '<div class="consult-box">' +
       '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
@@ -582,42 +688,133 @@ function setupQuiz(topic, record) {
   });
 }
 
-/* ---------- Справочник ---------- */
+/* ---------- Справочник: общие помощники ---------- */
+
+function sectionOf(topic) {
+  return SECTIONS.find(function (s) { return s.id === topic.section; });
+}
+
+function hasVideo(topic) {
+  return Boolean((topic.video || "").trim());
+}
+
+function hasMemo(topic) {
+  const memo = topic.memo || {};
+  return hasItems(memo.doList) || hasItems(memo.dontList) || hasItems(memo.urgentList);
+}
 
 /* Приводит текст к виду для поиска: маленькие буквы, «ё» → «е», лишние пробелы убраны */
 function normalizeText(text) {
   return text.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
 }
 
-/* Весь текст темы, по которому идёт поиск: название, описание и памятка */
+/* Весь текст темы, по которому идёт поиск: название, описание, памятка, подробный текст и вопросы */
 function topicSearchText(topic) {
-  return normalizeText([
-    topic.title,
-    topic.description,
-    topic.memo.doList.join(" "),
-    topic.memo.dontList.join(" "),
-    topic.memo.urgentList.join(" ")
-  ].join(" "));
+  const memo = topic.memo || {};
+  const parts = [topic.title, topic.description]
+    .concat(memo.doList || [], memo.dontList || [], memo.urgentList || [], topic.details || [])
+    .concat((topic.faq || []).map(function (f) { return f.q + " " + f.a; }));
+  return normalizeText(parts.join(" "));
 }
+
+/* Обложка карточки: картинка из папки images или цветная заглушка с названием раздела.
+   Если картинку не удалось загрузить (например, ошибка в имени файла), остаётся заглушка. */
+function renderCover(topic, section) {
+  const cover = (topic.cover || "").trim();
+  return (
+    '<div class="tile-cover" style="background:' + escapeHtml(section.color || "#5b6478") + '">' +
+      '<span class="tile-cover-label">' + escapeHtml(section.title) + "</span>" +
+      (cover
+        ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
+        : "") +
+    "</div>"
+  );
+}
+
+/* ОДНА общая карточка для справочника, памяток, видео и статей.
+   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием) */
+function renderTile(topic, options) {
+  const section = sectionOf(topic);
+  return (
+    '<a class="tile" href="' + options.href + '">' +
+      '<div class="tile-media">' +
+        renderCover(topic, section) +
+        (options.play ? '<span class="tile-play" aria-label="Есть видео">▶</span>' : "") +
+        (options.badge ? '<span class="tile-badge">' + escapeHtml(options.badge) + "</span>" : "") +
+      "</div>" +
+      '<div class="tile-body">' +
+        '<span class="tile-section">' + escapeHtml(section.title) + "</span>" +
+        "<h3>" + escapeHtml(topic.title) + "</h3>" +
+        (options.text ? '<p class="tile-text">' + escapeHtml(options.text) + "</p>" : "") +
+      "</div>" +
+    "</a>"
+  );
+}
+
+function topicLink(page, topic, hash) {
+  return page + "?id=" + encodeURIComponent(topic.id) + (hash || "");
+}
+
+/* Группа кнопок-фильтров. items: [{id, title}], onChange(id) вызывается при выборе */
+function setupFilterButtons(box, items, onChange) {
+  box.innerHTML = items.map(function (f, i) {
+    return (
+      '<button type="button" class="filter' + (i === 0 ? " active" : "") + '" data-id="' + f.id + '" ' +
+      'aria-pressed="' + (i === 0) + '">' + escapeHtml(f.title) + "</button>"
+    );
+  }).join("");
+
+  box.addEventListener("click", function (e) {
+    const button = e.target.closest(".filter");
+    if (!button) return;
+    box.querySelectorAll(".filter").forEach(function (b) {
+      b.classList.toggle("active", b === button);
+      b.setAttribute("aria-pressed", b === button);
+    });
+    onChange(button.dataset.id);
+  });
+}
+
+const SECTION_FILTERS = [{ id: "all", title: "Все" }].concat(SECTIONS);
+
+/* Типы материалов в поиске: какие темы подходят и куда ведёт карточка */
+const MATERIAL_TYPES = [
+  { id: "all", title: "Все", fits: function () { return true; },
+    href: function (t) { return topicLink("article.html", t); } },
+  { id: "memos", title: "Памятки", badge: "Памятка", fits: hasMemo,
+    href: function (t) { return topicLink("article.html", t, "#memo"); } },
+  { id: "videos", title: "Видео", badge: "Видео", fits: hasVideo,
+    href: function (t) { return topicLink("lesson.html", t); } },
+  { id: "articles", title: "Статьи", badge: "Статья", fits: function (t) { return hasItems(t.details); },
+    href: function (t) { return topicLink("article.html", t, "#details"); } }
+];
+
+const EMPTY_RESULT =
+  '<div class="card empty-result">' +
+    "<p>Ничего не найдено. Попробуйте другое слово или " +
+    '<a href="consultant.html">спросите консультанта</a>.</p>' +
+  "</div>";
+
+/* ---------- Справочник: поиск (reference.html) ---------- */
 
 function setupReferencePage() {
   const page = document.getElementById("reference-page");
   if (!page) return;
 
   const input = document.getElementById("search-input");
-  const filtersBox = document.getElementById("filters");
   const list = document.getElementById("reference-list");
   const counter = document.getElementById("results-count");
   let currentSection = "all";
+  let currentType = MATERIAL_TYPES[0];
 
-  // Кнопки-фильтры: «Все» + по одной на каждый раздел из data.js
-  const filters = [{ id: "all", title: "Все" }].concat(SECTIONS);
-  filtersBox.innerHTML = filters.map(function (f) {
-    return (
-      '<button type="button" class="filter' + (f.id === "all" ? " active" : "") + '" data-section="' + f.id + '" ' +
-      'aria-pressed="' + (f.id === "all") + '">' + escapeHtml(f.title) + "</button>"
-    );
-  }).join("");
+  setupFilterButtons(document.getElementById("type-filters"), MATERIAL_TYPES, function (id) {
+    currentType = MATERIAL_TYPES.find(function (t) { return t.id === id; });
+    showResults();
+  });
+  setupFilterButtons(document.getElementById("filters"), SECTION_FILTERS, function (id) {
+    currentSection = id;
+    showResults();
+  });
 
   function showResults() {
     // Каждое слово запроса должно встретиться в теме: «уход ожог» найдёт «Ожоги»
@@ -625,47 +822,107 @@ function setupReferencePage() {
 
     const found = TOPICS.filter(function (topic) {
       if (currentSection !== "all" && topic.section !== currentSection) return false;
+      if (!currentType.fits(topic)) return false;
       const text = topicSearchText(topic);
       return words.every(function (word) { return text.indexOf(word) !== -1; });
     });
 
     if (!found.length) {
       counter.textContent = "";
-      list.innerHTML =
-        '<div class="card empty-result">' +
-          "<p>Ничего не найдено. Попробуйте другое слово или " +
-          '<a href="consultant.html">спросите консультанта</a>.</p>' +
-        "</div>";
+      list.innerHTML = EMPTY_RESULT;
       return;
     }
 
-    counter.textContent = "Найдено тем: " + found.length;
+    counter.textContent = "Найдено: " + found.length;
     list.innerHTML = found.map(function (topic) {
-      const section = SECTIONS.find(function (s) { return s.id === topic.section; });
-      return (
-        '<a class="card lesson-card" href="article.html?id=' + encodeURIComponent(topic.id) + '">' +
-          '<span class="lesson-num">' + escapeHtml(section.title) + "</span>" +
-          "<h3>" + escapeHtml(topic.title) + "</h3>" +
-          "<p>" + escapeHtml(topic.description) + "</p>" +
-        "</a>"
-      );
+      return renderTile(topic, {
+        href: currentType.href(topic),
+        badge: currentType.badge,
+        play: currentType.id === "videos",
+        text: topic.description
+      });
     }).join("");
   }
 
   input.addEventListener("input", showResults);
-
-  filtersBox.addEventListener("click", function (e) {
-    const button = e.target.closest(".filter");
-    if (!button) return;
-    currentSection = button.dataset.section;
-    filtersBox.querySelectorAll(".filter").forEach(function (b) {
-      b.classList.toggle("active", b === button);
-      b.setAttribute("aria-pressed", b === button);
-    });
-    showResults();
-  });
-
   showResults();
+}
+
+/* ---------- Справочник: Памятки, Видео, Статьи ---------- */
+
+function renderMemosPage() {
+  const list = document.getElementById("memos-list");
+  if (!list) return;
+  const topics = TOPICS.filter(hasMemo);
+  list.innerHTML = topics.length
+    ? topics.map(function (t) {
+        return renderTile(t, { href: topicLink("article.html", t, "#memo"), text: t.description });
+      }).join("")
+    : EMPTY_RESULT;
+}
+
+function renderVideosPage() {
+  const list = document.getElementById("videos-list");
+  if (!list) return;
+  list.innerHTML = TOPICS.map(function (t) {
+    const ready = hasVideo(t);
+    return renderTile(t, {
+      href: topicLink("lesson.html", t),
+      play: ready,
+      badge: ready ? "" : "Скоро"
+    });
+  }).join("");
+}
+
+function renderArticlesPage() {
+  const list = document.getElementById("articles-list");
+  if (!list) return;
+  const topics = TOPICS.filter(function (t) { return hasItems(t.details); });
+  list.innerHTML = topics.length
+    ? topics.map(function (t) {
+        // На карточке — первый абзац подробного текста
+        const first = t.details.filter(Boolean)[0];
+        return renderTile(t, { href: topicLink("article.html", t, "#details"), text: first });
+      }).join("")
+    : EMPTY_RESULT;
+}
+
+/* ---------- Справочник: Частые вопросы (faq.html) ---------- */
+
+function setupFaqPage() {
+  const list = document.getElementById("faq-list");
+  if (!list) return;
+
+  function show(sectionId) {
+    const topics = TOPICS.filter(function (t) {
+      return (sectionId === "all" || t.section === sectionId) && hasItems(t.faq);
+    });
+
+    if (!topics.length) {
+      list.innerHTML = '<div class="card empty-result"><p>В этом разделе пока нет вопросов.</p></div>';
+      return;
+    }
+
+    list.innerHTML = topics.map(function (t) {
+      return (
+        '<section class="faq-topic">' +
+          '<p class="tile-section">' + escapeHtml(sectionOf(t).title) + "</p>" +
+          '<h2><a href="' + topicLink("article.html", t) + '">' + escapeHtml(t.title) + "</a></h2>" +
+          t.faq.filter(function (f) { return f && f.q; }).map(function (f) {
+            return (
+              '<details class="faq-item">' +
+                "<summary>" + escapeHtml(f.q) + "</summary>" +
+                '<div class="faq-answer"><p>' + escapeHtml(f.a || "") + "</p></div>" +
+              "</details>"
+            );
+          }).join("") +
+        "</section>"
+      );
+    }).join("");
+  }
+
+  setupFilterButtons(document.getElementById("faq-filters"), SECTION_FILTERS, show);
+  show("all");
 }
 
 /* ---------- Статья справочника ---------- */
@@ -685,7 +942,7 @@ function renderArticlePage() {
     return;
   }
 
-  const section = SECTIONS.find(function (s) { return s.id === topic.section; });
+  const section = sectionOf(topic);
   document.title = topic.title + " — Справочник — Опора";
 
   page.innerHTML =
@@ -698,12 +955,23 @@ function renderArticlePage() {
     "<h1>" + escapeHtml(topic.title) + "</h1>" +
     '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
 
+    renderDetails(topic) +
     renderMemo(topic, section) +
+    renderSources(topic) +
 
     '<div class="buttons article-actions">' +
-      '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-primary">Пройти урок по этой теме</a>' +
+      '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-primary">Пройти урок по этой теме</a>' +
       '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
     "</div>";
+
+  scrollToHash();
+}
+
+/* Страница строится скриптом, поэтому к якорю (#memo, #details) прокручиваем сами */
+function scrollToHash() {
+  if (!location.hash) return;
+  const target = document.getElementById(location.hash.slice(1));
+  if (target) target.scrollIntoView();
 }
 
 /* ---------- Запуск ---------- */
@@ -717,5 +985,9 @@ document.addEventListener("DOMContentLoaded", function () {
   renderLessonsPage();
   renderLessonPage();
   setupReferencePage();
+  renderMemosPage();
+  renderVideosPage();
+  renderArticlesPage();
+  setupFaqPage();
   renderArticlePage();
 });

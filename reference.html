@@ -20,13 +20,16 @@
         <input type="search" id="search-input" class="search-input"
                placeholder="Например: ожог, пролежни, стресс" autocomplete="off">
 
-        <!-- Кнопки-фильтры по разделам создаются из js/main.js -->
-        <div id="filters" class="filters" aria-label="Разделы"></div>
+        <!-- Кнопки-фильтры создаются из js/main.js -->
+        <p class="filters-label">Что показать</p>
+        <div id="type-filters" class="filters" role="group" aria-label="Тип материала"></div>
+        <p class="filters-label">Раздел</p>
+        <div id="filters" class="filters" role="group" aria-label="Раздел"></div>
 
         <p id="results-count" class="muted" aria-live="polite"></p>
 
         <!-- Карточки тем заполняются из js/main.js по данным из js/data.js -->
-        <div id="reference-list" class="lessons-grid"></div>
+        <div id="reference-list" class="tile-grid"></div>
       </div>
     </section>
   </main>
