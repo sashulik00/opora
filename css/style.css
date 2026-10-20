@@ -733,6 +733,39 @@ input:focus { border-color: var(--accent); outline: none; }
   text-align: center;
 }
 
+/* ===== Личный кабинет ===== */
+.cabinet-guest { max-width: 640px; }
+.cabinet-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin: 8px 0 8px;
+}
+.cabinet-next p { margin: 0; }
+.cabinet-data { max-width: 640px; }
+.cabinet-data p { margin-bottom: 0.6em; }
+.cabinet-data .btn { margin-top: 12px; }
+.cabinet-reset {
+  margin-top: 48px;
+  max-width: 640px;
+  border-style: dashed;
+}
+.cabinet-reset h2 { font-size: 1.2rem; }
+.reset-confirm {
+  margin-top: 8px;
+  padding: 16px 18px;
+  background: #fdecea;
+  border: 2px solid #c62828;
+  border-radius: var(--radius);
+}
+.btn-danger {
+  background: #c62828;
+  border-color: #c62828;
+  color: #fff;
+}
+.btn-danger:hover { background: #a61f1f; border-color: #a61f1f; }
+
 /* ===== Подвал ===== */
 .site-footer {
   background: var(--text);

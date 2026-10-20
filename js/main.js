@@ -146,7 +146,9 @@ function renderHeader() {
     },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
     { href: "help.html", text: "Помощь", page: "help" },
-    { href: "login.html", text: user ? user.name : "Кабинет / Войти", page: "login" }
+    user
+      ? { href: "cabinet.html", text: user.name, page: "cabinet" }
+      : { href: "login.html", text: "Войти", page: "login" }
   ];
 
   function linkHtml(link, active) {
@@ -312,6 +314,11 @@ function setupLoginPage() {
     });
   });
 
+  // login.html?tab=register — сразу открыть вкладку «Регистрация» (кнопка из кабинета)
+  if (new URLSearchParams(location.search).get("tab") === "register") {
+    page.querySelector('.tab[data-tab="register"]').click();
+  }
+
   // Если на вход пришли со страницы урока — после входа вернуть туда
   function afterLogin() {
     const back = new URLSearchParams(location.search).get("back");
@@ -350,25 +357,37 @@ function setupLoginPage() {
 
 /* ---------- Страница «Уроки» ---------- */
 
+/* Сколько уроков пройдено по сохранённому прогрессу */
+function countPassed(progress) {
+  return TOPICS.filter(function (t) {
+    return progress[t.id] && progress[t.id].passed;
+  }).length;
+}
+
+/* Полоса прогресса «Пройдено N из M» — общая для «Уроков» и кабинета.
+   suffix — слово после числа, например « уроков» */
+function renderProgressBar(progress, suffix) {
+  const passedCount = countPassed(progress);
+  const percent = Math.round((passedCount / TOPICS.length) * 100);
+  return (
+    '<div class="card progress-card">' +
+      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + TOPICS.length + (suffix || "") + "</p>" +
+      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + TOPICS.length +
+        '" aria-valuenow="' + passedCount + '" aria-label="Прогресс обучения">' +
+        '<div class="progress-fill" style="width:' + percent + '%"></div>' +
+      "</div>" +
+    "</div>"
+  );
+}
+
 function renderLessonsPage() {
   const page = document.getElementById("lessons-page");
   if (!page) return;
 
   const user = getCurrentUser();
   const progress = getProgress();
-  const passedCount = TOPICS.filter(function (t) {
-    return progress[t.id] && progress[t.id].passed;
-  }).length;
-  const percent = Math.round((passedCount / TOPICS.length) * 100);
 
-  let html =
-    '<div class="card progress-card">' +
-      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + TOPICS.length + "</p>" +
-      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + TOPICS.length +
-        '" aria-valuenow="' + passedCount + '" aria-label="Прогресс обучения">' +
-        '<div class="progress-fill" style="width:' + percent + '%"></div>' +
-      "</div>" +
-    "</div>";
+  let html = renderProgressBar(progress);
 
   if (!user) {
     html +=
@@ -376,6 +395,13 @@ function renderLessonsPage() {
       '<a href="' + loginLinkBack() + '">Войти</a></p>';
   }
 
+  html += renderLessonCards(progress);
+  page.innerHTML = html;
+}
+
+/* Список всех уроков по разделам: номер, название, описание, статус и лучший результат */
+function renderLessonCards(progress) {
+  let html = "";
   SECTIONS.forEach(function (section) {
     html += '<h2 class="lessons-section-title">' + escapeHtml(section.title) + "</h2>";
     html += '<div class="lessons-grid">';
@@ -399,8 +425,91 @@ function renderLessonsPage() {
 
     html += "</div>";
   });
+  return html;
+}
 
-  page.innerHTML = html;
+/* ---------- Личный кабинет ---------- */
+
+function renderCabinetPage() {
+  const page = document.getElementById("cabinet-page");
+  if (!page) return;
+
+  const user = getCurrentUser();
+
+  if (!user) {
+    page.innerHTML =
+      "<h1>Личный кабинет</h1>" +
+      '<div class="card cabinet-guest">' +
+        '<p class="lead">Войдите, чтобы сохранять прогресс.</p>' +
+        '<div class="buttons">' +
+          '<a href="login.html" class="btn btn-primary">Войти</a>' +
+          '<a href="login.html?tab=register" class="btn btn-secondary">Зарегистрироваться</a>' +
+        "</div>" +
+      "</div>";
+    return;
+  }
+
+  const progress = getProgress();
+  const next = TOPICS.find(function (t) { return !(progress[t.id] && progress[t.id].passed); });
+
+  page.innerHTML =
+    "<h1>Здравствуйте, " + escapeHtml(user.name) + "!</h1>" +
+    renderProgressBar(progress, " уроков") +
+
+    '<div class="cabinet-next">' +
+      (next
+        ? '<a href="lesson.html?id=' + encodeURIComponent(next.id) + '" class="btn btn-primary">Продолжить</a>' +
+          '<p class="muted">Следующий урок: ' + escapeHtml(next.title) + "</p>"
+        : '<p class="success">Вы прошли все уроки</p>' +
+          '<a href="lessons.html" class="btn btn-primary">К списку уроков</a>') +
+    "</div>" +
+
+    '<h2 class="lesson-h2">Мои уроки</h2>' +
+    renderLessonCards(progress) +
+
+    '<h2 class="lesson-h2">Мои данные</h2>' +
+    '<div class="card cabinet-data">' +
+      '<p><span class="muted">Имя:</span> <strong>' + escapeHtml(user.name) + "</strong></p>" +
+      '<p><span class="muted">Почта:</span> <strong>' + escapeHtml(user.email) + "</strong></p>" +
+      '<button type="button" id="cabinet-logout" class="btn btn-secondary">Выйти</button>' +
+    "</div>" +
+
+    '<div class="card cabinet-reset">' +
+      "<h2>Сбросить прогресс</h2>" +
+      '<p class="muted">Удалит все результаты тестов и отметки о пройденных уроках. Аккаунт останется.</p>' +
+      '<button type="button" id="reset-btn" class="btn btn-secondary">Сбросить прогресс</button>' +
+      // Подтверждение прямо на странице: показывается после нажатия «Сбросить прогресс»
+      '<div id="reset-confirm" class="reset-confirm" role="alertdialog" aria-labelledby="reset-question" hidden>' +
+        '<p id="reset-question"><strong>Вы уверены?</strong> Отменить это будет нельзя.</p>' +
+        '<div class="buttons">' +
+          '<button type="button" id="reset-yes" class="btn btn-danger">Да, сбросить</button>' +
+          '<button type="button" id="reset-no" class="btn btn-secondary">Отмена</button>' +
+        "</div>" +
+      "</div>" +
+    "</div>";
+
+  document.getElementById("cabinet-logout").addEventListener("click", function () {
+    logoutUser();
+    location.href = "index.html";
+  });
+
+  const resetBtn = document.getElementById("reset-btn");
+  const confirmBox = document.getElementById("reset-confirm");
+
+  resetBtn.addEventListener("click", function () {
+    resetBtn.hidden = true;
+    confirmBox.hidden = false;
+    document.getElementById("reset-no").focus();
+  });
+  document.getElementById("reset-no").addEventListener("click", function () {
+    confirmBox.hidden = true;
+    resetBtn.hidden = false;
+    resetBtn.focus();
+  });
+  document.getElementById("reset-yes").addEventListener("click", function () {
+    localStorage.removeItem(progressKey(user)); // только прогресс этого пользователя
+    renderCabinetPage();
+  });
 }
 
 /* ---------- Страница урока ---------- */
@@ -1036,6 +1145,7 @@ document.addEventListener("DOMContentLoaded", function () {
   renderSections();
   setupLoginPage();
   renderLessonsPage();
+  renderCabinetPage();
   renderLessonPage();
   setupReferencePage();
   renderMemosPage();
