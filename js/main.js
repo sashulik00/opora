@@ -963,7 +963,20 @@ function setupReferencePage() {
 function renderMemosPage() {
   const list = document.getElementById("memos-list");
   if (!list) return;
-  const topics = TOPICS.filter(hasMemo);
+
+  // memos.html?section=psychology — только памятки одного раздела (так ссылается страница «Помощь»)
+  const section = SECTIONS.find(function (s) {
+    return s.id === new URLSearchParams(location.search).get("section");
+  });
+  if (section) {
+    list.insertAdjacentHTML("beforebegin",
+      '<p class="hint">Раздел: <strong>' + escapeHtml(section.title) + "</strong>. " +
+      '<a href="memos.html">Показать все памятки</a></p>');
+  }
+
+  const topics = TOPICS.filter(function (t) {
+    return hasMemo(t) && (!section || t.section === section.id);
+  });
   list.innerHTML = topics.length
     ? topics.map(function (t) {
         return renderTile(t, { href: topicLink("memo.html", t), text: t.description });
@@ -1136,6 +1149,97 @@ function renderArticlePage() {
     renderMoreOnTopic(topic, "article.html");
 }
 
+/* ---------- Помощь (help.html) ---------- */
+
+function renderContacts() {
+  const box = document.getElementById("contacts-list");
+  if (!box) return;
+
+  box.innerHTML = CONTACTS.map(function (c) {
+    const phone = (c.phone || "").trim();
+    const url = (c.url || "").trim();
+    const validUrl = /^https?:\/\//i.test(url); // ссылки только на сайты (http/https)
+    // Для ссылки «позвонить» оставляем только цифры и «+»
+    const tel = phone.replace(/[^\d+]/g, "");
+
+    return (
+      '<article class="card contact-card">' +
+        "<h3>" + escapeHtml(c.title) + "</h3>" +
+        (c.description ? "<p>" + escapeHtml(c.description) + "</p>" : "") +
+        (phone
+          ? '<p class="contact-phone">Телефон: <a href="tel:' + escapeHtml(tel) + '">' + escapeHtml(phone) + "</a></p>"
+          : "") +
+        (validUrl
+          ? '<a href="' + escapeHtml(url) + '" class="btn btn-secondary" target="_blank" rel="noopener">Перейти на сайт</a>'
+          : "") +
+        (!phone && !validUrl ? '<p class="muted contact-pending">Контакты уточняются</p>' : "") +
+      "</article>"
+    );
+  }).join("");
+}
+
+/* Опрос самочувствия: считает баллы и показывает результат. Ответы НЕ сохраняются. */
+function setupWellbeingSurvey() {
+  const form = document.getElementById("wellbeing-form");
+  if (!form) return;
+
+  const result = document.getElementById("wellbeing-result");
+  const error = document.getElementById("wellbeing-error");
+
+  form.querySelector(".wellbeing-questions").innerHTML = WELLBEING.questions.map(function (q, qi) {
+    return (
+      '<fieldset class="question">' +
+        "<legend>" + (qi + 1) + ". " + escapeHtml(q) + "</legend>" +
+        WELLBEING.options.map(function (option, points) {
+          return (
+            '<label class="option">' +
+              '<input type="radio" name="w' + qi + '" value="' + points + '"> ' +
+              "<span>" + escapeHtml(option) + "</span>" +
+            "</label>"
+          );
+        }).join("") +
+      "</fieldset>"
+    );
+  }).join("");
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    let total = 0;
+    let answered = 0;
+    WELLBEING.questions.forEach(function (q, qi) {
+      const checked = form.querySelector('input[name="w' + qi + '"]:checked');
+      if (checked) {
+        answered++;
+        total += Number(checked.value);
+      }
+    });
+
+    if (answered < WELLBEING.questions.length) {
+      error.textContent = "Ответьте, пожалуйста, на все вопросы.";
+      result.hidden = true;
+      return;
+    }
+    error.textContent = "";
+
+    const outcome = WELLBEING.results.find(function (r) { return total <= r.max; }) ||
+      WELLBEING.results[WELLBEING.results.length - 1];
+
+    result.innerHTML =
+      '<p class="wellbeing-text">' + escapeHtml(outcome.text) + "</p>" +
+      '<p class="muted">' + escapeHtml(WELLBEING.disclaimer) + "</p>" +
+      (outcome.high ? '<p class="wellbeing-urgent">' + escapeHtml(WELLBEING.urgentNote) + "</p>" : "");
+    result.hidden = false;
+    result.focus();
+  });
+
+  // «Пройти заново» очищает ответы и прячет результат
+  form.addEventListener("reset", function () {
+    error.textContent = "";
+    result.hidden = true;
+  });
+}
+
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -1155,4 +1259,6 @@ document.addEventListener("DOMContentLoaded", function () {
   renderMemoPage();
   renderVideoPage();
   renderArticlePage();
+  renderContacts();
+  setupWellbeingSurvey();
 });

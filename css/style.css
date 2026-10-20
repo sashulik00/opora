@@ -766,6 +766,66 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 .btn-danger:hover { background: #a61f1f; border-color: #a61f1f; }
 
+/* ===== Помощь ===== */
+.emergency {
+  background: #c62828;
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-top: 8px;
+}
+.emergency p {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+.emergency a {
+  color: #fff;
+  text-decoration: underline;
+  font-size: 1.8rem;
+}
+.contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+.contact-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.contact-card p { margin-bottom: 0.8em; }
+.contact-card .btn { margin-top: auto; }
+.contact-phone {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+.contact-phone a { white-space: nowrap; }
+.contact-pending {
+  margin-top: auto;
+  font-style: italic;
+}
+.wellbeing-result {
+  margin-top: 24px;
+  padding: 20px 22px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.wellbeing-result:focus { outline: none; }
+.wellbeing-text {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+.wellbeing-urgent {
+  margin: 0;
+  padding: 14px 16px;
+  border: 2px solid #c62828;
+  border-radius: 10px;
+  background: #fdecea;
+  font-weight: bold;
+}
+
 /* ===== Подвал ===== */
 .site-footer {
   background: var(--text);
@@ -807,7 +867,8 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 
 @media (max-width: 600px) {
-  .tile-grid { grid-template-columns: 1fr; }
+  .tile-grid,
+  .contacts-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {

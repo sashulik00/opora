@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Помощь — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="help">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <div class="container">
+        <h1>Помощь</h1>
+        <p class="lead">Вы не одни. Здесь контакты служб и небольшой опрос для тех, кто ухаживает</p>
+
+        <!-- Экстренный блок -->
+        <div class="emergency" role="note">
+          <p>Если угроза жизни, звоните <a href="tel:112">112</a></p>
+        </div>
+
+        <!-- Куда обратиться: карточки из CONTACTS в js/data.js -->
+        <h2 class="lesson-h2">Куда обратиться</h2>
+        <div id="contacts-list" class="contacts-grid"></div>
+
+        <!-- Опрос: вопросы и тексты результатов из WELLBEING в js/data.js. Ответы нигде не сохраняются -->
+        <h2 class="lesson-h2">Как вы себя чувствуете?</h2>
+        <div class="card wellbeing">
+          <p class="muted">Вспомните последние две недели и выберите по одному ответу на каждый вопрос.
+            Ответы никуда не отправляются и не сохраняются.</p>
+          <form id="wellbeing-form">
+            <div class="wellbeing-questions"></div>
+            <p id="wellbeing-error" class="error" role="alert"></p>
+            <div class="buttons">
+              <button type="submit" class="btn btn-primary">Показать результат</button>
+              <button type="reset" class="btn btn-secondary">Пройти заново</button>
+            </div>
+          </form>
+          <div id="wellbeing-result" class="wellbeing-result" tabindex="-1" aria-live="polite" hidden></div>
+        </div>
+
+        <!-- Полезные материалы -->
+        <h2 class="lesson-h2">Полезные материалы</h2>
+        <div class="card">
+          <div class="buttons">
+            <a href="memos.html?section=psychology" class="btn btn-primary">Памятки: психологическая поддержка</a>
+            <a href="lessons.html" class="btn btn-secondary">Уроки</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
