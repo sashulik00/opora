@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Справочник — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="reference">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <div class="container" id="reference-page">
+        <h1>Справочник</h1>
+        <p class="lead">Найдите нужную тему без прохождения курса</p>
+
+        <label for="search-input" class="visually-hidden">Поиск по темам</label>
+        <input type="search" id="search-input" class="search-input"
+               placeholder="Например: ожог, пролежни, стресс" autocomplete="off">
+
+        <!-- Кнопки-фильтры по разделам создаются из js/main.js -->
+        <div id="filters" class="filters" aria-label="Разделы"></div>
+
+        <p id="results-count" class="muted" aria-live="polite"></p>
+
+        <!-- Карточки тем заполняются из js/main.js по данным из js/data.js -->
+        <div id="reference-list" class="lessons-grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

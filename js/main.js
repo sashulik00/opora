@@ -376,6 +376,17 @@ function renderList(items) {
   }).join("") + "</ul>";
 }
 
+/* Памятка из трёх блоков — общая для урока и статьи справочника */
+function renderMemo(topic, section) {
+  return (
+    '<div class="memo-grid">' +
+      '<div class="card memo memo-do"><h3>Что делать</h3>' + renderList(topic.memo.doList) + "</div>" +
+      '<div class="card memo memo-dont"><h3>Чего нельзя</h3>' + renderList(topic.memo.dontList) + "</div>" +
+      '<div class="card memo memo-urgent"><h3>' + escapeHtml(section.urgentTitle) + "</h3>" + renderList(topic.memo.urgentList) + "</div>" +
+    "</div>"
+  );
+}
+
 function renderLessonPage() {
   const page = document.getElementById("lesson-page");
   if (!page) return;
@@ -430,11 +441,7 @@ function renderLessonPage() {
     renderVideo(topic) +
 
     '<h2 class="lesson-h2">Памятка</h2>' +
-    '<div class="memo-grid">' +
-      '<div class="card memo memo-do"><h3>Что делать</h3>' + renderList(topic.memo.doList) + "</div>" +
-      '<div class="card memo memo-dont"><h3>Чего нельзя</h3>' + renderList(topic.memo.dontList) + "</div>" +
-      '<div class="card memo memo-urgent"><h3>' + escapeHtml(section.urgentTitle) + "</h3>" + renderList(topic.memo.urgentList) + "</div>" +
-    "</div>" +
+    renderMemo(topic, section) +
 
     '<h2 class="lesson-h2">Проверь себя</h2>' +
     '<div class="card">' +
@@ -575,6 +582,130 @@ function setupQuiz(topic, record) {
   });
 }
 
+/* ---------- Справочник ---------- */
+
+/* Приводит текст к виду для поиска: маленькие буквы, «ё» → «е», лишние пробелы убраны */
+function normalizeText(text) {
+  return text.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
+}
+
+/* Весь текст темы, по которому идёт поиск: название, описание и памятка */
+function topicSearchText(topic) {
+  return normalizeText([
+    topic.title,
+    topic.description,
+    topic.memo.doList.join(" "),
+    topic.memo.dontList.join(" "),
+    topic.memo.urgentList.join(" ")
+  ].join(" "));
+}
+
+function setupReferencePage() {
+  const page = document.getElementById("reference-page");
+  if (!page) return;
+
+  const input = document.getElementById("search-input");
+  const filtersBox = document.getElementById("filters");
+  const list = document.getElementById("reference-list");
+  const counter = document.getElementById("results-count");
+  let currentSection = "all";
+
+  // Кнопки-фильтры: «Все» + по одной на каждый раздел из data.js
+  const filters = [{ id: "all", title: "Все" }].concat(SECTIONS);
+  filtersBox.innerHTML = filters.map(function (f) {
+    return (
+      '<button type="button" class="filter' + (f.id === "all" ? " active" : "") + '" data-section="' + f.id + '" ' +
+      'aria-pressed="' + (f.id === "all") + '">' + escapeHtml(f.title) + "</button>"
+    );
+  }).join("");
+
+  function showResults() {
+    // Каждое слово запроса должно встретиться в теме: «уход ожог» найдёт «Ожоги»
+    const words = normalizeText(input.value).split(" ").filter(Boolean);
+
+    const found = TOPICS.filter(function (topic) {
+      if (currentSection !== "all" && topic.section !== currentSection) return false;
+      const text = topicSearchText(topic);
+      return words.every(function (word) { return text.indexOf(word) !== -1; });
+    });
+
+    if (!found.length) {
+      counter.textContent = "";
+      list.innerHTML =
+        '<div class="card empty-result">' +
+          "<p>Ничего не найдено. Попробуйте другое слово или " +
+          '<a href="consultant.html">спросите консультанта</a>.</p>' +
+        "</div>";
+      return;
+    }
+
+    counter.textContent = "Найдено тем: " + found.length;
+    list.innerHTML = found.map(function (topic) {
+      const section = SECTIONS.find(function (s) { return s.id === topic.section; });
+      return (
+        '<a class="card lesson-card" href="article.html?id=' + encodeURIComponent(topic.id) + '">' +
+          '<span class="lesson-num">' + escapeHtml(section.title) + "</span>" +
+          "<h3>" + escapeHtml(topic.title) + "</h3>" +
+          "<p>" + escapeHtml(topic.description) + "</p>" +
+        "</a>"
+      );
+    }).join("");
+  }
+
+  input.addEventListener("input", showResults);
+
+  filtersBox.addEventListener("click", function (e) {
+    const button = e.target.closest(".filter");
+    if (!button) return;
+    currentSection = button.dataset.section;
+    filtersBox.querySelectorAll(".filter").forEach(function (b) {
+      b.classList.toggle("active", b === button);
+      b.setAttribute("aria-pressed", b === button);
+    });
+    showResults();
+  });
+
+  showResults();
+}
+
+/* ---------- Статья справочника ---------- */
+
+function renderArticlePage() {
+  const page = document.getElementById("article-page");
+  if (!page) return;
+
+  const id = new URLSearchParams(location.search).get("id");
+  const topic = TOPICS.find(function (t) { return t.id === id; });
+
+  if (!topic) {
+    page.innerHTML =
+      '<div class="card"><h1>Статья не найдена</h1>' +
+      "<p>Возможно, ссылка устарела.</p>" +
+      '<a href="reference.html" class="btn btn-primary">В справочник</a></div>';
+    return;
+  }
+
+  const section = SECTIONS.find(function (s) { return s.id === topic.section; });
+  document.title = topic.title + " — Справочник — Опора";
+
+  page.innerHTML =
+    '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
+      '<a href="reference.html">Справочник</a> <span aria-hidden="true">→</span> ' +
+      '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
+    "</nav>" +
+
+    '<p class="lesson-num">' + escapeHtml(section.title) + "</p>" +
+    "<h1>" + escapeHtml(topic.title) + "</h1>" +
+    '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
+
+    renderMemo(topic, section) +
+
+    '<div class="buttons article-actions">' +
+      '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-primary">Пройти урок по этой теме</a>' +
+      '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
+    "</div>";
+}
+
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -585,4 +716,6 @@ document.addEventListener("DOMContentLoaded", function () {
   setupLoginPage();
   renderLessonsPage();
   renderLessonPage();
+  setupReferencePage();
+  renderArticlePage();
 });

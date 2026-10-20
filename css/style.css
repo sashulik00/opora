@@ -484,6 +484,55 @@ input:focus { border-color: var(--accent); outline: none; }
   text-align: center;
 }
 
+/* ===== Справочник ===== */
+/* Текст виден только программам чтения с экрана */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.search-input {
+  font-size: 1.3rem;
+  padding: 18px 20px;
+  min-height: 64px;
+  border-radius: var(--radius);
+  margin: 8px 0 16px;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.filter {
+  font-family: inherit;
+  font-size: 1.05rem;
+  padding: 12px 18px;
+  min-height: 52px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.filter:hover { border-color: var(--accent); }
+.filter.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+}
+.empty-result {
+  grid-column: 1 / -1;
+  font-size: 1.15rem;
+}
+.empty-result p { margin: 0; }
+
+.article-actions { margin-top: 32px; }
+
 /* ===== Подвал ===== */
 .site-footer {
   background: var(--text);
@@ -520,4 +569,5 @@ input:focus { border-color: var(--accent); outline: none; }
   .lessons-grid { grid-template-columns: 1fr; }
   .finish-card .btn,
   .consult-box .btn { width: 100%; }
+  .filter { flex: 1 1 100%; }
 }
