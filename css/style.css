@@ -581,6 +581,32 @@ input:focus { border-color: var(--accent); outline: none; }
 
 .article-actions { margin-top: 32px; }
 
+/* Статья: абзацы чуть крупнее и с отступами */
+.article-text p { margin-bottom: 1.1em; }
+
+/* «Ещё по теме» внизу страниц памятки, видео и статьи */
+.more-on-topic {
+  margin-top: 40px;
+  padding: 20px 24px;
+}
+.more-on-topic h2 {
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+.more-on-topic ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.more-on-topic a {
+  display: inline-block;
+  padding: 8px 0;
+  font-weight: bold;
+}
+
 .filters-label {
   font-weight: bold;
   font-size: 1rem;

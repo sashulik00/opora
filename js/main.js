@@ -443,10 +443,11 @@ function renderList(items, tag) {
   }).join("") + "</" + tag + ">";
 }
 
-/* Памятка из трёх блоков друг под другом — общая для урока и статьи.
-   Пустые блоки не показываются; если пусто всё — нет и заголовка «Памятка». */
-function renderMemo(topic, section) {
-  const memo = topic.memo || {};
+/* Памятка из трёх блоков друг под другом — общая для урока (topic.lessonMemo)
+   и справочника (topic.memo). Пустые блоки не показываются; если пусто всё — функция вернёт "".
+   withHeading — добавить заголовок «Памятка» (нужен в уроке) */
+function renderMemo(memo, section, withHeading) {
+  memo = memo || {};
   const blocks = [
     { list: memo.doList, cls: "memo-do", title: "Что делать", tag: "ol" },
     { list: memo.dontList, cls: "memo-dont", title: "Чего нельзя" },
@@ -455,7 +456,7 @@ function renderMemo(topic, section) {
 
   if (!blocks.length) return "";
   return (
-    '<h2 class="lesson-h2" id="memo">Памятка</h2>' +
+    (withHeading ? '<h2 class="lesson-h2" id="memo">Памятка</h2>' : "") +
     '<div class="memo-stack">' +
       blocks.map(function (b) {
         return '<div class="card memo ' + b.cls + '"><h3>' + escapeHtml(b.title) + "</h3>" + renderList(b.list, b.tag) + "</div>";
@@ -545,7 +546,7 @@ function renderLessonPage() {
 
     renderVideo(topic) +
     renderDetails(topic) +
-    renderMemo(topic, section) +
+    renderMemo(topic.lessonMemo, section, true) +
 
     '<h2 class="lesson-h2">Проверь себя</h2>' +
     '<div class="card">' +
@@ -698,9 +699,14 @@ function hasVideo(topic) {
   return Boolean((topic.video || "").trim());
 }
 
+/* Есть ли у темы памятка СПРАВОЧНИКА (поле memo; памятка урока — lessonMemo) */
 function hasMemo(topic) {
   const memo = topic.memo || {};
   return hasItems(memo.doList) || hasItems(memo.dontList) || hasItems(memo.urgentList);
+}
+
+function hasArticle(topic) {
+  return hasItems(topic.details);
 }
 
 /* Приводит текст к виду для поиска: маленькие буквы, «ё» → «е», лишние пробелы убраны */
@@ -708,7 +714,8 @@ function normalizeText(text) {
   return text.toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ").trim();
 }
 
-/* Весь текст темы, по которому идёт поиск: название, описание, памятка, подробный текст и вопросы */
+/* Текст темы для поиска в справочнике: название, описание, памятка справочника (memo),
+   статья (details) и частые вопросы (faq). Памятка и тест урока сюда не входят. */
 function topicSearchText(topic) {
   const memo = topic.memo || {};
   const parts = [topic.title, topic.description]
@@ -751,8 +758,8 @@ function renderTile(topic, options) {
   );
 }
 
-function topicLink(page, topic, hash) {
-  return page + "?id=" + encodeURIComponent(topic.id) + (hash || "");
+function topicLink(page, topic) {
+  return page + "?id=" + encodeURIComponent(topic.id);
 }
 
 /* Группа кнопок-фильтров. items: [{id, title}], onChange(id) вызывается при выборе */
@@ -777,16 +784,11 @@ function setupFilterButtons(box, items, onChange) {
 
 const SECTION_FILTERS = [{ id: "all", title: "Все" }].concat(SECTIONS);
 
-/* Типы материалов в поиске: какие темы подходят и куда ведёт карточка */
+/* Типы материалов справочника: есть ли такой материал у темы и на какую страницу он ведёт */
 const MATERIAL_TYPES = [
-  { id: "all", title: "Все", fits: function () { return true; },
-    href: function (t) { return topicLink("article.html", t); } },
-  { id: "memos", title: "Памятки", badge: "Памятка", fits: hasMemo,
-    href: function (t) { return topicLink("article.html", t, "#memo"); } },
-  { id: "videos", title: "Видео", badge: "Видео", fits: hasVideo,
-    href: function (t) { return topicLink("lesson.html", t); } },
-  { id: "articles", title: "Статьи", badge: "Статья", fits: function (t) { return hasItems(t.details); },
-    href: function (t) { return topicLink("article.html", t, "#details"); } }
+  { id: "memos", title: "Памятки", badge: "Памятка", page: "memo.html", fits: hasMemo },
+  { id: "videos", title: "Видео", badge: "Видео", page: "video.html", fits: hasVideo },
+  { id: "articles", title: "Статьи", badge: "Статья", page: "article.html", fits: hasArticle }
 ];
 
 const EMPTY_RESULT =
@@ -805,10 +807,10 @@ function setupReferencePage() {
   const list = document.getElementById("reference-list");
   const counter = document.getElementById("results-count");
   let currentSection = "all";
-  let currentType = MATERIAL_TYPES[0];
+  let currentType = "all";
 
-  setupFilterButtons(document.getElementById("type-filters"), MATERIAL_TYPES, function (id) {
-    currentType = MATERIAL_TYPES.find(function (t) { return t.id === id; });
+  setupFilterButtons(document.getElementById("type-filters"), [{ id: "all", title: "Все" }].concat(MATERIAL_TYPES), function (id) {
+    currentType = id;
     showResults();
   });
   setupFilterButtons(document.getElementById("filters"), SECTION_FILTERS, function (id) {
@@ -819,36 +821,35 @@ function setupReferencePage() {
   function showResults() {
     // Каждое слово запроса должно встретиться в теме: «уход ожог» найдёт «Ожоги»
     const words = normalizeText(input.value).split(" ").filter(Boolean);
+    const types = MATERIAL_TYPES.filter(function (t) { return currentType === "all" || t.id === currentType; });
 
-    const found = TOPICS.filter(function (topic) {
-      if (currentSection !== "all" && topic.section !== currentSection) return false;
-      if (!currentType.fits(topic)) return false;
+    // Одна карточка на каждый материал темы: памятка, видео, статья
+    const cards = [];
+    TOPICS.forEach(function (topic) {
+      if (currentSection !== "all" && topic.section !== currentSection) return;
       const text = topicSearchText(topic);
-      return words.every(function (word) { return text.indexOf(word) !== -1; });
+      if (!words.every(function (word) { return text.indexOf(word) !== -1; })) return;
+
+      types.forEach(function (type) {
+        if (!type.fits(topic)) return;
+        cards.push(renderTile(topic, {
+          href: topicLink(type.page, topic),
+          badge: type.badge,
+          play: type.id === "videos",
+          text: topic.description
+        }));
+      });
     });
 
-    if (!found.length) {
-      counter.textContent = "";
-      list.innerHTML = EMPTY_RESULT;
-      return;
-    }
-
-    counter.textContent = "Найдено: " + found.length;
-    list.innerHTML = found.map(function (topic) {
-      return renderTile(topic, {
-        href: currentType.href(topic),
-        badge: currentType.badge,
-        play: currentType.id === "videos",
-        text: topic.description
-      });
-    }).join("");
+    counter.textContent = cards.length ? "Найдено материалов: " + cards.length : "";
+    list.innerHTML = cards.length ? cards.join("") : EMPTY_RESULT;
   }
 
   input.addEventListener("input", showResults);
   showResults();
 }
 
-/* ---------- Справочник: Памятки, Видео, Статьи ---------- */
+/* ---------- Справочник: списки Памятки, Видео, Статьи ---------- */
 
 function renderMemosPage() {
   const list = document.getElementById("memos-list");
@@ -856,7 +857,7 @@ function renderMemosPage() {
   const topics = TOPICS.filter(hasMemo);
   list.innerHTML = topics.length
     ? topics.map(function (t) {
-        return renderTile(t, { href: topicLink("article.html", t, "#memo"), text: t.description });
+        return renderTile(t, { href: topicLink("memo.html", t), text: t.description });
       }).join("")
     : EMPTY_RESULT;
 }
@@ -867,7 +868,7 @@ function renderVideosPage() {
   list.innerHTML = TOPICS.map(function (t) {
     const ready = hasVideo(t);
     return renderTile(t, {
-      href: topicLink("lesson.html", t),
+      href: topicLink("video.html", t),
       play: ready,
       badge: ready ? "" : "Скоро"
     });
@@ -877,12 +878,12 @@ function renderVideosPage() {
 function renderArticlesPage() {
   const list = document.getElementById("articles-list");
   if (!list) return;
-  const topics = TOPICS.filter(function (t) { return hasItems(t.details); });
+  const topics = TOPICS.filter(hasArticle);
   list.innerHTML = topics.length
     ? topics.map(function (t) {
-        // На карточке — первый абзац подробного текста
+        // На карточке — первый абзац статьи
         const first = t.details.filter(Boolean)[0];
-        return renderTile(t, { href: topicLink("article.html", t, "#details"), text: first });
+        return renderTile(t, { href: topicLink("article.html", t), text: first });
       }).join("")
     : EMPTY_RESULT;
 }
@@ -907,7 +908,7 @@ function setupFaqPage() {
       return (
         '<section class="faq-topic">' +
           '<p class="tile-section">' + escapeHtml(sectionOf(t).title) + "</p>" +
-          '<h2><a href="' + topicLink("article.html", t) + '">' + escapeHtml(t.title) + "</a></h2>" +
+          "<h2>" + escapeHtml(t.title) + "</h2>" +
           t.faq.filter(function (f) { return f && f.q; }).map(function (f) {
             return (
               '<details class="faq-item">' +
@@ -925,53 +926,105 @@ function setupFaqPage() {
   show("all");
 }
 
-/* ---------- Статья справочника ---------- */
+/* ---------- Справочник: страницы одного материала (memo / video / article) ---------- */
 
+/* Находит тему по ?id= в адресе. Если не нашли — показывает сообщение и возвращает null */
+function topicFromAddress(page, listHref, listTitle) {
+  const id = new URLSearchParams(location.search).get("id");
+  const topic = TOPICS.find(function (t) { return t.id === id; });
+  if (!topic) {
+    page.innerHTML =
+      '<div class="card"><h1>Материал не найден</h1>' +
+      "<p>Возможно, ссылка устарела.</p>" +
+      '<a href="' + listHref + '" class="btn btn-primary">' + escapeHtml(listTitle) + "</a></div>";
+  }
+  return topic || null;
+}
+
+/* Хлебные крошки «Справочник → Раздел → Тема» и заголовок */
+function renderMaterialHead(topic, listHref, listTitle) {
+  return (
+    '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
+      '<a href="reference.html">Справочник</a> <span aria-hidden="true">→</span> ' +
+      '<a href="' + listHref + '">' + escapeHtml(listTitle) + "</a> <span aria-hidden=\"true\">→</span> " +
+      '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
+    "</nav>" +
+    '<p class="lesson-num">' + escapeHtml(sectionOf(topic).title) + "</p>" +
+    "<h1>" + escapeHtml(topic.title) + "</h1>"
+  );
+}
+
+/* «Ещё по теме»: ссылки на другие материалы темы, кроме текущей страницы */
+function renderMoreOnTopic(topic, current) {
+  const links = [
+    { page: "memo.html", title: "Памятка" },
+    { page: "video.html", title: "Видео" },
+    { page: "article.html", title: "Статья" },
+    { page: "lesson.html", title: "Урок" }
+  ].filter(function (l) { return l.page !== current; });
+
+  return (
+    '<aside class="card more-on-topic" aria-label="Ещё по теме">' +
+      "<h2>Ещё по теме</h2>" +
+      "<ul>" + links.map(function (l) {
+        return '<li><a href="' + topicLink(l.page, topic) + '">' + l.title + "</a></li>";
+      }).join("") + "</ul>" +
+    "</aside>"
+  );
+}
+
+function renderSoon(text) {
+  return '<div class="video-placeholder">' + escapeHtml(text) + "</div>";
+}
+
+/* memo.html — только памятка справочника */
+function renderMemoPage() {
+  const page = document.getElementById("memo-page");
+  if (!page) return;
+  const topic = topicFromAddress(page, "memos.html", "К списку памяток");
+  if (!topic) return;
+
+  document.title = topic.title + " — Памятка — Опора";
+  page.innerHTML =
+    renderMaterialHead(topic, "memos.html", "Памятки") +
+    (renderMemo(topic.memo, sectionOf(topic), false) || renderSoon("Памятка скоро появится")) +
+    renderMoreOnTopic(topic, "memo.html");
+}
+
+/* video.html — только видеоплеер */
+function renderVideoPage() {
+  const page = document.getElementById("video-page");
+  if (!page) return;
+  const topic = topicFromAddress(page, "videos.html", "К списку видео");
+  if (!topic) return;
+
+  document.title = topic.title + " — Видео — Опора";
+  page.innerHTML =
+    renderMaterialHead(topic, "videos.html", "Видео") +
+    renderVideo(topic) +
+    '<div class="buttons article-actions">' +
+      '<a href="videos.html" class="btn btn-secondary">К списку видео</a>' +
+    "</div>" +
+    renderMoreOnTopic(topic, "video.html");
+}
+
+/* article.html — только статья (details) и источники */
 function renderArticlePage() {
   const page = document.getElementById("article-page");
   if (!page) return;
+  const topic = topicFromAddress(page, "articles.html", "К списку статей");
+  if (!topic) return;
 
-  const id = new URLSearchParams(location.search).get("id");
-  const topic = TOPICS.find(function (t) { return t.id === id; });
-
-  if (!topic) {
-    page.innerHTML =
-      '<div class="card"><h1>Статья не найдена</h1>' +
-      "<p>Возможно, ссылка устарела.</p>" +
-      '<a href="reference.html" class="btn btn-primary">В справочник</a></div>';
-    return;
-  }
-
-  const section = sectionOf(topic);
-  document.title = topic.title + " — Справочник — Опора";
-
+  document.title = topic.title + " — Статья — Опора";
   page.innerHTML =
-    '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
-      '<a href="reference.html">Справочник</a> <span aria-hidden="true">→</span> ' +
-      '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
-    "</nav>" +
-
-    '<p class="lesson-num">' + escapeHtml(section.title) + "</p>" +
-    "<h1>" + escapeHtml(topic.title) + "</h1>" +
-    '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
-
-    renderDetails(topic) +
-    renderMemo(topic, section) +
+    renderMaterialHead(topic, "articles.html", "Статьи") +
+    (hasArticle(topic)
+      ? '<div class="card details article-text">' +
+          topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
+        "</div>"
+      : renderSoon("Статья скоро появится")) +
     renderSources(topic) +
-
-    '<div class="buttons article-actions">' +
-      '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-primary">Пройти урок по этой теме</a>' +
-      '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
-    "</div>";
-
-  scrollToHash();
-}
-
-/* Страница строится скриптом, поэтому к якорю (#memo, #details) прокручиваем сами */
-function scrollToHash() {
-  if (!location.hash) return;
-  const target = document.getElementById(location.hash.slice(1));
-  if (target) target.scrollIntoView();
+    renderMoreOnTopic(topic, "article.html");
 }
 
 /* ---------- Запуск ---------- */
@@ -989,5 +1042,7 @@ document.addEventListener("DOMContentLoaded", function () {
   renderVideosPage();
   renderArticlesPage();
   setupFaqPage();
+  renderMemoPage();
+  renderVideoPage();
   renderArticlePage();
 });
