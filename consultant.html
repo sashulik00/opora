@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ИИ-консультант — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="consultant">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <div class="container lesson-container">
+        <h1>Задайте вопрос по уходу</h1>
+        <p class="lead">Я даю справочную информацию и не заменяю врача</p>
+
+        <div class="card chat">
+          <!-- Переписка. Живёт только на странице: при обновлении очищается и нигде не сохраняется -->
+          <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Переписка с консультантом"></div>
+
+          <div id="chat-hints" class="chat-hints" aria-label="Примеры вопросов">
+            <button type="button" class="chat-hint">Как обрабатывать ожог?</button>
+            <button type="button" class="chat-hint">Что делать при пролежнях?</button>
+            <button type="button" class="chat-hint">Как поддержать близкого?</button>
+            <button type="button" class="chat-hint">Как справиться с усталостью?</button>
+          </div>
+
+          <form id="chat-form" class="chat-form">
+            <label for="chat-input" class="visually-hidden">Ваш вопрос</label>
+            <input type="text" id="chat-input" placeholder="Напишите вопрос…" autocomplete="off" enterkeyhint="send">
+            <button type="submit" id="chat-send" class="btn btn-primary">Отправить</button>
+          </form>
+        </div>
+
+        <p class="chat-disclaimer">Справочная информация, не заменяет консультацию врача. В экстренной ситуации звоните <a href="tel:112">112</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

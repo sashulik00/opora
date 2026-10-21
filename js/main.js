@@ -1240,6 +1240,179 @@ function setupWellbeingSurvey() {
   });
 }
 
+/* ---------- ИИ-консультант (consultant.html) — демо без ИИ ---------- */
+
+/* Слова сообщения в «поисковом» виде: маленькие буквы, ё → е, без знаков препинания */
+function messageWords(text) {
+  return normalizeText(text).split(/[^a-zа-я0-9]+/).filter(Boolean);
+}
+
+/* Совпадает ли ключевое слово с вопросом.
+   Фраза из нескольких слов ищется целиком, одно слово — как начало любого слова вопроса
+   ("ожог" найдёт «ожога», но "ран" не найдёт «раненый», если писать "рана"/"раны"). */
+function keywordMatches(keyword, words, joined) {
+  const k = normalizeText(keyword);
+  if (k.indexOf(" ") !== -1) return joined.indexOf(k) !== -1;
+  return words.some(function (w) { return w.indexOf(k) === 0; });
+}
+
+/* Тревожная фраза ищется с запасом на окончания: у длинных слов последние две буквы
+   не учитываются. Так «кровотечение» найдёт и «кровотечения», а «потерял сознание» —
+   «потеряла сознание». Слова фразы должны идти подряд. Лучше лишний раз показать 112,
+   чем пропустить опасную ситуацию. */
+function alarmMatches(phrase, words) {
+  const parts = messageWords(phrase).map(function (w) {
+    return w.length > 5 ? w.slice(0, -2) : w;
+  });
+  for (let i = 0; i + parts.length <= words.length; i++) {
+    const fits = parts.every(function (p, j) { return words[i + j].indexOf(p) === 0; });
+    if (fits) return true;
+  }
+  return false;
+}
+
+/* Подбор ответа по data.js. Возвращает один из вариантов:
+   { type: "alarm" } | { type: "answer", text, topicId } | { type: "fallback" } */
+function findConsultantAnswer(question) {
+  const joined = " " + messageWords(question).join(" ") + " ";
+  const words = messageWords(question);
+
+  // 1) Тревожные слова важнее всего
+  const alarm = CONSULTANT.alarmWords.some(function (phrase) { return alarmMatches(phrase, words); });
+  if (alarm) return { type: "alarm" };
+
+  // 2) Ответ, у которого совпало больше всего ключевых слов
+  let best = null;
+  let bestScore = 0;
+  CONSULTANT.answers.forEach(function (a) {
+    const score = a.keywords.filter(function (k) { return keywordMatches(k, words, joined); }).length;
+    if (score > bestScore) {
+      best = a;
+      bestScore = score;
+    }
+  });
+  if (best) return { type: "answer", text: best.text, topicId: best.topicId };
+
+  // 3) Ничего не нашли
+  return { type: "fallback" };
+}
+
+/* ЕДИНСТВЕННОЕ место, где появляется ответ консультанта.
+   Сейчас — поиск по data.js с небольшой паузой «Консультант печатает…».
+   Чтобы подключить настоящий ИИ, достаточно заменить содержимое этой функции
+   на запрос к своему серверу (см. объяснение в чате). Функция должна вернуть Promise
+   с объектом того же вида, что у findConsultantAnswer. */
+function getConsultantReply(question) {
+  const delay = 500 + Math.random() * 500; // 0,5–1 секунда
+  return new Promise(function (resolve) {
+    setTimeout(function () { resolve(findConsultantAnswer(question)); }, delay);
+  });
+}
+
+function setupConsultantPage() {
+  const chat = document.getElementById("chat-log");
+  if (!chat) return;
+
+  const form = document.getElementById("chat-form");
+  const input = document.getElementById("chat-input");
+  const sendBtn = document.getElementById("chat-send");
+  const hintsBox = document.getElementById("chat-hints");
+  let busy = false;
+
+  function addMessage(who, html, extraClass) {
+    const msg = document.createElement("div");
+    msg.className = "msg msg-" + who + (extraClass ? " " + extraClass : "");
+    msg.innerHTML =
+      '<span class="visually-hidden">' + (who === "user" ? "Вы:" : "Консультант:") + "</span>" + html;
+    chat.appendChild(msg);
+    chat.scrollTop = chat.scrollHeight;
+    return msg;
+  }
+
+  function topicButtons(topicId) {
+    const topic = TOPICS.find(function (t) { return t.id === topicId; });
+    if (!topic) return "";
+    return (
+      '<div class="msg-links">' +
+        '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-small btn-primary">Открыть урок</a>' +
+        '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-small btn-secondary">Памятка</a>' +
+        '<a href="' + topicLink("article.html", topic) + '" class="btn btn-small btn-secondary">Статья</a>' +
+      "</div>"
+    );
+  }
+
+  function replyHtml(reply) {
+    if (reply.type === "alarm") {
+      return (
+        '<p class="alarm-text">' + escapeHtml(CONSULTANT.alarmText) + "</p>" +
+        '<a href="tel:112" class="alarm-phone">Позвонить 112</a>'
+      );
+    }
+    if (reply.type === "answer") {
+      return "<p>" + escapeHtml(reply.text) + "</p>" + topicButtons(reply.topicId);
+    }
+    return (
+      "<p>" + escapeHtml(CONSULTANT.fallback) + "</p>" +
+      '<div class="msg-links"><a href="' + escapeHtml(CONSULTANT.fallbackLink.url) +
+        '" class="btn btn-small btn-secondary">' + escapeHtml(CONSULTANT.fallbackLink.title) + "</a></div>"
+    );
+  }
+
+  function ask(question) {
+    question = question.trim();
+    if (!question || busy) return;
+
+    busy = true;
+    sendBtn.disabled = true;
+    addMessage("user", "<p>" + escapeHtml(question) + "</p>");
+    input.value = "";
+
+    const typing = addMessage("bot", '<p class="typing">Консультант печатает…</p>', "msg-typing");
+
+    getConsultantReply(question).then(function (reply) {
+      typing.remove();
+      addMessage("bot", replyHtml(reply), reply.type === "alarm" ? "msg-alarm" : "");
+      busy = false;
+      sendBtn.disabled = false;
+    });
+  }
+
+  // Первое сообщение консультанта
+  addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+
+  // Отправка кнопкой и клавишей Enter (Enter в поле формы отправляет её сам)
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    ask(input.value);
+    input.focus();
+  });
+
+  // Кнопки-подсказки отправляют свой текст как вопрос
+  hintsBox.addEventListener("click", function (e) {
+    const hint = e.target.closest(".chat-hint");
+    if (hint) ask(hint.textContent);
+  });
+
+  // consultant.html?topic=burns — сразу спросить про тему и показать ответ именно по ней
+  const topicId = new URLSearchParams(location.search).get("topic");
+  const topic = TOPICS.find(function (t) { return t.id === topicId; });
+  if (topic) {
+    const answer = CONSULTANT.answers.find(function (a) { return a.topicId === topic.id; });
+    busy = true;
+    sendBtn.disabled = true;
+    addMessage("user", "<p>" + escapeHtml("Расскажите про тему: " + topic.title) + "</p>");
+    const typing = addMessage("bot", '<p class="typing">Консультант печатает…</p>', "msg-typing");
+    setTimeout(function () {
+      typing.remove();
+      addMessage("bot", replyHtml(answer
+        ? { type: "answer", text: answer.text, topicId: topic.id }
+        : { type: "answer", text: topic.description, topicId: topic.id }));
+      busy = false;
+      sendBtn.disabled = false;
+    }, 700);
+  }
+}
+
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -1261,4 +1434,5 @@ document.addEventListener("DOMContentLoaded", function () {
   renderArticlePage();
   renderContacts();
   setupWellbeingSurvey();
+  setupConsultantPage();
 });

@@ -826,6 +826,115 @@ input:focus { border-color: var(--accent); outline: none; }
   font-weight: bold;
 }
 
+/* ===== ИИ-консультант (чат) ===== */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px 4px 8px;
+}
+.msg {
+  max-width: 85%;
+  padding: 14px 18px;
+  border-radius: 18px;
+  word-wrap: break-word;
+}
+.msg p { margin: 0; }
+.msg p + p { margin-top: 0.6em; }
+.msg-bot {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+.msg-user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.typing {
+  color: var(--muted);
+  font-style: italic;
+}
+.msg-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.btn-small {
+  padding: 10px 16px;
+  min-height: 46px;
+  font-size: 1rem;
+}
+/* Тревожный ответ: крупный красный блок */
+.msg-alarm {
+  max-width: 100%;
+  width: 100%;
+  background: #c62828;
+  border-color: #c62828;
+  color: #fff;
+}
+.alarm-text {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+.alarm-phone {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 12px 22px;
+  min-height: 52px;
+  background: #fff;
+  color: #c62828;
+  border-radius: var(--radius);
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+.chat-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chat-hint {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 10px 16px;
+  min-height: 46px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chat-hint:hover { border-color: var(--accent); }
+.chat-form {
+  display: flex;
+  gap: 10px;
+}
+.chat-form input {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+  font-size: 1.1rem; /* не меньше 16px — иначе телефон увеличивает страницу при вводе */
+}
+.chat-disclaimer {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 /* ===== Подвал ===== */
 .site-footer {
   background: var(--text);
@@ -882,4 +991,11 @@ input:focus { border-color: var(--accent); outline: none; }
   .finish-card .btn,
   .consult-box .btn { width: 100%; }
   .filter { flex: 1 1 100%; }
+  .chat { padding: 14px; }
+  .msg { max-width: 92%; }
+  .chat-log { min-height: 180px; max-height: 50vh; }
+  /* Подсказки — одной прокручиваемой строкой, чтобы поле ввода было ближе */
+  .chat-hints { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .chat-hint { flex: 0 0 auto; }
+  .chat-form .btn { padding: 14px 16px; }
 }
