@@ -291,6 +291,19 @@ img { max-width: 100%; }
 /* ===== Блоки на главной ===== */
 .block { padding: 40px 0; }
 
+/* Карточки разделов — ссылки (на уроки раздела или на «Права и документы») */
+a.section-card {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+a.section-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(31, 42, 68, 0.1);
+}
+a.section-card p:last-child { margin-bottom: 0; }
+
 .section-icon {
   width: 56px;
   height: 56px;
@@ -412,7 +425,10 @@ input:focus { border-color: var(--accent); outline: none; }
   transition: width 0.4s;
 }
 
-.lessons-section-title { margin-top: 40px; }
+.lessons-section-title {
+  margin-top: 40px;
+  scroll-margin-top: 110px; /* переход с главной по ссылке #medical не прячет заголовок под шапкой */
+}
 
 .lessons-grid {
   display: grid;
@@ -566,20 +582,114 @@ input:focus { border-color: var(--accent); outline: none; }
   background: #fdecea;
 }
 
-.quiz-result {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-}
-.score {
-  font-size: 1.5rem;
+/* Блок «Проверь себя» на странице урока */
+.test-start p:last-child { margin-bottom: 0; }
+.best-result { margin: 16px 0 0; }
+
+/* ===== Страница теста (test.html) ===== */
+.back-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 1.05rem;
   font-weight: bold;
 }
-.mistakes { padding-left: 1.2em; }
-.mistakes li { margin-bottom: 12px; }
+.test-progress { margin-bottom: 20px; }
+.test-progress .progress-text { margin-bottom: 8px; }
+.question legend:focus { outline: none; }
 
-.finish-card { margin-top: 24px; }
-.finish-card .muted { margin: 10px 0 0; }
+.test-result { text-align: center; }
+.test-result:focus { outline: none; }
+.test-result .buttons { justify-content: center; margin-top: 8px; }
+.test-percent {
+  margin: 0;
+  font-size: 3.2rem;
+  font-weight: bold;
+  line-height: 1.1;
+}
+.test-verdict {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+.test-result.is-passed { border: 3px solid #2e7d32; }
+.test-result.is-passed .test-percent,
+.test-result.is-passed .test-verdict { color: #2e7d32; }
+.test-result.is-failed { border: 3px solid var(--accent); }
+.test-result.is-failed .test-percent,
+.test-result.is-failed .test-verdict { color: var(--accent-dark); }
+
+.test-review {
+  margin: 0;
+  padding-left: 1.6em;
+}
+.review-item {
+  margin-bottom: 14px;
+  padding: 18px 22px;
+}
+.review-item p { margin-bottom: 0.4em; }
+.review-item p:last-child { margin-bottom: 0; }
+.review-question { font-weight: bold; }
+.review-item.is-right { border-left: 6px solid #2e7d32; }
+.review-item.is-wrong { border-left: 6px solid var(--accent); }
+.review-mark { font-weight: bold; white-space: nowrap; }
+.review-item.is-right .review-mark { color: #2e7d32; }
+.review-item.is-wrong .review-mark { color: var(--accent-dark); }
+.review-explanation {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ===== Права и документы (rights.html) ===== */
+.rights-note {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+.rights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* .card.rights-item — чтобы общий отступ карточек (в том числе телефонный) не перебивал аккордеон */
+.card.rights-item { padding: 0; overflow: hidden; }
+.rights-heading { margin: 0; font-size: 1.2rem; }
+.rights-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 64px;
+  padding: 18px 24px;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+.rights-toggle:hover { color: var(--accent); }
+.rights-arrow {
+  flex-shrink: 0;
+  font-size: 1.4rem;
+  color: var(--accent);
+  transition: transform 0.2s;
+}
+.rights-item.is-open .rights-arrow { transform: rotate(180deg); }
+.rights-item.is-open { border-color: var(--accent); }
+.rights-panel {
+  padding: 4px 24px 24px;
+  border-top: 1px solid var(--border);
+}
+.rights-block { margin-top: 18px; }
+.rights-block h3 {
+  font-size: 1.05rem;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.rights-block p { margin-bottom: 0.4em; }
+.rights-block ul,
+.rights-block ol { margin: 0; padding-left: 1.4em; }
 
 .consult-box {
   margin-top: 32px;
@@ -1035,6 +1145,9 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 
 @media (max-width: 480px) {
+  .rights-toggle { padding: 16px 18px; }
+  .rights-panel { padding: 4px 18px 20px; }
+  .test-percent { font-size: 2.6rem; }
   body { font-size: 18px; }
   .hero { padding: 40px 0 96px; }
   /* На узком экране сдвигаем кадр вправо, чтобы были видны люди на картинке */

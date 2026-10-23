@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Права и документы — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="rights">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <div class="container lesson-container">
+        <h1>Права и документы</h1>
+        <p class="lead">Выплаты, инвалидность, протезы и льготы: что положено и куда обратиться</p>
+
+        <label for="rights-search" class="visually-hidden">Поиск по ситуациям</label>
+        <input type="search" id="rights-search" class="search-input"
+               placeholder="Например: инвалидность, протез, выплаты" autocomplete="off">
+        <p class="rights-note">Информация справочная; проверяйте актуальность на официальных сайтах.</p>
+
+        <!-- Карточки-ситуации строятся из js/main.js по массиву RIGHTS в js/data.js -->
+        <div id="rights-list" class="rights-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

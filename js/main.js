@@ -61,7 +61,20 @@ function logoutUser() {
 
 /* ---------- Прогресс по урокам (localStorage, отдельно для каждой почты) ---------- */
 
-const PASS_RATE = 0.7; // зачёт — от 70% верных ответов
+/* Порог зачёта PASS_RATE (0.7 = 70%) задан в js/data.js, рядом с placeholderQuiz */
+
+/* Уроки — только темы с kind: "lesson". Все подсчёты прогресса, «Продолжить»,
+   номера уроков и «Следующий урок» идут по этому списку. Число уроков берётся из data.js. */
+const LESSONS = TOPICS.filter(function (t) { return t.kind === "lesson"; });
+
+function isLesson(topic) {
+  return Boolean(topic) && topic.kind === "lesson";
+}
+
+/* Следующий урок после данного (или null, если это последний) */
+function nextLesson(topic) {
+  return LESSONS[LESSONS.indexOf(topic) + 1] || null;
+}
 
 /* Прогресс хранится так:
    opora_progress_почта = {
@@ -88,23 +101,21 @@ function saveProgress(progress) {
   localStorage.setItem(progressKey(user), JSON.stringify(progress));
 }
 
-/* Записать результат теста: храним лучший результат и отметку о зачёте */
+/* Записать результат теста: храним лучший результат (по доле верных ответов —
+   плохой результат хороший не перезапишет) и отметку о зачёте (она не снимается) */
 function saveTestResult(topicId, correct, total) {
   const progress = getProgress();
   const record = progress[topicId] || { best: 0, total: total, passed: false, completed: false };
-  if (correct >= record.best) {
+  const oldRate = record.total ? record.best / record.total : 0;
+  if (correct / total >= oldRate) {
     record.best = correct;
     record.total = total;
   }
-  if (correct / total >= PASS_RATE) record.passed = true;
+  if (correct / total >= PASS_RATE) {
+    record.passed = true;
+    record.completed = true;
+  }
   progress[topicId] = record;
-  saveProgress(progress);
-}
-
-function markLessonCompleted(topicId) {
-  const progress = getProgress();
-  if (!progress[topicId]) return;
-  progress[topicId].completed = true;
   saveProgress(progress);
 }
 
@@ -141,7 +152,8 @@ function renderHeader() {
         { href: "memos.html", text: "Памятки", page: "memos" },
         { href: "videos.html", text: "Видео", page: "videos" },
         { href: "articles.html", text: "Статьи", page: "articles" },
-        { href: "faq.html", text: "Частые вопросы", page: "faq" }
+        { href: "faq.html", text: "Частые вопросы", page: "faq" },
+        { href: "rights.html", text: "Права и документы", page: "rights" }
       ]
     },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
@@ -266,14 +278,17 @@ function renderSections() {
   if (!box) return;
 
   box.innerHTML = SECTIONS.map(function (section) {
-    const count = TOPICS.filter(function (t) { return t.section === section.id; }).length;
+    // Считаем только уроки (kind: "lesson"). Раздел без уроков ведёт на «Права и документы»
+    const count = LESSONS.filter(function (t) { return t.section === section.id; }).length;
+    const href = count ? "lessons.html#" + section.id : "rights.html";
+    const note = count ? "Уроков: " + count : "Права и документы: ситуаций " + RIGHTS.length;
     return (
-      '<article class="card section-card">' +
+      '<a class="card section-card" href="' + href + '">' +
         '<div class="section-icon" aria-hidden="true">' + section.icon + "</div>" +
         "<h3>" + escapeHtml(section.title) + "</h3>" +
         "<p>" + escapeHtml(section.description) + "</p>" +
-        '<p class="muted">Тем: ' + count + "</p>" +
-      "</article>"
+        '<p class="muted">' + note + "</p>" +
+      "</a>"
     );
   }).join("");
 }
@@ -357,9 +372,10 @@ function setupLoginPage() {
 
 /* ---------- Страница «Уроки» ---------- */
 
-/* Сколько уроков пройдено по сохранённому прогрессу */
+/* Сколько уроков пройдено по сохранённому прогрессу.
+   Считаются только уроки: старые записи по темам справочника остаются в памяти, но не учитываются */
 function countPassed(progress) {
-  return TOPICS.filter(function (t) {
+  return LESSONS.filter(function (t) {
     return progress[t.id] && progress[t.id].passed;
   }).length;
 }
@@ -368,11 +384,11 @@ function countPassed(progress) {
    suffix — слово после числа, например « уроков» */
 function renderProgressBar(progress, suffix) {
   const passedCount = countPassed(progress);
-  const percent = Math.round((passedCount / TOPICS.length) * 100);
+  const percent = Math.round((passedCount / LESSONS.length) * 100);
   return (
     '<div class="card progress-card">' +
-      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + TOPICS.length + (suffix || "") + "</p>" +
-      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + TOPICS.length +
+      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + LESSONS.length + (suffix || "") + "</p>" +
+      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length +
         '" aria-valuenow="' + passedCount + '" aria-label="Прогресс обучения">' +
         '<div class="progress-fill" style="width:' + percent + '%"></div>' +
       "</div>" +
@@ -399,14 +415,17 @@ function renderLessonsPage() {
   page.innerHTML = html;
 }
 
-/* Список всех уроков по разделам: номер, название, описание, статус и лучший результат */
+/* Список всех уроков по разделам: номер, название, описание, статус и лучший результат.
+   Разделы без уроков (сейчас «Социально-правовая помощь») не показываются */
 function renderLessonCards(progress) {
   let html = "";
   SECTIONS.forEach(function (section) {
-    html += '<h2 class="lessons-section-title">' + escapeHtml(section.title) + "</h2>";
+    if (!LESSONS.some(function (t) { return t.section === section.id; })) return;
+
+    html += '<h2 class="lessons-section-title" id="' + section.id + '">' + escapeHtml(section.title) + "</h2>";
     html += '<div class="lessons-grid">';
 
-    TOPICS.forEach(function (topic, index) {
+    LESSONS.forEach(function (topic, index) {
       if (topic.section !== section.id) return;
       const record = progress[topic.id];
       const passed = record && record.passed;
@@ -450,7 +469,7 @@ function renderCabinetPage() {
   }
 
   const progress = getProgress();
-  const next = TOPICS.find(function (t) { return !(progress[t.id] && progress[t.id].passed); });
+  const next = LESSONS.find(function (t) { return !(progress[t.id] && progress[t.id].passed); });
 
   page.innerHTML =
     "<h1>Здравствуйте, " + escapeHtml(user.name) + "!</h1>" +
@@ -607,9 +626,9 @@ function renderLessonPage() {
   if (!page) return;
 
   const id = new URLSearchParams(location.search).get("id");
-  const index = TOPICS.findIndex(function (t) { return t.id === id; });
+  const topic = TOPICS.find(function (t) { return t.id === id; });
 
-  if (index === -1) {
+  if (!topic) {
     page.innerHTML =
       '<div class="card"><h1>Урок не найден</h1>' +
       '<p>Возможно, ссылка устарела.</p>' +
@@ -617,31 +636,18 @@ function renderLessonPage() {
     return;
   }
 
-  const topic = TOPICS[index];
-  const section = SECTIONS.find(function (s) { return s.id === topic.section; });
-  const nextTopic = TOPICS[index + 1];
+  // Тема только для справочника (kind: "reference") — урока и теста у неё нет
+  if (!isLesson(topic)) {
+    page.innerHTML = renderNotALesson(topic);
+    return;
+  }
+
+  const index = LESSONS.indexOf(topic);
+  const section = sectionOf(topic);
   const user = getCurrentUser();
   const record = getProgress()[topic.id];
 
   document.title = topic.title + " — Опора. Школа ухода";
-
-  /* --- Вопросы теста --- */
-  const questionsHtml = topic.quiz.map(function (q, qi) {
-    const options = q.options.map(function (option, oi) {
-      return (
-        '<label class="option" data-q="' + qi + '" data-o="' + oi + '">' +
-          '<input type="radio" name="q' + qi + '" value="' + oi + '"> ' +
-          "<span>" + escapeHtml(option) + "</span>" +
-        "</label>"
-      );
-    }).join("");
-    return (
-      '<fieldset class="question">' +
-        "<legend>" + (qi + 1) + ". " + escapeHtml(q.question) + "</legend>" +
-        options +
-      "</fieldset>"
-    );
-  }).join("");
 
   page.innerHTML =
     '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
@@ -657,36 +663,17 @@ function renderLessonPage() {
     renderDetails(topic) +
     renderMemo(topic.lessonMemo, section, true) +
 
+    // Тест — на отдельной странице test.html
     '<h2 class="lesson-h2">Проверь себя</h2>' +
-    '<div class="card">' +
-      (record
-        ? '<p class="muted">Ваш лучший результат: ' + record.best + "/" + record.total +
-          (record.passed ? " — тест сдан ✓" : "") + "</p>"
-        : "") +
+    '<div class="card test-start">' +
+      "<p>Вопросов в тесте: " + topic.quiz.length + ". Для зачёта нужно не меньше " +
+        Math.round(PASS_RATE * 100) + "% верных ответов.</p>" +
+      '<a href="' + topicTestLink(topic) + '" class="btn btn-primary">Приступить к тесту</a>' +
+      (record ? renderBestResult(record) : "") +
       (!user
         ? '<p class="hint">Тест можно пройти и без входа, но результат не сохранится. ' +
           '<a href="' + loginLinkBack() + '">Войти</a></p>'
         : "") +
-      '<form id="quiz-form">' +
-        questionsHtml +
-        '<p id="quiz-error" class="error" role="alert"></p>' +
-        '<button type="submit" id="check-btn" class="btn btn-primary">Проверить</button>' +
-      "</form>" +
-      '<div id="quiz-result" class="quiz-result" aria-live="polite" hidden></div>' +
-    "</div>" +
-
-    '<div class="card finish-card">' +
-      '<button id="finish-btn" class="btn btn-primary" disabled>Завершить урок</button>' +
-      '<p id="finish-note" class="muted small">Кнопка станет активной после успешного теста (от 70% верных ответов).</p>' +
-      '<div id="finish-next" hidden>' +
-        '<p class="success">Урок завершён! ✓</p>' +
-        '<div class="buttons">' +
-          (nextTopic
-            ? '<a href="lesson.html?id=' + encodeURIComponent(nextTopic.id) + '" class="btn btn-primary">Следующий урок</a>'
-            : "") +
-          '<a href="lessons.html" class="btn btn-secondary">К списку уроков</a>' +
-        "</div>" +
-      "</div>" +
     "</div>" +
 
     renderSources(topic) +
@@ -694,108 +681,199 @@ function renderLessonPage() {
     '<div class="consult-box">' +
       '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
     "</div>";
-
-  setupQuiz(topic, record);
 }
 
-function setupQuiz(topic, record) {
-  const form = document.getElementById("quiz-form");
-  const result = document.getElementById("quiz-result");
-  const error = document.getElementById("quiz-error");
-  const checkBtn = document.getElementById("check-btn");
-  const finishBtn = document.getElementById("finish-btn");
-  const finishNote = document.getElementById("finish-note");
+function topicTestLink(topic) {
+  return "test.html?topic=" + encodeURIComponent(topic.id);
+}
 
-  function enableFinish() {
-    finishBtn.disabled = false;
-    finishNote.hidden = true;
+/* «Лучший результат: 8 из 10 (80%) — урок пройден ✓» */
+function renderBestResult(record) {
+  const percent = record.total ? Math.round(record.best / record.total * 100) : 0;
+  return (
+    '<p class="best-result">Лучший результат: ' + record.best + " из " + record.total + " (" + percent + "%)" +
+      (record.passed ? ' — <span class="status status-done">урок пройден ✓</span>' : "") +
+    "</p>"
+  );
+}
+
+/* Сообщение для темы справочника, открытой как урок или тест */
+function renderNotALesson(topic) {
+  return (
+    '<div class="card">' +
+      "<h1>" + escapeHtml(topic.title) + "</h1>" +
+      "<p>Эта тема есть только в справочнике: урока и теста по ней нет.</p>" +
+      '<div class="buttons">' +
+        '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-primary">Памятка</a>' +
+        '<a href="' + topicLink("article.html", topic) + '" class="btn btn-secondary">Статья</a>' +
+      "</div>" +
+    "</div>"
+  );
+}
+
+/* ---------- Тест (test.html?topic=ID) ---------- */
+
+/* Перемешивание списка (алгоритм Фишера — Йетса). Исходный список не меняется */
+function shuffled(list) {
+  const copy = list.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy;
+}
+
+function renderTestPage() {
+  const page = document.getElementById("test-page");
+  if (!page) return;
+
+  const id = new URLSearchParams(location.search).get("topic");
+  const topic = TOPICS.find(function (t) { return t.id === id; });
+
+  if (!topic) {
+    page.innerHTML =
+      '<div class="card"><h1>Тест не найден</h1>' +
+      "<p>Возможно, ссылка устарела.</p>" +
+      '<a href="lessons.html" class="btn btn-primary">К списку уроков</a></div>';
+    return;
+  }
+  if (!isLesson(topic)) {
+    page.innerHTML = renderNotALesson(topic);
+    return;
   }
 
-  // Если тест уже был сдан раньше — урок можно сразу завершить
-  if (record && record.passed) enableFinish();
+  const lessonHref = topicLink("lesson.html", topic);
+  const next = nextLesson(topic);
+  document.title = "Тест: " + topic.title + " — Опора";
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
+  page.innerHTML =
+    '<a href="' + lessonHref + '" class="back-link">← Вернуться к материалу</a>' +
+    '<p class="lesson-num">Тест · Урок ' + (LESSONS.indexOf(topic) + 1) + "</p>" +
+    "<h1>" + escapeHtml(topic.title) + "</h1>" +
+    '<div id="test-body"></div>';
 
-    // Собираем ответы
-    const answers = topic.quiz.map(function (q, qi) {
-      const checked = form.querySelector('input[name="q' + qi + '"]:checked');
-      return checked ? Number(checked.value) : null;
+  const body = document.getElementById("test-body");
+  let questions = [];
+  let current = 0;
+  let answers = [];
+
+  /* Новое прохождение: вопросы и варианты в случайном порядке */
+  function start() {
+    questions = shuffled(topic.quiz).map(function (q) {
+      return {
+        question: q.question,
+        explanation: q.explanation || "",
+        correctText: q.options[q.correct],
+        // Запоминаем исходный номер варианта, чтобы проверить ответ после перемешивания
+        options: shuffled(q.options.map(function (text, i) { return { text: text, isCorrect: i === q.correct }; }))
+      };
     });
+    current = 0;
+    answers = [];
+    showQuestion();
+  }
 
-    if (answers.indexOf(null) !== -1) {
-      error.textContent = "Ответьте, пожалуйста, на все вопросы.";
-      return;
-    }
-    error.textContent = "";
+  function showQuestion() {
+    const q = questions[current];
+    const total = questions.length;
+    const isLast = current === total - 1;
 
-    // Считаем верные и отмечаем варианты цветом
-    let correct = 0;
-    const mistakes = [];
-    topic.quiz.forEach(function (q, qi) {
-      if (answers[qi] === q.correct) {
-        correct++;
-      } else {
-        mistakes.push({ number: qi + 1, question: q.question, yours: q.options[answers[qi]], right: q.options[q.correct] });
-        form.querySelector('.option[data-q="' + qi + '"][data-o="' + answers[qi] + '"]').classList.add("is-wrong");
+    body.innerHTML =
+      '<div class="test-progress">' +
+        '<p class="progress-text">Вопрос <strong>' + (current + 1) + "</strong> из " + total + "</p>" +
+        '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + total +
+          '" aria-valuenow="' + (current + 1) + '" aria-label="Ход теста">' +
+          '<div class="progress-fill" style="width:' + Math.round((current + 1) / total * 100) + '%"></div>' +
+        "</div>" +
+      "</div>" +
+      '<form id="test-form" class="card">' +
+        '<fieldset class="question">' +
+          '<legend tabindex="-1">' + escapeHtml(q.question) + "</legend>" +
+          q.options.map(function (o, oi) {
+            return (
+              '<label class="option">' +
+                '<input type="radio" name="answer" value="' + oi + '"> ' +
+                "<span>" + escapeHtml(o.text) + "</span>" +
+              "</label>"
+            );
+          }).join("") +
+        "</fieldset>" +
+        '<p id="test-error" class="error" role="alert"></p>' +
+        '<button type="submit" class="btn btn-primary">' + (isLast ? "Показать результат" : "Далее") + "</button>" +
+      "</form>";
+
+    // Для перехода с клавиатуры и программ чтения с экрана — фокус на новый вопрос
+    if (current > 0) body.querySelector("legend").focus();
+
+    document.getElementById("test-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const checked = this.querySelector('input[name="answer"]:checked');
+      if (!checked) {
+        document.getElementById("test-error").textContent = "Выберите один вариант ответа.";
+        return;
       }
-      form.querySelector('.option[data-q="' + qi + '"][data-o="' + q.correct + '"]').classList.add("is-right");
+      answers.push(q.options[Number(checked.value)]);
+      current++;
+      if (current < questions.length) showQuestion();
+      else showResult();
     });
+  }
 
-    // Блокируем ответы, пока человек смотрит результат
-    form.querySelectorAll("input").forEach(function (input) { input.disabled = true; });
-    checkBtn.hidden = true;
-
-    const total = topic.quiz.length;
+  function showResult() {
+    const total = questions.length;
+    const correct = answers.filter(function (a) { return a.isCorrect; }).length;
+    const percent = Math.round(correct / total * 100);
     const passed = correct / total >= PASS_RATE;
+    const needed = Math.ceil(PASS_RATE * total - 1e-9); // сколько верных нужно для зачёта
+
     saveTestResult(topic.id, correct, total); // если не вошли — функция ничего не сохранит
 
-    let html = '<p class="score">Верно ' + correct + " из " + total + "</p>";
+    body.innerHTML =
+      '<div class="card test-result ' + (passed ? "is-passed" : "is-failed") + '" tabindex="-1">' +
+        '<p class="test-percent">' + percent + "%</p>" +
+        '<p class="test-verdict">' + (passed ? "Зачтено ✓" : "Не зачтено") + "</p>" +
+        "<p>Верно " + correct + " из " + total + ". Для зачёта нужно " + needed + " из " + total +
+          " (" + Math.round(PASS_RATE * 100) + "%).</p>" +
+        (passed ? "" : '<p class="muted">Пересмотрите материал урока и попробуйте ещё раз.</p>') +
+        (!getCurrentUser()
+          ? '<p class="hint">Результат не сохранён: вы не вошли. <a href="' + loginLinkBack() + '">Войти</a></p>'
+          : "") +
+        '<div class="buttons">' +
+          '<button type="button" id="test-again" class="btn btn-secondary">Пройти ещё раз</button>' +
+          '<a href="' + lessonHref + '" class="btn btn-secondary">Вернуться к уроку</a>' +
+          (next ? '<a href="' + topicLink("lesson.html", next) + '" class="btn btn-primary">К следующему уроку</a>' : "") +
+        "</div>" +
+      "</div>" +
 
-    if (mistakes.length) {
-      html += "<h3>Разбор ошибок</h3><ul class=\"mistakes\">" + mistakes.map(function (m) {
-        return (
-          "<li><strong>" + m.number + ". " + escapeHtml(m.question) + "</strong><br>" +
-          "Ваш ответ: " + escapeHtml(m.yours) + "<br>" +
-          "Правильный ответ: <strong>" + escapeHtml(m.right) + "</strong></li>"
-        );
-      }).join("") + "</ul>";
-    }
+      '<h2 class="lesson-h2">Разбор ответов</h2>' +
+      '<ol class="test-review">' +
+        questions.map(function (q, i) {
+          const a = answers[i];
+          return (
+            '<li class="card review-item ' + (a.isCorrect ? "is-right" : "is-wrong") + '">' +
+              '<p class="review-question">' + escapeHtml(q.question) + "</p>" +
+              "<p>Ваш ответ: <strong>" + escapeHtml(a.text) + "</strong> " +
+                (a.isCorrect ? '<span class="review-mark">✓ верно</span>' : '<span class="review-mark">✗ неверно</span>') + "</p>" +
+              "<p>Верный ответ: <strong>" + escapeHtml(q.correctText) + "</strong></p>" +
+              (q.explanation ? '<p class="review-explanation">' + escapeHtml(q.explanation) + "</p>" : "") +
+            "</li>"
+          );
+        }).join("") +
+      "</ol>";
 
-    if (passed) {
-      html += '<p class="success">Тест сдан! Теперь можно завершить урок.</p>';
-      enableFinish();
-    } else {
-      html +=
-        '<p class="fail">Пересмотрите урок и попробуйте снова.</p>' +
-        '<button type="button" id="retry-btn" class="btn btn-secondary">Пройти тест заново</button>';
-    }
+    const resultCard = body.querySelector(".test-result");
+    resultCard.focus();
+    resultCard.scrollIntoView({ block: "start" });
 
-    if (!getCurrentUser()) {
-      html += '<p class="hint">Чтобы результат сохранился, <a href="' + loginLinkBack() + '">войдите</a>.</p>';
-    }
+    document.getElementById("test-again").addEventListener("click", function () {
+      start();
+      page.scrollIntoView({ block: "start" });
+    });
+  }
 
-    result.innerHTML = html;
-    result.hidden = false;
-
-    const retryBtn = document.getElementById("retry-btn");
-    if (retryBtn) {
-      retryBtn.addEventListener("click", function () {
-        form.reset();
-        form.querySelectorAll("input").forEach(function (input) { input.disabled = false; });
-        form.querySelectorAll(".option").forEach(function (o) { o.classList.remove("is-right", "is-wrong"); });
-        result.hidden = true;
-        checkBtn.hidden = false;
-        form.querySelector("legend").scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-    }
-  });
-
-  finishBtn.addEventListener("click", function () {
-    markLessonCompleted(topic.id);
-    finishBtn.hidden = true;
-    document.getElementById("finish-next").hidden = false;
-  });
+  start();
 }
 
 /* ---------- Справочник: общие помощники ---------- */
@@ -1083,7 +1161,11 @@ function renderMoreOnTopic(topic, current) {
     { page: "video.html", title: "Видео" },
     { page: "article.html", title: "Статья" },
     { page: "lesson.html", title: "Урок" }
-  ].filter(function (l) { return l.page !== current; });
+  ].filter(function (l) {
+    // У тем справочника (kind: "reference") урока нет — ссылку «Урок» не показываем
+    if (l.page === "lesson.html" && !isLesson(topic)) return false;
+    return l.page !== current;
+  });
 
   return (
     '<aside class="card more-on-topic" aria-label="Ещё по теме">' +
@@ -1332,6 +1414,18 @@ function setupConsultantPage() {
   function topicButtons(topicId) {
     const topic = TOPICS.find(function (t) { return t.id === topicId; });
     if (!topic) return "";
+    // У урока — «Открыть урок», у темы справочника — только памятка и статья
+    if (!isLesson(topic)) {
+      return (
+        '<div class="msg-links">' +
+          '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-small btn-primary">Памятка</a>' +
+          '<a href="' + topicLink("article.html", topic) + '" class="btn btn-small btn-secondary">Статья</a>' +
+          (topic.section === "legal"
+            ? '<a href="rights.html" class="btn btn-small btn-secondary">Права и документы</a>'
+            : "") +
+        "</div>"
+      );
+    }
     return (
       '<div class="msg-links">' +
         '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-small btn-primary">Открыть урок</a>' +
@@ -1413,6 +1507,91 @@ function setupConsultantPage() {
   }
 }
 
+/* ---------- Права и документы (rights.html) ---------- */
+
+/* Текст карточки для поиска: название, ключевые слова и все блоки */
+function rightsSearchText(item) {
+  return normalizeText([item.title, item.what, item.where, item.entitled]
+    .concat(item.keywords || [], item.documents || [], item.steps || [])
+    .join(" "));
+}
+
+function renderRightsCard(item) {
+  const source = item.source || {};
+  const validUrl = /^https?:\/\//i.test(source.url || "");
+  const panelId = "rights-panel-" + item.id;
+
+  function block(title, content) {
+    return content ? '<div class="rights-block"><h3>' + title + "</h3>" + content + "</div>" : "";
+  }
+  function para(text) { return text ? "<p>" + escapeHtml(text) + "</p>" : ""; }
+
+  return (
+    '<article class="card rights-item" data-id="' + escapeHtml(item.id) + '">' +
+      '<h2 class="rights-heading">' +
+        '<button type="button" class="rights-toggle" aria-expanded="false" aria-controls="' + panelId + '">' +
+          "<span>" + escapeHtml(item.title) + "</span>" +
+          '<span class="rights-arrow" aria-hidden="true">▾</span>' +
+        "</button>" +
+      "</h2>" +
+      '<div class="rights-panel" id="' + panelId + '" hidden>' +
+        block("Что это", para(item.what)) +
+        block("Куда обратиться", para(item.where)) +
+        block("Какие документы нужны", hasItems(item.documents) ? renderList(item.documents) : "") +
+        block("Что положено", para(item.entitled)) +
+        block("Что делать по шагам", hasItems(item.steps) ? renderList(item.steps, "ol") : "") +
+        block("Где проверить",
+          (validUrl
+            ? '<p><a href="' + escapeHtml(source.url) + '" target="_blank" rel="noopener">' +
+                escapeHtml(source.title || source.url) + "</a></p>"
+            : '<p class="muted">Ссылка на официальный сайт уточняется</p>') +
+          '<p class="muted">Проверено: ' + escapeHtml(item.checked || "дата уточняется") + "</p>") +
+      "</div>" +
+    "</article>"
+  );
+}
+
+function setupRightsPage() {
+  const list = document.getElementById("rights-list");
+  if (!list) return;
+
+  const input = document.getElementById("rights-search");
+
+  // Открыть одну карточку (остальные закрываются) или закрыть её
+  function toggle(card, open) {
+    list.querySelectorAll(".rights-item").forEach(function (c) {
+      const isThis = c === card && open;
+      c.classList.toggle("is-open", isThis);
+      c.querySelector(".rights-toggle").setAttribute("aria-expanded", isThis);
+      c.querySelector(".rights-panel").hidden = !isThis;
+    });
+  }
+
+  function show() {
+    const words = normalizeText(input.value).split(" ").filter(Boolean);
+    const found = RIGHTS.filter(function (item) {
+      const text = rightsSearchText(item);
+      return words.every(function (w) { return text.indexOf(w) !== -1; });
+    });
+
+    list.innerHTML = found.length
+      ? found.map(renderRightsCard).join("")
+      : '<div class="card empty-result"><p><strong>Ничего не найдено.</strong> ' +
+        "Попробуйте другое слово, например «инвалидность», «протез» или «выплаты», " +
+        'или <a href="consultant.html">спросите консультанта</a>.</p></div>';
+  }
+
+  list.addEventListener("click", function (e) {
+    const button = e.target.closest(".rights-toggle");
+    if (!button) return;
+    const card = button.closest(".rights-item");
+    toggle(card, !card.classList.contains("is-open"));
+  });
+
+  input.addEventListener("input", show);
+  show();
+}
+
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -1424,6 +1603,8 @@ document.addEventListener("DOMContentLoaded", function () {
   renderLessonsPage();
   renderCabinetPage();
   renderLessonPage();
+  renderTestPage();
+  setupRightsPage();
   setupReferencePage();
   renderMemosPage();
   renderVideosPage();
