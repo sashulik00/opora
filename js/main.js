@@ -1066,11 +1066,40 @@ function renderMemosPage() {
   const topics = TOPICS.filter(function (t) {
     return hasMemo(t) && (!section || t.section === section.id);
   });
-  list.innerHTML = topics.length
-    ? topics.map(function (t) {
-        return renderTile(t, { href: topicLink("memo.html", t), text: t.description });
-      }).join("")
-    : EMPTY_RESULT;
+  list.innerHTML = topics.length ? topics.map(renderMemoCard).join("") : EMPTY_RESULT;
+}
+
+/* Карточка памятки для «кладки» на memos.html.
+   Пропорции картинки идут по кругу: 4:3, 3:4, 1:1, 16:10 (классы memo-card--a…d в style.css).
+   Если у темы нет cover (или файл не нашёлся) — цветная плашка с названием раздела. */
+const MEMO_CARD_SHAPES = ["a", "b", "c", "d"];
+
+function renderMemoCard(topic, index) {
+  const section = sectionOf(topic);
+  const shape = MEMO_CARD_SHAPES[index % MEMO_CARD_SHAPES.length];
+  const cover = (topic.cover || "").trim();
+  const href = topicLink("memo.html", topic);
+
+  return (
+    '<article class="memo-card memo-card--' + shape + '">' +
+      '<div class="memo-card-media' + (index % 2 ? " is-green" : "") + '">' +
+        '<span class="memo-card-placeholder" aria-hidden="true">' + escapeHtml(section.title) + "</span>" +
+        (cover
+          ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
+          : "") +
+      "</div>" +
+      '<div class="memo-card-body">' +
+        '<div class="memo-card-tags">' +
+          '<span class="memo-card-section">' + escapeHtml(section.title) + "</span>" +
+          (isLesson(topic) ? '<span class="memo-card-lesson">Есть урок</span>' : "") +
+        "</div>" +
+        // Вся карточка кликабельна: ссылка в заголовке растянута на карточку (см. .memo-card-link::after)
+        '<h2 class="memo-card-title"><a class="memo-card-link" href="' + href + '">' + escapeHtml(topic.title) + "</a></h2>" +
+        '<p class="memo-card-text">' + escapeHtml(topic.description) + "</p>" +
+        '<span class="memo-card-more" aria-hidden="true">Открыть памятку →</span>' +
+      "</div>" +
+    "</article>"
+  );
 }
 
 function renderVideosPage() {
