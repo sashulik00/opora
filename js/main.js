@@ -1119,13 +1119,33 @@ function renderArticlesPage() {
   const list = document.getElementById("articles-list");
   if (!list) return;
   const topics = TOPICS.filter(hasArticle);
-  list.innerHTML = topics.length
-    ? topics.map(function (t) {
-        // На карточке — первый абзац статьи
-        const first = t.details.filter(Boolean)[0];
-        return renderTile(t, { href: topicLink("article.html", t), text: first });
-      }).join("")
-    : EMPTY_RESULT;
+  list.innerHTML = topics.length ? topics.map(renderArticleCard).join("") : EMPTY_RESULT;
+}
+
+/* Карточка статьи на articles.html: картинка 4:3, заголовок статьи (articleTitle,
+   если пусто — название темы) и кнопка «Читать статью». Вся карточка — одна ссылка.
+   Без cover — плашка с названием раздела, терракотовая и зелёная по очереди. */
+function renderArticleCard(topic, index) {
+  const section = sectionOf(topic);
+  const cover = (topic.cover || "").trim();
+  const title = (topic.articleTitle || "").trim() || topic.title;
+
+  return (
+    '<article class="article-card">' +
+      '<div class="article-card-media' + (index % 2 ? " is-green" : "") + '">' +
+        '<span class="article-card-placeholder" aria-hidden="true">' + escapeHtml(section.title) + "</span>" +
+        (cover
+          ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
+          : "") +
+      "</div>" +
+      '<div class="article-card-body">' +
+        // Ссылка в заголовке растянута на всю карточку (см. .article-card-link::after)
+        '<h2 class="article-card-title"><a class="article-card-link" href="' + topicLink("article.html", topic) + '">' +
+          escapeHtml(title) + "</a></h2>" +
+        '<span class="article-card-button" aria-hidden="true">Читать статью</span>' +
+      "</div>" +
+    "</article>"
+  );
 }
 
 /* ---------- Справочник: Частые вопросы (faq.html) ---------- */
