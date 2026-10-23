@@ -532,6 +532,13 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 .memo-urgent h3 { color: #c62828; }
 
+/* Вводный текст темы (intro): над видео в уроке, первым абзацем в памятке и статье */
+.topic-intro {
+  margin: 0 0 24px;
+  border-left: 6px solid var(--accent);
+  font-size: 1.1rem;
+}
+
 /* «Подробнее» и «Источники» */
 .details p:last-child { margin-bottom: 0; }
 .sources {

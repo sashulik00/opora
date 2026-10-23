@@ -604,21 +604,31 @@ function renderDetails(topic) {
   );
 }
 
-/* «Источники» — ссылки из поля sources (только адреса http/https) */
+/* Название источника: ссылкой, если адрес есть (только http/https), иначе обычным текстом */
+function sourceHtml(source) {
+  const url = (source.url || "").trim();
+  const title = source.title || url;
+  if (/^https?:\/\//i.test(url)) {
+    return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(title) + "</a>";
+  }
+  return escapeHtml(title);
+}
+
+/* «Источники» — из поля sources. Без адреса название показывается текстом */
 function renderSources(topic) {
-  const sources = (topic.sources || []).filter(function (s) {
-    return s && s.url && /^https?:\/\//i.test(s.url);
-  });
+  const sources = (topic.sources || []).filter(function (s) { return s && (s.title || s.url); });
   if (!sources.length) return "";
   return (
     '<h2 class="lesson-h2">Источники</h2>' +
     '<ul class="card sources">' +
-      sources.map(function (s) {
-        return '<li><a href="' + escapeHtml(s.url) + '" target="_blank" rel="noopener">' +
-          escapeHtml(s.title || s.url) + "</a></li>";
-      }).join("") +
+      sources.map(function (s) { return "<li>" + sourceHtml(s) + "</li>"; }).join("") +
     "</ul>"
   );
+}
+
+/* Вводный текст темы (поле intro) */
+function renderIntro(topic) {
+  return topic.intro ? '<p class="card topic-intro">' + escapeHtml(topic.intro) + "</p>" : "";
 }
 
 function renderLessonPage() {
@@ -659,6 +669,7 @@ function renderLessonPage() {
     "<h1>" + escapeHtml(topic.title) + "</h1>" +
     '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
 
+    renderIntro(topic) +   // вводный текст — над видео
     renderVideo(topic) +
     renderDetails(topic) +
     renderMemo(topic.lessonMemo, section, true) +
@@ -905,7 +916,7 @@ function normalizeText(text) {
    статья (details) и частые вопросы (faq). Памятка и тест урока сюда не входят. */
 function topicSearchText(topic) {
   const memo = topic.memo || {};
-  const parts = [topic.title, topic.description]
+  const parts = [topic.title, topic.description, topic.intro || ""]
     .concat(memo.doList || [], memo.dontList || [], memo.urgentList || [], topic.details || [])
     .concat((topic.faq || []).map(function (f) { return f.q + " " + f.a; }));
   return normalizeText(parts.join(" "));
@@ -1191,6 +1202,7 @@ function renderMemoPage() {
   document.title = topic.title + " — Памятка — Опора";
   page.innerHTML =
     renderMaterialHead(topic, "memos.html", "Памятки") +
+    renderIntro(topic) +   // вводный абзац сверху
     (renderMemo(topic.memo, sectionOf(topic), false) || renderSoon("Памятка скоро появится")) +
     renderMoreOnTopic(topic, "memo.html");
 }
@@ -1222,6 +1234,7 @@ function renderArticlePage() {
   document.title = topic.title + " — Статья — Опора";
   page.innerHTML =
     renderMaterialHead(topic, "articles.html", "Статьи") +
+    renderIntro(topic) +   // вводный абзац сверху
     (hasArticle(topic)
       ? '<div class="card details article-text">' +
           topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
@@ -1541,10 +1554,10 @@ function renderRightsCard(item) {
         block("Что положено", para(item.entitled)) +
         block("Что делать по шагам", hasItems(item.steps) ? renderList(item.steps, "ol") : "") +
         block("Где проверить",
-          (validUrl
-            ? '<p><a href="' + escapeHtml(source.url) + '" target="_blank" rel="noopener">' +
-                escapeHtml(source.title || source.url) + "</a></p>"
-            : '<p class="muted">Ссылка на официальный сайт уточняется</p>') +
+          // Название источника: ссылкой, если адрес есть, иначе текстом
+          (source.title || validUrl
+            ? "<p>" + sourceHtml(source) + "</p>"
+            : '<p class="muted">Источник уточняется</p>') +
           '<p class="muted">Проверено: ' + escapeHtml(item.checked || "дата уточняется") + "</p>") +
       "</div>" +
     "</article>"
