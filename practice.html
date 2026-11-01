@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Практика — Опора. Школа ухода</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<!-- data-page="lessons" — чтобы в меню подсвечивался пункт «Уроки»; page-practice — тёплый фон страницы -->
+<body data-page="lessons" class="page-practice">
+
+  <header id="site-header" class="site-header"></header>
+
+  <main>
+    <section class="block">
+      <!-- Страница строится из js/main.js: тема и номер задания берутся из адреса
+           (practice.html?topic=burns&task=1), задания — из поля practice.tasks темы в js/data.js -->
+      <div class="container practice-container" id="practice-page"></div>
+    </section>
+  </main>
+
+  <footer id="site-footer" class="site-footer"></footer>
+
+  <script src="js/data.js"></script>
+  <!-- Маски для практики «Что здесь не так»; файл создаёт скрипт tools/make-masks.py -->
+  <script src="js/practice-masks.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1459,3 +1459,288 @@ input:focus { border-color: var(--accent); outline: none; }
   .chat-hint { flex: 0 0 auto; }
   .chat-form .btn { padding: 14px 16px; }
 }
+
+/* ===== Практика (страница practice.html; поле practice.tasks в js/data.js) ===== */
+
+/* Карточка «Практика» на странице урока */
+.practice-start p { margin: 0 0 16px; }
+.practice-start-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+/* Тёплый фон страницы практики и широкий контейнер — чтобы картинка была крупной */
+body.page-practice { background: #f6efe6; }
+.practice-container { max-width: 1440px; }
+
+/* Три колонки: список заданий — задание — результаты; уже 1000px — друг под другом */
+.practice-page-grid {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+.practice-nav,
+.practice-side-col,
+.practice-none {
+  background: #fff;
+  border: 1px solid #eadfce;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(107, 74, 53, 0.07);
+  padding: 20px;
+}
+.practice-none h1 { font-size: 1.6rem; }
+
+/* Левая колонка: список заданий */
+.practice-nav-title { margin: 0 0 4px; font-size: 1.3rem; }
+.practice-nav-topic { margin: 0; font-weight: bold; color: var(--accent); }
+.practice-nav-count { margin: 4px 0 14px; font-size: 0.95rem; color: var(--muted); }
+.practice-nav-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.practice-nav-item {
+  display: block;
+  padding: 10px 12px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+.practice-nav-item:hover { background: #fbf5ee; }
+.practice-nav-item.is-current {
+  border-color: var(--accent);
+  background: #fdf6ef;
+  font-weight: bold;
+}
+.practice-nav-check { color: #2e7d32; font-weight: bold; }
+.practice-nav-back { font-size: 1rem; color: var(--accent); }
+
+/* Центр: задание */
+.practice-task-title { margin: 0 0 6px; font-size: 1.7rem; }
+.practice-task-desc { margin: 0 0 20px; font-size: 0.95rem; color: var(--muted); }
+
+.practice-scene {
+  position: relative;      /* от него считается положение окна «Выбрать эту деталь?» */
+  margin: 8px 8px 0;       /* место под белую рамку картинки */
+}
+/* Картинка в белой рамке со скруглением и мягкой тенью.
+   Рамка нарисована тенью — так она не меняет размер картинки и не сбивает выбор предметов */
+.practice-stage {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #e4e1dc;
+  box-shadow: 0 0 0 8px #fff, 0 10px 30px rgba(107, 74, 53, 0.16);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.practice-stage.is-pointer { cursor: pointer; }
+.practice-stage img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  display: block;
+  pointer-events: none;   /* предмет под курсором ищется по маске, а не по картинке */
+}
+
+/* Подсветка контура при наведении: тёплый жёлтый свет, одинаковый у ошибок и верных предметов */
+.practice-layer {
+  filter: drop-shadow(0 0 0 rgba(255, 200, 90, 0)) drop-shadow(0 0 0 rgba(240, 140, 30, 0));
+  transition: filter 0.25s ease, opacity 0.8s ease;
+}
+.practice-layer.is-hover {
+  filter: drop-shadow(0 0 3px rgba(255, 222, 100, 0.95)) drop-shadow(0 0 12px rgba(250, 180, 40, 0.85));
+}
+/* Выбранный верный предмет: мягкая зелёная обводка остаётся */
+.practice-layer.is-ok {
+  filter: drop-shadow(0 0 2px rgba(120, 200, 120, 0.95)) drop-shadow(0 0 8px rgba(46, 125, 50, 0.6));
+}
+/* Найденная ошибка растворяется за 0.8 сек */
+.practice-layer.is-gone {
+  opacity: 0;
+  filter: blur(6px);
+  transition: opacity 0.8s ease, filter 0.8s ease;
+}
+/* Подсказка после двух промахов: предмет пульсирует 2 секунды */
+.practice-layer.is-pulse { animation: practice-pulse 1s ease-in-out 2; }
+@keyframes practice-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255, 200, 90, 0)) drop-shadow(0 0 0 rgba(240, 140, 30, 0)); }
+  50% { filter: drop-shadow(0 0 4px rgba(255, 222, 100, 1)) drop-shadow(0 0 16px rgba(250, 180, 40, 0.95)); }
+}
+
+/* Окно «Выбрать эту деталь?» */
+.practice-popup {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  max-width: 240px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(107, 74, 53, 0.22);
+}
+.practice-popup-q {
+  margin: 0 0 10px;
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+.practice-popup-btns {
+  display: flex;
+  gap: 10px;
+}
+.practice-popup-btns .btn { min-width: 76px; }
+
+/* Маленькая подсказка у выбранного верного предмета */
+.practice-tip {
+  position: absolute;
+  z-index: 4;
+  width: max-content;
+  max-width: 230px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid #a5c99a;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(107, 74, 53, 0.18);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* Под картинкой: сообщение, «Готово!», кнопки */
+.practice-message {
+  margin: 22px 0 0;
+  color: var(--accent-dark);
+  opacity: 0;
+}
+.practice-message:empty { margin: 0; }
+.practice-message.is-shown { animation: practice-fade 0.4s ease forwards; }
+@keyframes practice-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.practice-finish {
+  margin-top: 22px;
+  padding: 14px 18px;
+  background: #fff;
+  border: 2px solid #2e7d32;
+  border-radius: 14px;
+}
+.practice-finish .success { margin: 0; }
+.practice-note {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.practice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+/* Правая колонка: счётчик и ячейки результатов (2 в ряд) */
+.practice-count {
+  margin: 0 0 14px;
+  font-size: 1.1rem;
+}
+.practice-count:focus { outline: none; }
+.practice-cells {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.practice-cell {
+  min-height: 120px;
+  border-radius: 12px;
+}
+.practice-cell.is-empty { background: rgba(234, 223, 206, 0.45); }
+.practice-card {
+  padding: 10px 11px 12px;
+  background: #fff;
+  border: 1px solid #eadfce;
+  box-shadow: 0 2px 8px rgba(107, 74, 53, 0.08);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;   /* длинные слова («Противопролежневая») переносятся, а не вылезают за ячейку */
+  hyphens: auto;
+  animation: practice-fade 0.4s ease;
+}
+.practice-card h3 {
+  margin: 6px 0 4px;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+.practice-card p { margin: 0; }
+.practice-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: bold;
+}
+.practice-tag--error { background: #fbe1cf; color: #9a3f1b; }
+.practice-tag--ok { background: #e1f0dc; color: #2e6b30; }
+
+/* Нет картинок — серый блок вместо задания */
+.practice-missing {
+  aspect-ratio: 1024 / 572;
+  max-width: 100%;
+  border-radius: var(--radius);
+  background: #e4e1dc;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Узкий экран: список заданий — полосой над картинкой, результаты — под картинкой */
+@media (max-width: 999px) {
+  .practice-page-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .practice-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    padding: 12px 14px;
+  }
+  .practice-nav-title { margin: 0; font-size: 1.1rem; }
+  .practice-nav-count { margin: 0; }
+  .practice-nav-list {
+    flex-direction: row;
+    flex-basis: 100%;
+    overflow-x: auto;
+    margin: 0;
+  }
+  .practice-nav-item { white-space: nowrap; padding: 6px 12px; }
+  .practice-nav-back { margin-left: auto; }
+  .practice-side-col { padding: 16px; }
+}
+@media (max-width: 480px) {
+  .practice-task-title { font-size: 1.4rem; }
+  .practice-actions .btn { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .practice-layer,
+  .practice-layer.is-gone { transition-duration: 0.2s; }
+  .practice-message.is-shown,
+  .practice-card { animation: none; opacity: 1; }
+}

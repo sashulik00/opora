@@ -24,6 +24,20 @@
                   пояснение explanation. Пока заглушки: placeholderQuiz(10) — 10 вопросов
                   (медицинские уроки), placeholderQuiz(7) — 7 вопросов (психологические).
                   Порог зачёта — PASS_RATE ниже, под placeholderQuiz
+    practice    — необязательно: практика (страница practice.html?topic=ID; в уроке — карточка
+                  «Практика» перед тестом). Нет поля — нет карточки.
+                  practice: { tasks: [ задание, задание, ... ] } — новое задание = новый элемент tasks.
+                  Задание: id (уникальный в теме), type ("spot-error" — «Что здесь не так»), title,
+                  description, width, height, background, alt, items.
+                  Картинки кладутся в папку images/practice/<папка>/:
+                  фон (правильная картинка) и PNG-слои с прозрачностью того же размера.
+                  Слои рисуются по порядку списка items: первый — снизу.
+                  role у слоя: "error" — ошибка (её ищут), "ok" — верный предмет-ловушка,
+                  "cover" — не кликается и исчезает вместе со слоем (или группой) из coverFor.
+                  group у слоя: слои с одинаковым group — одна ошибка (выбираются и исчезают вместе,
+                  в счётчике — одна). label и explanation пишутся у каждого слоя группы.
+                  ПОСЛЕ ДОБАВЛЕНИЯ ИЛИ ЗАМЕНЫ КАРТИНОК запустите: python tools/make-masks.py
+                  (без этого на сайте, открытом файлом, предметы не будут выбираться мышью)
 
   СПРАВОЧНИК (если не нужно — оставьте пустым: [] или ""):
     memo        — памятка справочника (страница memo.html), те же три списка:
@@ -123,6 +137,34 @@ const TOPICS = [
         "При уходе за ожогом после выписки: нарастающее покраснение, отёк, гной, усиление боли или температура — признаки, о которых нужно сообщить лечащему врачу.",
         "Если ожог случился дома: срочная помощь нужна при глубоком или обширном ожоге, поражении лица, дыхательных путей, кистей, промежности или крупных суставов, при химическом или электрическом ожоге.",
         "Затруднённое дыхание, нарушение сознания, признаки шока: немедленно вызвать экстренную помощь."
+      ]
+    },
+    practice: {
+      tasks: [
+        {
+          id: "spot-error-1",
+          type: "spot-error",
+          title: "Что здесь не так?",
+          description: "Найдите на картинке ошибки в уходе за ожогом. Подсвечиваются все предметы, которые можно выбрать, часть из них нужна, часть нет. Нажмите на предмет и подтвердите выбор: вам подскажут, ошибка это или нет.",
+          width: 1024, height: 572,
+          background: "images/practice/ozhogi/00_fon.jpg",
+          alt: "Предплечье на столе, рядом разложены предметы",
+          items: [
+            { id: "kozha", image: "images/practice/ozhogi/09_kozha.png", role: "cover", coverFor: "pasta" },
+            { id: "mazok", image: "images/practice/ozhogi/10_mazok.png", role: "error", group: "pasta", label: "Зубная паста",
+              explanation: "Зубную пасту, масло, спирт и другие домашние средства на ожог не наносят. Нужна стерильная неприлипающая повязка." },
+            { id: "tubik", image: "images/practice/ozhogi/11_tubik.png", role: "error", group: "pasta", label: "Зубная паста",
+              explanation: "Зубную пасту, масло, спирт и другие домашние средства на ожог не наносят. Нужна стерильная неприлипающая повязка." },
+            { id: "koltso", image: "images/practice/ozhogi/20_koltso.png", role: "error", label: "Кольцо на руке",
+              explanation: "Кольца и украшения рядом с ожогом снимают сразу, пока не появился отёк." },
+            { id: "maslo", image: "images/practice/ozhogi/30_maslo.png", role: "error", label: "Масло",
+              explanation: "Масло и другие домашние средства на ожог не наносят." },
+            { id: "povyazka", image: "images/practice/ozhogi/40_povyazka.png", role: "ok", label: "Неприлипающая повязка",
+              explanation: "Верный предмет. Ожог закрывают стерильной неприлипающей повязкой." },
+            { id: "bint", image: "images/practice/ozhogi/41_bint.png", role: "ok", label: "Бинт",
+              explanation: "Верный предмет. Бинтом закрепляют повязку." }
+          ]
+        }
       ]
     },
     quiz: [
@@ -259,6 +301,32 @@ const TOPICS = [
         "Покраснение распространяется, боль усиливается или поднялась температура: нужна медицинская оценка."
       ]
     },
+    practice: {
+      tasks: [
+        {
+          id: "spot-error-1",
+          type: "spot-error",
+          title: "Что здесь не так?",
+          description: "Семья готовится менять повязку. Найдите на картинке ошибки в подготовке. Подсвечиваются все предметы, которые можно выбрать: часть из них нужна, часть нет. Нажмите на предмет и подтвердите выбор.",
+          width: 1024, height: 572,
+          background: "images/practice/rany/00_fon.jpg",
+          alt: "Нога с повязкой на пледе и предметы для перевязки",
+          items: [
+            { id: "lotok", image: "images/practice/rany/09_lotok.png", role: "cover", coverFor: "tarelka" },
+            { id: "tarelka", image: "images/practice/rany/10_tarelka.png", role: "error", label: "Материалы на грязной тарелке",
+              explanation: "Перед перевязкой готовят чистую поверхность и назначенные материалы. Стерильные салфетки нельзя класть на посуду с остатками еды." },
+            { id: "maz", image: "images/practice/rany/20_maz.png", role: "error", label: "Мазь с антибиотиком",
+              explanation: "Антибиотиковые мази самостоятельно не применяют, только по назначению медицинского работника." },
+            { id: "zelenka", image: "images/practice/rany/30_zelenka.png", role: "error", label: "Зелёнка",
+              explanation: "Агрессивные антисептики самостоятельно не применяют. Рану обрабатывают только тем средством, которое указал медицинский работник." },
+            { id: "mylo", image: "images/practice/rany/40_mylo.png", role: "ok", label: "Мыло",
+              explanation: "Верный предмет. Перед перевязкой тщательно моют руки." },
+            { id: "naznacheniya", image: "images/practice/rany/41_naznacheniya.png", role: "ok", label: "Назначения врача",
+              explanation: "Верный предмет. Рану обрабатывают только так и тем средством, которые указал медицинский работник." }
+          ]
+        }
+      ]
+    },
     quiz: [
       {
         question: "Что нужно сделать перед перевязкой?",
@@ -390,6 +458,35 @@ const TOPICS = [
         "Покраснение не исчезает после разгрузки.",
         "Появился пузырь или повреждение кожи: обратитесь к медицинскому работнику.",
         "Рана глубокая, есть гной, запах, лихорадка или повреждение быстро растёт: нужна срочная медицинская оценка."
+      ]
+    },
+    practice: {
+      tasks: [
+        {
+          id: "spot-error-1",
+          type: "spot-error",
+          title: "Что здесь не так?",
+          description: "Человек лежит в кровати. Найдите на картинке ошибки в уходе. Подсвечиваются все предметы, которые можно выбрать: часть из них нужна, часть нет. Нажмите на предмет и подтвердите выбор.",
+          width: 1264, height: 843,
+          background: "images/practice/prolezhni/00_fon.jpg",
+          alt: "Кровать с лежачим человеком, рядом предметы для ухода",
+          items: [
+            { id: "podushka", image: "images/practice/prolezhni/40_podushka.png", role: "ok", label: "Противопролежневая подушка",
+              explanation: "Верный предмет. Подушки и противопролежневый матрас разгружают участки давления." },
+            { id: "grafik", image: "images/practice/prolezhni/41_grafik.png", role: "ok", label: "График смены положения",
+              explanation: "Верный предмет. Положение тела меняют по графику, согласованному с медицинским работником." },
+            { id: "stakan", image: "images/practice/prolezhni/42_stakan.png", role: "ok", label: "Стакан воды",
+              explanation: "Верный предмет. Нужно достаточное питьё с учётом назначений врача." },
+            { id: "pyatno", image: "images/practice/prolezhni/11_pyatno.png", role: "error", group: "wet", label: "Влажное бельё",
+              explanation: "Кожу поддерживают чистой и сухой, влажное бельё меняют вовремя." },
+            { id: "pelenka", image: "images/practice/prolezhni/10_pelenka.png", role: "error", group: "wet", label: "Влажное бельё",
+              explanation: "Кожу поддерживают чистой и сухой, влажное бельё меняют вовремя." },
+            { id: "mochalka", image: "images/practice/prolezhni/20_mochalka.png", role: "error", label: "Жёсткая мочалка",
+              explanation: "Покрасневшие участки не растирают." },
+            { id: "maslo", image: "images/practice/prolezhni/30_maslo.png", role: "error", label: "Массажное масло",
+              explanation: "Область костных выступов не массируют." }
+          ]
+        }
       ]
     },
     quiz: [

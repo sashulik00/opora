@@ -673,9 +673,10 @@ function renderLessonPage() {
     renderVideo(topic) +
     renderDetails(topic) +
     renderMemo(topic.lessonMemo, section, true) +
+    renderPracticeBlock(topic) +   // практика «Что здесь не так» — только если у темы есть поле practice
 
     // Тест — на отдельной странице test.html
-    '<h2 class="lesson-h2">Проверь себя</h2>' +
+    '<h2 class="lesson-h2" id="test">Проверь себя</h2>' +
     '<div class="card test-start">' +
       "<p>Вопросов в тесте: " + topic.quiz.length + ". Для зачёта нужно не меньше " +
         Math.round(PASS_RATE * 100) + "% верных ответов.</p>" +
@@ -721,6 +722,644 @@ function renderNotALesson(topic) {
     "</div>"
   );
 }
+
+/* ---------- Практика «Что здесь не так» (поле practice у темы в data.js) ----------
+   Картинка из слоёв: фон (правильное состояние) и PNG-слои с прозрачностью.
+   Человек ищет слои-ошибки (role "error"); найденный слой растворяется, под ним виден фон.
+   Слои с одинаковым group — одна ошибка: подсвечиваются, выбираются и исчезают вместе.
+   Верный предмет (role "ok") после выбора остаётся, обводится зелёным и показывает подсказку.
+   Какой предмет под курсором — понятно по маске непрозрачных мест слоя:
+   маски заранее считает скрипт tools/make-masks.py и кладёт в js/practice-masks.js
+   (сайт открывается файлом, и там браузер не даёт читать пиксели картинок).
+   Если маски для слоя нет — пробуем прочитать пиксели сами (работает, если сайт открыт через сервер).
+   Отметка о выполнении — progress.practiceDone[ID темы] = true; на зачёт урока не влияет. */
+
+const PRACTICE_ALPHA_MIN = 20;  // пиксель — часть предмета, если непрозрачность больше 20 (из 255)
+const PRACTICE_REACH = 10;      // запас вокруг предмета в пикселях экрана — мелкие предметы легче выбрать
+const PRACTICE_MASK_CELL = 4;   // клетка маски 4×4 пикселя (как в tools/make-masks.py)
+let practiceListeners = null;   // обработчики открытого задания (снимаются при переключении)
+
+/* Задания практики темы (practice.tasks); нет практики — пустой список */
+function practiceTasks(topic) {
+  return (topic && topic.practice && Array.isArray(topic.practice.tasks)) ? topic.practice.tasks : [];
+}
+
+/* Выполнено ли задание: progress.practiceDone[ID темы][ID задания] = true.
+   Старая запись practiceDone[ID темы] = true (до разделения на задания) — это выполненное первое задание */
+function isTaskDone(topic, task) {
+  const record = (getProgress().practiceDone || {})[topic.id];
+  if (record === true) return practiceTasks(topic).indexOf(task) === 0;
+  return Boolean(record && record[task.id]);
+}
+
+function countTasksDone(topic) {
+  return practiceTasks(topic).filter(function (t) { return isTaskDone(topic, t); }).length;
+}
+
+/* Практика темы выполнена, если выполнены все её задания */
+function isPracticeDone(topic) {
+  const tasks = practiceTasks(topic);
+  return tasks.length > 0 && countTasksDone(topic) === tasks.length;
+}
+
+function saveTaskDone(topic, task) {
+  const progress = getProgress();
+  progress.practiceDone = progress.practiceDone || {};
+  let record = progress.practiceDone[topic.id];
+  if (record === true) {  // старая запись — переводим в новый вид
+    record = {};
+    record[practiceTasks(topic)[0].id] = true;
+  }
+  record = record || {};
+  record[task.id] = true;
+  progress.practiceDone[topic.id] = record;
+  saveProgress(progress);
+}
+
+function practiceLink(topic, taskNumber) {
+  return "practice.html?topic=" + encodeURIComponent(topic.id) + (taskNumber > 1 ? "&task=" + taskNumber : "");
+}
+
+/* Карточка «Практика» на странице урока (только если у темы есть задания практики) */
+function renderPracticeBlock(topic) {
+  if (!practiceTasks(topic).length) return "";
+  return (
+    '<h2 class="lesson-h2" id="practice">Практика</h2>' +
+    '<div class="card practice-start">' +
+      "<p>Закрепите тему на картинках</p>" +
+      '<div class="practice-start-row">' +
+        '<a href="' + practiceLink(topic, 1) + '" class="btn btn-primary">Перейти к практике</a>' +
+        (isPracticeDone(topic) ? '<span class="status status-done">Практика выполнена ✓</span>' : "") +
+      "</div>" +
+    "</div>"
+  );
+}
+
+/* Маска слоя из js/practice-masks.js: { width, height, cell, cols, rows, bits } → с битами в виде массива */
+function practiceMaskFromFile(src) {
+  if (typeof PRACTICE_MASKS === "undefined" || !PRACTICE_MASKS[src]) return null;
+  const m = PRACTICE_MASKS[src];
+  const raw = atob(m.bits);
+  const bits = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bits[i] = raw.charCodeAt(i);
+  return { width: m.width, height: m.height, cell: m.cell, cols: m.cols, rows: m.rows, bits: bits };
+}
+
+/* Та же маска, но из пикселей загруженной картинки. На file:/// браузер это запрещает — тогда null */
+function practiceMaskFromImage(img) {
+  try {
+    const w = img.naturalWidth, h = img.naturalHeight, cell = PRACTICE_MASK_CELL;
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h).data;  // здесь и бывает ошибка безопасности
+    const cols = Math.ceil(w / cell), rows = Math.ceil(h / cell);
+    const bits = new Uint8Array(Math.ceil(cols * rows / 8));
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > PRACTICE_ALPHA_MIN) {
+          const n = Math.floor(y / cell) * cols + Math.floor(x / cell);
+          bits[n >> 3] |= 1 << (n & 7);
+        }
+      }
+    }
+    return { width: w, height: h, cell: cell, cols: cols, rows: rows, bits: bits };
+  } catch (e) {
+    return null;
+  }
+}
+
+/* Рамка предмета (в пикселях маски) — чтобы поставить окно «Выбрать эту деталь?» рядом с ним */
+function practiceMaskBox(m) {
+  let x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
+  for (let n = 0; n < m.cols * m.rows; n++) {
+    if (m.bits[n >> 3] >> (n & 7) & 1) {
+      const cx = n % m.cols, cy = Math.floor(n / m.cols);
+      x0 = Math.min(x0, cx); x1 = Math.max(x1, cx);
+      y0 = Math.min(y0, cy); y1 = Math.max(y1, cy);
+    }
+  }
+  if (x1 < 0) return null;
+  return { x0: x0 * m.cell, y0: y0 * m.cell, x1: (x1 + 1) * m.cell, y1: (y1 + 1) * m.cell };
+}
+
+/* Расстояние от точки (x, y) до ближайшего непрозрачного места маски, но не дальше reach.
+   0 — точка прямо на предмете, Infinity — предмет дальше reach */
+function practiceMaskDistance(m, x, y, reach) {
+  const c = m.cell;
+  const cx0 = Math.max(0, Math.floor((x - reach) / c)), cx1 = Math.min(m.cols - 1, Math.floor((x + reach) / c));
+  const cy0 = Math.max(0, Math.floor((y - reach) / c)), cy1 = Math.min(m.rows - 1, Math.floor((y + reach) / c));
+  let best = Infinity;
+  for (let cy = cy0; cy <= cy1; cy++) {
+    for (let cx = cx0; cx <= cx1; cx++) {
+      const n = cy * m.cols + cx;
+      if (!(m.bits[n >> 3] >> (n & 7) & 1)) continue;
+      const dx = Math.max(cx * c - x, 0, x - (cx + 1) * c);
+      const dy = Math.max(cy * c - y, 0, y - (cy + 1) * c);
+      best = Math.min(best, Math.sqrt(dx * dx + dy * dy));
+    }
+  }
+  return best <= reach ? best : Infinity;
+}
+
+/* Задание «Что здесь не так» (type "spot-error") на странице practice.html.
+   task — задание из practice.tasks; сцена рисуется в #practice-task, карточки результатов — в #practice-results.
+   onDone() вызывается, когда найдены все ошибки (чтобы обновить список заданий слева) */
+function setupPractice(topic, task, taskIndex, onDone) {
+  const box = document.getElementById("practice-task");
+  const side = document.getElementById("practice-results");
+  if (!box || !side) return;
+
+  const practice = task;
+  const items = (practice.items || []).map(function (item) {
+    return Object.assign({}, item, { mask: null, box: null });
+  });
+
+  /* «Узел» — то, что выбирают целиком: группа (предметы с одинаковым group) или один предмет.
+     Узлы бывают двух ролей: "error" (ошибка) и "ok" (верный предмет) */
+  const units = [];
+  items.forEach(function (item) {
+    if (item.role !== "error" && item.role !== "ok") return;
+    const key = item.group || item.id;
+    let unit = units.find(function (u) { return u.key === key; });
+    if (!unit) {
+      unit = { key: key, role: item.role, label: item.label || "", explanation: item.explanation || "",
+               items: [], found: false, accepted: false };
+      units.push(unit);
+    }
+    unit.items.push(item);
+    item.unit = unit;
+  });
+  const errorUnits = units.filter(function (u) { return u.role === "error"; });
+
+  const tasks = practiceTasks(topic);
+  const nextIndex = taskIndex + 1 < tasks.length ? taskIndex + 1 : -1;
+  const mainCls = isTaskDone(topic, task) ? "btn-primary" : "btn-secondary";  // после выполнения — выделена цветом
+
+  box.innerHTML =
+    '<div class="practice-scene">' +
+      '<div class="practice-stage" style="aspect-ratio: ' + practice.width + " / " + practice.height + '">' +
+        '<img class="practice-bg" src="' + escapeHtml(practice.background) + '" alt="' + escapeHtml(practice.alt || "") + '" draggable="false">' +
+        items.map(function (item) {
+          return '<img class="practice-layer" data-id="' + escapeHtml(item.id) + '" src="' + escapeHtml(item.image) +
+            '" alt="" aria-hidden="true" draggable="false">';
+        }).join("") +
+      "</div>" +
+      // Окно подтверждения — открывается рядом с выбранным предметом
+      '<div class="practice-popup" role="dialog" aria-label="Выбрать эту деталь?" hidden>' +
+        '<p class="practice-popup-q">Выбрать эту деталь?</p>' +
+        '<div class="practice-popup-btns">' +
+          '<button type="button" class="btn btn-primary btn-small" data-answer="yes">Да</button>' +
+          '<button type="button" class="btn btn-secondary btn-small" data-answer="no">Нет</button>' +
+        "</div>" +
+      "</div>" +
+      // Подсказка у уже выбранного верного предмета
+      '<div class="practice-tip" hidden></div>' +
+      // Скрытый набор кнопок — для клавиатуры (Tab + Enter) и программ чтения с экрана
+      '<div class="practice-keys" role="group" aria-label="Предметы на картинке">' +
+        units.map(function (unit, i) {
+          return '<button type="button" class="visually-hidden practice-key" data-unit="' + i + '">' +
+            "Выбрать эту деталь: " + escapeHtml(unit.label || unit.key) + "</button>";
+        }).join("") +
+      "</div>" +
+    "</div>" +
+
+    // Под картинкой: сообщения, «Готово!» и кнопки
+    '<p class="practice-message" aria-live="polite"></p>' +
+    '<div class="practice-finish" hidden>' +
+      '<p class="success">Готово! Вы нашли все ошибки</p>' +
+      (getCurrentUser() ? "" :
+        '<p class="practice-note">Вы не вошли, поэтому отметка о практике не сохранится. <a href="' + loginLinkBack() + '">Войти</a></p>') +
+    "</div>" +
+    '<div class="practice-actions">' +
+      (nextIndex >= 0
+        ? '<a href="' + practiceLink(topic, nextIndex + 1) + '" data-task="' + (nextIndex + 1) + '" class="btn ' + mainCls + ' practice-main">К следующему заданию</a>'
+        : '<a href="' + topicTestLink(topic) + '" class="btn ' + mainCls + ' practice-main">К тесту</a>') +
+      '<button type="button" class="btn btn-secondary practice-again">Пройти ещё раз</button>' +
+      '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">К уроку</a>' +
+    "</div>";
+
+  // Справа: счётчик и ячейки — по одной на каждый выбираемый предмет (группа — одна ячейка)
+  side.innerHTML =
+    '<p class="practice-count" tabindex="-1"></p>' +
+    '<div class="practice-cells">' +
+      units.map(function () { return '<div class="practice-cell is-empty"></div>'; }).join("") +
+    "</div>";
+
+  const scene = box.querySelector(".practice-scene");
+  const stage = box.querySelector(".practice-stage");
+  const popup = box.querySelector(".practice-popup");
+  const tip = box.querySelector(".practice-tip");
+  const keys = box.querySelector(".practice-keys");
+  const message = box.querySelector(".practice-message");
+  const finish = box.querySelector(".practice-finish");
+  const mainButton = box.querySelector(".practice-main");
+  const count = side.querySelector(".practice-count");
+  const cells = side.querySelector(".practice-cells");
+
+  // Общие обработчики (Esc, клик мимо) снимаются, когда открывают другое задание
+  if (practiceListeners) practiceListeners.abort();
+  practiceListeners = new AbortController();
+  const listen = { signal: practiceListeners.signal };
+
+  items.forEach(function (item) {
+    item.layer = stage.querySelector('.practice-layer[data-id="' + CSS.escape(item.id) + '"]');
+  });
+  units.forEach(function (unit, i) {
+    unit.keyButton = keys.querySelector('[data-unit="' + i + '"]');
+  });
+
+  /* Слои, которые меняются вместе с узлом: сами предметы и слои-cover с coverFor = группа или id предмета */
+  function unitLayers(unit) {
+    return items.filter(function (i) {
+      return i.unit === unit || (i.role === "cover" && (i.coverFor === unit.key ||
+        unit.items.some(function (u) { return u.id === i.coverFor; })));
+    }).map(function (i) { return i.layer; });
+  }
+  function itemLayers(unit) {
+    return unit.items.map(function (i) { return i.layer; });
+  }
+
+  let hovered = null;      // подсвеченный узел
+  let chosen = null;       // узел, для которого открыто окно «Выбрать эту деталь?»
+  let chosenByKey = false; // окно открыли с клавиатуры — после него вернём фокус на кнопки
+  let tipUnit = null;      // узел, у которого открыта подсказка
+  let misses = 0;          // промахи подряд; после двух — подсказка
+  let pulseTimer = null;
+
+  /* --- Картинки: если хоть одной нет, показываем серый блок вместо практики --- */
+  let broken = false;
+  function showMissing() {
+    if (broken) return;
+    broken = true;
+    box.innerHTML = '<div class="practice-missing">Картинки практики пока не добавлены</div>';
+    side.innerHTML = "";
+  }
+  stage.querySelectorAll("img").forEach(function (img) {
+    const item = items.find(function (i) { return i.layer === img; });
+    function ready() {
+      if (!item || !item.unit) return;
+      item.mask = practiceMaskFromFile(item.image) || practiceMaskFromImage(img);
+      item.box = item.mask && practiceMaskBox(item.mask);
+      if (!item.mask) console.warn("Практика: нет маски для " + item.image + " — запустите python tools/make-masks.py");
+    }
+    if (img.complete) {
+      if (img.naturalWidth) ready(); else showMissing();
+    } else {
+      img.addEventListener("load", ready);
+      img.addEventListener("error", showMissing);
+    }
+  });
+
+  /* --- Подсветка: одинаковая у ошибок и верных предметов; у группы — у всех предметов сразу --- */
+  function setHover(unit) {
+    if (unit && unit.accepted) unit = null;  // выбранный верный предмет и так обведён зелёным
+    if (hovered === unit) return;
+    if (hovered) itemLayers(hovered).forEach(function (l) { l.classList.remove("is-hover"); });
+    hovered = unit;
+    if (unit) itemLayers(unit).forEach(function (l) { l.classList.add("is-hover"); });
+    stage.classList.toggle("is-pointer", Boolean(unit));
+  }
+
+  /* Какой предмет под точкой экрана (или рядом, в пределах запаса) */
+  function itemAt(clientX, clientY) {
+    const rect = stage.getBoundingClientRect();
+    let best = null, bestDist = Infinity;
+    items.forEach(function (item) {
+      if (!item.unit || item.unit.found || !item.mask) return;
+      const k = item.mask.width / rect.width;  // пикселей маски в одном пикселе экрана
+      const d = practiceMaskDistance(item.mask, (clientX - rect.left) * k, (clientY - rect.top) * k, PRACTICE_REACH * k) / k;
+      if (d <= bestDist) { best = item; bestDist = d; }  // при равенстве выигрывает верхний слой
+    });
+    return bestDist === Infinity ? null : best;
+  }
+
+  /* Ставит окно или подсказку рядом с рамкой предмета: справа; не помещается — слева;
+     иначе над предметом или под ним (по центру) */
+  function placeNear(el, b) {
+    const rect = stage.getBoundingClientRect();
+    const k = rect.width / practice.width;
+    b = b || { x0: 0, y0: 0, x1: practice.width, y1: practice.height };
+    const pw = el.offsetWidth, ph = el.offsetHeight, gap = 14;
+    let top = (b.y0 + b.y1) / 2 * k - ph / 2;
+    top = Math.max(0, Math.min(top, rect.height - ph));
+    let left = b.x1 * k + gap;
+    if (left + pw > rect.width) left = b.x0 * k - gap - pw;
+    if (left < 0) {
+      left = Math.min(Math.max(0, (b.x0 + b.x1) / 2 * k - pw / 2), Math.max(0, rect.width - pw));
+      top = b.y0 * k - gap - ph >= 0 ? b.y0 * k - gap - ph : b.y1 * k + gap;
+    }
+    el.style.left = Math.round(left) + "px";
+    el.style.top = Math.round(Math.max(0, top)) + "px";
+  }
+
+  /* --- Подсказка у выбранного верного предмета --- */
+  function showTip(unit, item) {
+    if (tipUnit === unit) return;
+    tipUnit = unit;
+    tip.textContent = unit.explanation;
+    tip.hidden = false;
+    placeNear(tip, (item || unit.items[0]).box);
+  }
+  function hideTip() {
+    tipUnit = null;
+    tip.hidden = true;
+  }
+
+  stage.addEventListener("pointermove", function (e) {
+    if (e.pointerType === "touch" || chosen) return;  // на телефоне — по касанию
+    const item = itemAt(e.clientX, e.clientY);
+    const unit = item && item.unit;
+    setHover(unit);
+    if (unit && unit.accepted) showTip(unit, item); else hideTip();
+  });
+  stage.addEventListener("pointerleave", function () {
+    if (!chosen) setHover(null);
+    hideTip();
+  });
+
+  stage.addEventListener("click", function (e) {
+    const wasOpen = Boolean(chosen);
+    closePopup();
+    const item = itemAt(e.clientX, e.clientY);
+    const unit = item && item.unit;
+    if (unit && unit.accepted) {
+      showTip(unit, item);  // верный предмет уже выбран — только подсказка (на телефоне — по касанию)
+    } else if (unit) {
+      hideTip();
+      setHover(unit);
+      openPopup(unit, item, false);
+    } else {
+      hideTip();
+      if (!wasOpen) miss();
+    }
+  });
+
+  /* --- Окно «Выбрать эту деталь?» --- */
+  function openPopup(unit, item, byKey) {
+    chosen = unit;
+    chosenByKey = byKey;
+    popup.hidden = false;
+    placeNear(popup, (item || unit.items[0]).box);
+    popup.querySelector('[data-answer="yes"]').focus({ preventScroll: true });
+  }
+
+  function closePopup(returnFocus) {
+    if (!chosen) return;
+    const unit = chosen;
+    if (popup.contains(document.activeElement)) document.activeElement.blur();
+    popup.hidden = true;
+    chosen = null;
+    setHover(null);
+    if (returnFocus && chosenByKey && !unit.found) unit.keyButton.focus();
+  }
+
+  popup.addEventListener("click", function (e) {
+    const button = e.target.closest("[data-answer]");
+    if (!button) return;
+    const unit = chosen;
+    const byKey = chosenByKey;
+    if (button.dataset.answer === "yes") {
+      closePopup(false);
+      choose(unit, byKey);
+    } else {
+      closePopup(true);
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (chosen) closePopup(true);
+    hideTip();
+  }, listen);
+  document.addEventListener("click", function (e) {
+    if (scene.contains(e.target)) return;
+    if (chosen) closePopup(false);
+    hideTip();
+  }, listen);
+
+  /* --- Клавиатура: скрытые кнопки подсвечивают предмет и открывают окно (или подсказку) --- */
+  function unitOfKey(target) {
+    const key = target.closest(".practice-key");
+    return key ? units[Number(key.dataset.unit)] : null;
+  }
+  keys.addEventListener("focusin", function (e) {
+    const unit = unitOfKey(e.target);
+    if (!unit || chosen) return;
+    setHover(unit);
+    if (unit.accepted) showTip(unit); else hideTip();
+  });
+  keys.addEventListener("focusout", function () {
+    if (!chosen) setHover(null);
+    hideTip();
+  });
+  keys.addEventListener("click", function (e) {
+    const unit = unitOfKey(e.target);
+    if (!unit) return;
+    e.stopPropagation();
+    if (unit.accepted) { showTip(unit); return; }
+    setHover(unit);
+    openPopup(unit, null, true);
+  });
+
+  /* --- Выбор, промах, итог --- */
+  function say(text) {
+    message.textContent = text;
+    message.classList.remove("is-shown");
+    void message.offsetWidth;  // перезапуск плавного появления
+    message.classList.toggle("is-shown", Boolean(text));
+  }
+
+  function updateCount() {
+    const n = errorUnits.filter(function (u) { return u.found; }).length;
+    count.innerHTML = "Найдено ошибок: <strong>" + n + "</strong> из " + errorUnits.length;
+    return n;
+  }
+
+  /* Карточка выбранного предмета — в следующую свободную ячейку справа */
+  function addCard(unit) {
+    const cell = cells.querySelector(".practice-cell.is-empty");
+    if (!cell) return;
+    const ok = unit.role === "ok";
+    cell.className = "practice-cell practice-card" + (ok ? " practice-card--ok" : "");
+    cell.innerHTML =
+      '<span class="practice-tag ' + (ok ? "practice-tag--ok" : "practice-tag--error") + '">' + (ok ? "Верно" : "Ошибка") + "</span>" +
+      "<h3>" + escapeHtml(unit.label) + "</h3>" +
+      "<p>" + escapeHtml(unit.explanation) + "</p>";
+  }
+
+  /* После выбора с клавиатуры — фокус на следующий ещё не выбранный предмет */
+  function focusNext(byKey) {
+    if (!byKey) return;
+    const next = units.find(function (u) { return !u.found && !u.accepted; });
+    if (next) next.keyButton.focus();
+  }
+
+  function choose(unit, byKey) {
+    if (!unit || unit.found || unit.accepted) return;
+    misses = 0;
+
+    if (unit.role === "ok") {
+      // Верный предмет: не исчезает и не считается; дальше обведён зелёным и показывает подсказку
+      unit.accepted = true;
+      itemLayers(unit).forEach(function (l) { l.classList.add("is-ok"); });
+      unit.keyButton.textContent = "Верный предмет: " + (unit.label || unit.key);
+      addCard(unit);
+      say("Верно, этот предмет нужен, его оставляем: " + unit.label + ".");
+      focusNext(byKey);
+      return;
+    }
+
+    unit.found = true;
+    unitLayers(unit).forEach(function (l) {
+      l.classList.remove("is-pulse");
+      l.classList.add("is-gone");
+    });
+    unit.keyButton.hidden = true;
+    addCard(unit);
+
+    const n = updateCount();
+    say("Верно, это ошибка: " + unit.label + ". Найдено ошибок: " + n + " из " + errorUnits.length + ".");
+
+    if (n === errorUnits.length) {
+      finish.hidden = false;
+      saveTaskDone(topic, task);
+      mainButton.classList.replace("btn-secondary", "btn-primary");
+      say("Готово! Вы нашли все ошибки");
+      message.classList.add("visually-hidden");  // на экране это уже есть в блоке «Готово!»; программа чтения прочитает
+      if (byKey) mainButton.focus();
+      if (onDone) onDone();
+    } else {
+      focusNext(byKey);
+    }
+  }
+
+  function miss() {
+    if (errorUnits.every(function (u) { return u.found; })) return;
+    say("Здесь всё в порядке, поищите ещё");
+    misses++;
+    if (misses < 2) return;
+    // Два промаха подряд — одна из ненайденных ошибок (вся группа) пульсирует 2 секунды
+    misses = 0;
+    const left = errorUnits.filter(function (u) { return !u.found; });
+    const hint = left[Math.floor(Math.random() * left.length)];
+    clearTimeout(pulseTimer);
+    items.forEach(function (i) { i.layer.classList.remove("is-pulse"); });
+    void stage.offsetWidth;  // перезапуск анимации
+    itemLayers(hint).forEach(function (l) { l.classList.add("is-pulse"); });
+    pulseTimer = setTimeout(function () {
+      items.forEach(function (i) { i.layer.classList.remove("is-pulse"); });
+    }, 2000);
+  }
+
+  box.querySelector(".practice-again").addEventListener("click", function () {
+    units.forEach(function (u) {
+      u.found = false;
+      u.accepted = false;
+      u.keyButton.hidden = false;
+      u.keyButton.textContent = "Выбрать эту деталь: " + (u.label || u.key);
+    });
+    items.forEach(function (i) {
+      i.layer.classList.remove("is-gone", "is-pulse", "is-hover", "is-ok");
+    });
+    hovered = null;
+    hideTip();
+    misses = 0;
+    cells.querySelectorAll(".practice-cell").forEach(function (cell) {
+      cell.className = "practice-cell is-empty";
+      cell.innerHTML = "";
+    });
+    finish.hidden = true;
+    updateCount();
+    message.classList.remove("visually-hidden");
+    say("");
+    count.focus();
+  });
+
+  updateCount();
+}
+
+/* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
+   Слева — список заданий темы, в центре — задание, справа — карточки результатов.
+   Задания переключаются без перезагрузки: меняется только ?task= в адресе */
+function renderPracticePage() {
+  const page = document.getElementById("practice-page");
+  if (!page) return;
+
+  const params = new URLSearchParams(location.search);
+  const topic = TOPICS.find(function (t) { return t.id === params.get("topic"); });
+  const tasks = practiceTasks(topic);
+
+  if (!tasks.length) {
+    page.innerHTML =
+      '<div class="card practice-none">' +
+        "<h1>Практика для этой темы пока не готова</h1>" +
+        '<a href="lessons.html" class="btn btn-primary">Вернуться к урокам</a>' +
+      "</div>";
+    return;
+  }
+
+  let index = parseInt(params.get("task"), 10) - 1;
+  if (!(index >= 0 && index < tasks.length)) index = 0;
+  const task = tasks[index];
+
+  document.title = "Практика: " + topic.title + " — Опора. Школа ухода";
+
+  page.innerHTML =
+    '<div class="practice-page-grid">' +
+      '<nav class="practice-nav" aria-label="Задания практики"></nav>' +
+      '<section class="practice-main-col">' +
+        '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
+        (task.description ? '<p class="practice-task-desc">' + escapeHtml(task.description) + "</p>" : "") +
+        '<div id="practice-task"></div>' +
+      "</section>" +
+      '<aside class="practice-side-col" id="practice-results" aria-label="Результаты"></aside>' +
+    "</div>";
+
+  const nav = page.querySelector(".practice-nav");
+  function renderNav() {
+    nav.innerHTML =
+      '<h2 class="practice-nav-title">Практика</h2>' +
+      '<p class="practice-nav-topic">' + escapeHtml(topic.title) + "</p>" +
+      '<p class="practice-nav-count">Выполнено заданий: ' + countTasksDone(topic) + " из " + tasks.length + "</p>" +
+      '<ol class="practice-nav-list">' +
+        tasks.map(function (t, i) {
+          const done = isTaskDone(topic, t);
+          return "<li>" +
+            '<a href="' + practiceLink(topic, i + 1) + '" data-task="' + (i + 1) + '"' +
+              ' class="practice-nav-item' + (i === index ? " is-current" : "") + (done ? " is-done" : "") + '"' +
+              (i === index ? ' aria-current="step"' : "") + ">" +
+              '<span class="practice-nav-num">' + (i + 1) + ".</span> " + escapeHtml(t.title) +
+              (done ? ' <span class="practice-nav-check" aria-label="выполнено">✓</span>' : "") +
+            "</a></li>";
+        }).join("") +
+      "</ol>" +
+      '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="practice-nav-back">← К уроку</a>';
+  }
+  renderNav();
+
+  if (task.type === "spot-error") setupPractice(topic, task, index, renderNav);
+
+  // Переход к другому заданию (список слева и кнопка «К следующему заданию») — без перезагрузки.
+  // Обработчик вешается один раз: сам блок страницы при переключении не пересоздаётся
+  if (page.dataset.ready) return;
+  page.dataset.ready = "1";
+  page.addEventListener("click", function (e) {
+    const link = e.target.closest("a[data-task]");
+    if (!link || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    e.preventDefault();
+    history.pushState(null, "", link.getAttribute("href"));
+    renderPracticePage();
+    window.scrollTo(0, 0);
+  });
+}
+
+/* Кнопки «назад/вперёд» браузера между заданиями */
+window.addEventListener("popstate", function () {
+  if (document.getElementById("practice-page")) renderPracticePage();
+});
 
 /* ---------- Тест (test.html?topic=ID) ---------- */
 
@@ -1665,6 +2304,7 @@ document.addEventListener("DOMContentLoaded", function () {
   renderLessonsPage();
   renderCabinetPage();
   renderLessonPage();
+  renderPracticePage();
   renderTestPage();
   setupRightsPage();
   setupReferencePage();
