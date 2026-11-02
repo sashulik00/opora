@@ -180,6 +180,21 @@ img { max-width: 100%; }
   font-size: 1.05rem;
 }
 .menu a:hover { background: var(--bg); }
+/* «Выйти» в меню — кнопка, но выглядит как пункт меню */
+.menu-logout {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.05rem;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-logout:hover { background: var(--bg); }
 .menu a.active {
   background: var(--accent);
   color: #fff;
@@ -1404,7 +1419,8 @@ input:focus { border-color: var(--accent); outline: none; }
     padding-bottom: 8px;
   }
   .menu.open { display: flex; }
-  .menu a { padding: 14px; font-size: 1.15rem; }
+  .menu a,
+  .menu-logout { padding: 14px; font-size: 1.15rem; }
 
   /* Подменю на телефоне — внутри списка, с отступом, открывается стрелкой */
   .sub-head a { flex: 1; }

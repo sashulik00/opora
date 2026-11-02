@@ -1,0 +1,20 @@
+# База данных PostgreSQL 16 для сайта «Опора».
+# Запуск: docker compose up -d     Остановка: docker compose stop
+# Пароль берётся из файла .env (POSTGRES_PASSWORD). Данные хранятся в папке pgdata.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: opora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в файле .env}
+      POSTGRES_DB: opora
+    ports:
+      - "127.0.0.1:5432:5432"   # база доступна только с этого компьютера
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opora -d opora"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

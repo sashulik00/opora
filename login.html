@@ -19,32 +19,37 @@
           <h1>Кабинет</h1>
 
           <div class="tabs" role="tablist">
-            <button class="tab active" data-tab="login" role="tab" aria-selected="true">Вход</button>
-            <button class="tab" data-tab="register" role="tab" aria-selected="false">Регистрация</button>
+            <button class="tab active" data-tab="login" role="tab" aria-selected="true">Войти</button>
+            <button class="tab" data-tab="register" role="tab" aria-selected="false">Зарегистрироваться</button>
           </div>
 
           <form id="login-form">
             <label for="login-email">Электронная почта</label>
             <input type="email" id="login-email" required autocomplete="email">
+            <label for="login-password">Пароль</label>
+            <input type="password" id="login-password" required autocomplete="current-password">
             <p id="login-error" class="error" role="alert"></p>
             <button type="submit" class="btn btn-primary btn-full">Войти</button>
           </form>
 
           <form id="register-form" hidden>
-            <label for="reg-name">Ваше имя</label>
-            <input type="text" id="reg-name" required autocomplete="given-name">
             <label for="reg-email">Электронная почта</label>
             <input type="email" id="reg-email" required autocomplete="email">
+            <label for="reg-password">Пароль (не короче 8 символов)</label>
+            <input type="password" id="reg-password" required minlength="8" autocomplete="new-password">
+            <label for="reg-password2">Повторите пароль</label>
+            <input type="password" id="reg-password2" required minlength="8" autocomplete="new-password">
             <p id="register-error" class="error" role="alert"></p>
             <button type="submit" class="btn btn-primary btn-full">Зарегистрироваться</button>
           </form>
 
-          <p class="muted small">Данные хранятся только в этом браузере на вашем устройстве.</p>
+          <!-- Текст подставляет js/main.js: где хранятся данные (на сервере или в этом браузере) -->
+          <p class="muted small" id="auth-note"></p>
         </div>
 
         <!-- Показывается, если пользователь вошёл -->
         <div id="auth-logged" class="card" hidden>
-          <h1>Здравствуйте, <span id="logged-name"></span>!</h1>
+          <h1>Здравствуйте!</h1>
           <p>Вы вошли как <strong id="logged-email"></strong>.</p>
           <div class="buttons">
             <a href="cabinet.html" class="btn btn-primary">В личный кабинет</a>
@@ -59,6 +64,8 @@
   <footer id="site-footer" class="site-footer"></footer>
 
   <script src="js/data.js"></script>
+  <!-- Вход и прогресс: сервер или память браузера (до main.js) -->
+  <script src="js/store.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,65 +1,19 @@
 /*
   Общий скрипт для всех страниц.
   1) Рисует шапку с меню и подвал (чтобы не копировать их в каждый HTML-файл).
-  2) Хранит вход/регистрацию в localStorage (память браузера).
+  2) Вход и прогресс берёт из js/store.js (сервер или localStorage — решает он).
   3) Заполняет главную страницу разделами из data.js.
   4) Обрабатывает формы на странице входа.
 */
 
-/* ---------- Пользователи (localStorage) ---------- */
+/* ---------- Пользователь (хранит js/store.js) ---------- */
 
-const USERS_KEY = "opora_users";        // список всех зарегистрированных
-const CURRENT_KEY = "opora_current";    // почта того, кто сейчас вошёл
-
-function getUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
-
+/* { email, name } или null. name есть только у старых «входов» без сервера */
 function getCurrentUser() {
-  const email = localStorage.getItem(CURRENT_KEY);
-  if (!email) return null;
-  return getUsers().find(function (u) { return u.email === email; }) || null;
+  return Store.getUser();
 }
 
-function normalizeEmail(email) {
-  return email.trim().toLowerCase();
-}
-
-function registerUser(name, email) {
-  email = normalizeEmail(email);
-  const users = getUsers();
-  if (users.some(function (u) { return u.email === email; })) {
-    return "Такая почта уже зарегистрирована. Войдите на вкладке «Вход».";
-  }
-  users.push({ name: name.trim(), email: email });
-  saveUsers(users);
-  localStorage.setItem(CURRENT_KEY, email);
-  return null; // null — значит ошибки нет
-}
-
-function loginUser(email) {
-  email = normalizeEmail(email);
-  const user = getUsers().find(function (u) { return u.email === email; });
-  if (!user) {
-    return "Такой почты нет. Зарегистрируйтесь на вкладке «Регистрация».";
-  }
-  localStorage.setItem(CURRENT_KEY, email);
-  return null;
-}
-
-function logoutUser() {
-  localStorage.removeItem(CURRENT_KEY);
-}
-
-/* ---------- Прогресс по урокам (localStorage, отдельно для каждой почты) ---------- */
+/* ---------- Прогресс по урокам (хранит js/store.js: на сервере или в localStorage) ---------- */
 
 /* Порог зачёта PASS_RATE (0.7 = 70%) задан в js/data.js, рядом с placeholderQuiz */
 
@@ -76,29 +30,19 @@ function nextLesson(topic) {
   return LESSONS[LESSONS.indexOf(topic) + 1] || null;
 }
 
-/* Прогресс хранится так:
-   opora_progress_почта = {
+/* Прогресс — один объект:
+   {
      burns: { best: 3, total: 3, passed: true, completed: true },
+     practiceDone: { burns: { "spot-error-1": true } },
      ...
-   } */
-function progressKey(user) {
-  return "opora_progress_" + user.email;
-}
-
+   }
+   Если человек не вошёл — пустой объект, и ничего не сохраняется */
 function getProgress() {
-  const user = getCurrentUser();
-  if (!user) return {};
-  try {
-    return JSON.parse(localStorage.getItem(progressKey(user))) || {};
-  } catch (e) {
-    return {};
-  }
+  return Store.getProgress();
 }
 
 function saveProgress(progress) {
-  const user = getCurrentUser();
-  if (!user) return;
-  localStorage.setItem(progressKey(user), JSON.stringify(progress));
+  Store.saveProgress(progress);
 }
 
 /* Записать результат теста: храним лучший результат (по доле верных ответов —
@@ -159,7 +103,7 @@ function renderHeader() {
     { href: "consultant.html", text: "Консультант", page: "consultant" },
     { href: "help.html", text: "Помощь", page: "help" },
     user
-      ? { href: "cabinet.html", text: user.name, page: "cabinet" }
+      ? { href: "cabinet.html", text: user.name || "Кабинет", page: "cabinet" }
       : { href: "login.html", text: "Войти", page: "login" }
   ];
 
@@ -186,7 +130,8 @@ function renderHeader() {
         '<ul class="submenu">' + sub + "</ul>" +
       "</li>"
     );
-  }).join("");
+  }).join("") +
+    (user ? '<li><button type="button" class="menu-logout">Выйти</button></li>' : "");
 
   header.innerHTML =
     '<div class="container header-inner">' +
@@ -194,6 +139,14 @@ function renderHeader() {
       '<button class="menu-toggle" aria-expanded="false" aria-controls="main-menu">☰ Меню</button>' +
       '<nav aria-label="Главное меню"><ul id="main-menu" class="menu">' + items + "</ul></nav>" +
     "</div>";
+
+  const logout = header.querySelector(".menu-logout");
+  if (logout) {
+    logout.addEventListener("click", function () {
+      logout.disabled = true;
+      Store.logout().then(function () { location.href = "index.html"; });
+    });
+  }
 
   // Кнопка «Меню» на телефоне открывает и закрывает список
   const toggle = header.querySelector(".menu-toggle");
@@ -302,21 +255,21 @@ function setupLoginPage() {
   const formsBox = document.getElementById("auth-forms");
   const loggedBox = document.getElementById("auth-logged");
 
+  // Подпись под формами: где хранятся данные
+  document.getElementById("auth-note").textContent = Store.getMode() === "server"
+    ? "Прогресс сохраняется на сервере: войдите с любого устройства и продолжите с того же места."
+    : "Сайт открыт без сервера: вход и прогресс хранятся только в этом браузере, пароль не проверяется. " +
+      "Чтобы работала настоящая регистрация, запустите сервер (инструкция в README.md).";
+
   function showState() {
     const user = getCurrentUser();
-    if (user) {
-      formsBox.hidden = true;
-      loggedBox.hidden = false;
-      document.getElementById("logged-name").textContent = user.name;
-      document.getElementById("logged-email").textContent = user.email;
-    } else {
-      formsBox.hidden = false;
-      loggedBox.hidden = true;
-    }
-    renderHeader(); // обновить имя в меню
+    formsBox.hidden = Boolean(user);
+    loggedBox.hidden = !user;
+    if (user) document.getElementById("logged-email").textContent = user.email;
+    renderHeader(); // обновить меню: «Кабинет» и «Выйти»
   }
 
-  // Переключение вкладок «Вход» / «Регистрация»
+  // Переключение вкладок «Войти» / «Зарегистрироваться»
   const tabs = page.querySelectorAll(".tab");
   tabs.forEach(function (tab) {
     tab.addEventListener("click", function () {
@@ -329,7 +282,7 @@ function setupLoginPage() {
     });
   });
 
-  // login.html?tab=register — сразу открыть вкладку «Регистрация» (кнопка из кабинета)
+  // login.html?tab=register — сразу открыть вкладку «Зарегистрироваться» (кнопка из кабинета)
   if (new URLSearchParams(location.search).get("tab") === "register") {
     page.querySelector('.tab[data-tab="register"]').click();
   }
@@ -345,26 +298,46 @@ function setupLoginPage() {
     }
   }
 
-  document.getElementById("login-form").addEventListener("submit", function (e) {
+  /* Отправка формы: кнопка неактивна, пока ждём ответ; ошибка — под полями */
+  function submitWith(form, errorBox, action) {
+    const button = form.querySelector('button[type="submit"]');
+    errorBox.textContent = "";
+    button.disabled = true;
+    action().then(function (error) {
+      button.disabled = false;
+      errorBox.textContent = error || "";
+      if (!error) afterLogin();
+    });
+  }
+
+  const loginForm = document.getElementById("login-form");
+  loginForm.addEventListener("submit", function (e) {
     e.preventDefault(); // не перезагружать страницу
-    const email = document.getElementById("login-email").value;
-    const error = loginUser(email);
-    document.getElementById("login-error").textContent = error || "";
-    if (!error) afterLogin();
+    submitWith(loginForm, document.getElementById("login-error"), function () {
+      return Store.login(document.getElementById("login-email").value, document.getElementById("login-password").value);
+    });
   });
 
-  document.getElementById("register-form").addEventListener("submit", function (e) {
+  const registerForm = document.getElementById("register-form");
+  registerForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    const name = document.getElementById("reg-name").value;
-    const email = document.getElementById("reg-email").value;
-    const error = name.trim() ? registerUser(name, email) : "Введите имя.";
-    document.getElementById("register-error").textContent = error || "";
-    if (!error) afterLogin();
+    const errorBox = document.getElementById("register-error");
+    const password = document.getElementById("reg-password").value;
+    if (password.length < 8) {
+      errorBox.textContent = "Пароль должен быть не короче 8 символов.";
+      return;
+    }
+    if (password !== document.getElementById("reg-password2").value) {
+      errorBox.textContent = "Пароли не совпадают.";
+      return;
+    }
+    submitWith(registerForm, errorBox, function () {
+      return Store.register(document.getElementById("reg-email").value, password);
+    });
   });
 
   document.getElementById("logout-btn").addEventListener("click", function () {
-    logoutUser();
-    showState();
+    Store.logout().then(showState);
   });
 
   showState();
@@ -472,7 +445,7 @@ function renderCabinetPage() {
   const next = LESSONS.find(function (t) { return !(progress[t.id] && progress[t.id].passed); });
 
   page.innerHTML =
-    "<h1>Здравствуйте, " + escapeHtml(user.name) + "!</h1>" +
+    "<h1>Здравствуйте" + (user.name ? ", " + escapeHtml(user.name) : "") + "!</h1>" +
     renderProgressBar(progress, " уроков") +
 
     '<div class="cabinet-next">' +
@@ -488,7 +461,7 @@ function renderCabinetPage() {
 
     '<h2 class="lesson-h2">Мои данные</h2>' +
     '<div class="card cabinet-data">' +
-      '<p><span class="muted">Имя:</span> <strong>' + escapeHtml(user.name) + "</strong></p>" +
+      (user.name ? '<p><span class="muted">Имя:</span> <strong>' + escapeHtml(user.name) + "</strong></p>" : "") +
       '<p><span class="muted">Почта:</span> <strong>' + escapeHtml(user.email) + "</strong></p>" +
       '<button type="button" id="cabinet-logout" class="btn btn-secondary">Выйти</button>' +
     "</div>" +
@@ -508,8 +481,7 @@ function renderCabinetPage() {
     "</div>";
 
   document.getElementById("cabinet-logout").addEventListener("click", function () {
-    logoutUser();
-    location.href = "index.html";
+    Store.logout().then(function () { location.href = "index.html"; });
   });
 
   const resetBtn = document.getElementById("reset-btn");
@@ -526,8 +498,7 @@ function renderCabinetPage() {
     resetBtn.focus();
   });
   document.getElementById("reset-yes").addEventListener("click", function () {
-    localStorage.removeItem(progressKey(user)); // только прогресс этого пользователя
-    renderCabinetPage();
+    Store.resetProgress().then(renderCabinetPage); // только прогресс этого пользователя
   });
 }
 
@@ -2296,6 +2267,10 @@ function setupRightsPage() {
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
+  Store.ready.then(startPage);
+});
+
+function startPage() {
   renderHeader();
   renderFileWarning();
   renderFooter();
@@ -2318,4 +2293,4 @@ document.addEventListener("DOMContentLoaded", function () {
   renderContacts();
   setupWellbeingSurvey();
   setupConsultantPage();
-});
+}
