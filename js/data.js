@@ -751,6 +751,41 @@ const TOPICS = [
         "Выраженная слабость, головокружение или боль: прекратить движение и оценить состояние."
       ]
     },
+    practice: {
+      tasks: [
+        {
+          id: "spot-error-1",
+          type: "spot-error",
+          title: "Что здесь не так?",
+          description: "Человек сейчас встанет с кровати и пойдёт к двери. Найдите в комнате всё, что может привести к падению. Подсвечиваются все предметы, которые можно выбрать: часть из них опасна, часть — наоборот, помогает.",
+          width: 1024, height: 572,
+          background: "images/practice/peremeshenie/00_fon.jpg",
+          alt: "Спальня: кровать, ходунки, ботинки, кресло-коляска у окна, ночник у двери",
+          items: [
+            { id: "kovrik", image: "images/practice/peremeshenie/10_kovrik.png", role: "error", label: "Коврик с загнутым краем",
+              explanation: "Загнутые края и скользящие коврики — частая причина падений. Коврики убирают или надёжно закрепляют." },
+            { id: "luzha", image: "images/practice/peremeshenie/20_luzha.png", role: "error", label: "Лужа на полу",
+              explanation: "Пролитую воду вытирают сразу: на мокром полу легко поскользнуться." },
+            { id: "provod", image: "images/practice/peremeshenie/30_provod.png", role: "error", label: "Провод на проходе",
+              explanation: "Провода убирают с прохода, чтобы не зацепиться за них ногой или ходунками." },
+            { id: "korobka", image: "images/practice/peremeshenie/40_korobka.png", role: "error", label: "Коробка и пакет на полу",
+              explanation: "Путь от кровати до двери освобождают заранее, до того как человек встанет." },
+            { id: "tapki", image: "images/practice/peremeshenie/50_tapki.png", role: "error", label: "Шлёпанцы без задника",
+              explanation: "Обувь без задника соскальзывает с ноги. Нужна закрытая устойчивая обувь, а на полу на пути ничего не должно лежать." },
+            { id: "kolyaska", image: "images/practice/peremeshenie/60_kolyaska.png", role: "ok", label: "Кресло-коляска у стены",
+              explanation: "Коляска стоит у стены и не перегораживает проход." },
+            { id: "hodunki", image: "images/practice/peremeshenie/61_hodunki.png", role: "ok", label: "Ходунки у кровати",
+              explanation: "Ходунки стоят рядом с кроватью, чтобы на них можно было опереться сразу при вставании." },
+            { id: "botinki", image: "images/practice/peremeshenie/62_botinki.png", role: "ok", label: "Ботинки на липучках",
+              explanation: "Закрытая обувь с задником держится на ноге и не скользит." },
+            { id: "nochnik", image: "images/practice/peremeshenie/63_nochnik.png", role: "ok", label: "Ночник",
+              explanation: "Ночной свет помогает не споткнуться в темноте." },
+            { id: "telefon", image: "images/practice/peremeshenie/64_telefon.png", role: "ok", label: "Телефон под рукой",
+              explanation: "Телефон рядом, чтобы можно было позвать на помощь." }
+          ]
+        }
+      ]
+    },
     quiz: [
       {
         question: "Что нужно сделать в первую очередь перед тем, как помогать человеку встать?",
