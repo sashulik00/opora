@@ -14,7 +14,12 @@
     <section class="block">
       <div class="container lesson-container">
         <h1>Задайте вопрос по уходу</h1>
-        <p class="lead">Я даю справочную информацию и не заменяю врача</p>
+
+        <!-- Постоянная заметка над чатом -->
+        <p class="chat-note" role="note">
+          Консультант отвечает по материалам школы, может ошибаться и не заменяет врача.
+          Не вводите личные данные. При опасности звоните <a href="tel:103">103</a> или <a href="tel:112">112</a>.
+        </p>
 
         <div class="card chat">
           <!-- Переписка. Живёт только на странице: при обновлении очищается и нигде не сохраняется -->
@@ -29,12 +34,13 @@
 
           <form id="chat-form" class="chat-form">
             <label for="chat-input" class="visually-hidden">Ваш вопрос</label>
-            <input type="text" id="chat-input" placeholder="Напишите вопрос…" autocomplete="off" enterkeyhint="send">
+            <input type="text" id="chat-input" placeholder="Напишите вопрос…" autocomplete="off" enterkeyhint="send" maxlength="500">
             <button type="submit" id="chat-send" class="btn btn-primary">Отправить</button>
           </form>
         </div>
 
-        <p class="chat-disclaimer">Справочная информация, не заменяет консультацию врача. В экстренной ситуации звоните <a href="tel:112">112</a>.</p>
+        <!-- Режим работы (подставляет js/main.js): ИИ через сервер или упрощённые ответы без сервера -->
+        <p class="chat-disclaimer" id="chat-mode"></p>
       </div>
     </section>
   </main>

@@ -2052,15 +2052,53 @@ function findConsultantAnswer(question) {
 }
 
 /* ЕДИНСТВЕННОЕ место, где появляется ответ консультанта.
-   Сейчас — поиск по data.js с небольшой паузой «Консультант печатает…».
-   Чтобы подключить настоящий ИИ, достаточно заменить содержимое этой функции
-   на запрос к своему серверу (см. объяснение в чате). Функция должна вернуть Promise
-   с объектом того же вида, что у findConsultantAnswer. */
-function getConsultantReply(question) {
+   • Сайт открыт через сервер (npm start) — вопрос уходит на сервер (/api/consultant),
+     там ИИ Яндекса отвечает по материалам школы.
+   • Сайт открыт файлом без сервера — упрощённые ответы по ключевым словам из data.js (как раньше).
+   Возвращает Promise с объектом:
+     { type: "alarm" | "answer" | "nothing" | "unavailable", answer, sources } — ответ сервера,
+     { type: "error", text } — ошибка (не вошли, слишком длинно, нет связи…),
+     или старый вид от findConsultantAnswer — без сервера. */
+function getConsultantReply(question, history) {
+  if (Store.getMode() === "server") {
+    return fetch("/api/consultant", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: question, history: history })
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) return { type: "error", text: data.error || "Консультант сейчас недоступен. Попробуйте чуть позже." };
+        return data;
+      });
+    }).catch(function () {
+      return { type: "error", text: "Нет связи с сервером. Проверьте интернет и попробуйте ещё раз." };
+    });
+  }
   const delay = 500 + Math.random() * 500; // 0,5–1 секунда
   return new Promise(function (resolve) {
     setTimeout(function () { resolve(findConsultantAnswer(question)); }, delay);
   });
+}
+
+/* Текст ответа ИИ → абзацы (пустая строка — новый абзац, перенос строки — <br>) */
+function formatAnswer(text) {
+  return String(text || "")
+    .replace(/\*\*/g, "")                       // жирный из Markdown просто убираем
+    .split(/\n\s*\n/)
+    .map(function (p) { return p.trim(); })
+    .filter(Boolean)
+    .map(function (p) { return "<p>" + escapeHtml(p).replace(/\n/g, "<br>") + "</p>"; })
+    .join("");
+}
+
+/* «Источники: урок «Ожоги», статья «Выплаты и льготы»» */
+function sourcesHtml(sources) {
+  if (!sources || !sources.length) return "";
+  return '<p class="msg-sources">Источники: ' + sources.map(function (s) {
+    const url = /^(lesson|article)\.html\?id=[\w-]+$/.test(s.url || "") ? s.url : "lesson.html?id=" + encodeURIComponent(s.topicId);
+    return (s.kind === "article" ? "статья" : "урок") + ' <a href="' + url + '">«' + escapeHtml(s.title) + "»</a>";
+  }).join(", ") + "</p>";
 }
 
 function setupConsultantPage() {
@@ -2071,7 +2109,13 @@ function setupConsultantPage() {
   const input = document.getElementById("chat-input");
   const sendBtn = document.getElementById("chat-send");
   const hintsBox = document.getElementById("chat-hints");
+  const serverMode = Store.getMode() === "server";
+  const history = [];  // последние реплики для сервера: [{ role: "user"|"assistant", content }]
   let busy = false;
+
+  document.getElementById("chat-mode").textContent = serverMode
+    ? "Ответы готовит ИИ по материалам уроков и справочника школы."
+    : "Сайт открыт без сервера: консультант отвечает упрощённо, по ключевым словам.";
 
   function addMessage(who, html, extraClass) {
     const msg = document.createElement("div");
@@ -2108,6 +2152,24 @@ function setupConsultantPage() {
   }
 
   function replyHtml(reply) {
+    // Ответы сервера (ИИ)
+    if (serverMode && reply.type === "alarm") {
+      return (
+        formatAnswer(reply.answer).replace("<p>", '<p class="alarm-text">') +
+        '<a href="tel:103" class="alarm-phone">Позвонить 103</a>' +
+        '<a href="tel:112" class="alarm-phone">Позвонить 112</a>' +
+        sourcesHtml(reply.sources)
+      );
+    }
+    if (reply.type === "error") return "<p>" + escapeHtml(reply.text) + "</p>";
+    if (serverMode) {
+      return formatAnswer(reply.answer) + sourcesHtml(reply.sources) +
+        (reply.type === "nothing" || (reply.type === "unavailable" && !(reply.sources || []).length)
+          ? '<div class="msg-links"><a href="lessons.html" class="btn btn-small btn-secondary">Все уроки</a></div>'
+          : "");
+    }
+
+    // Без сервера — как раньше
     if (reply.type === "alarm") {
       return (
         '<p class="alarm-text">' + escapeHtml(CONSULTANT.alarmText) + "</p>" +
@@ -2124,27 +2186,53 @@ function setupConsultantPage() {
     );
   }
 
+  function setBusy(value) {
+    busy = value;
+    sendBtn.disabled = value;
+  }
+
   function ask(question) {
     question = question.trim();
     if (!question || busy) return;
+    if (question.length > 500) {
+      addMessage("bot", "<p>Вопрос слишком длинный: не больше 500 символов. Сократите его, пожалуйста.</p>");
+      return;
+    }
 
-    busy = true;
-    sendBtn.disabled = true;
+    setBusy(true);
     addMessage("user", "<p>" + escapeHtml(question) + "</p>");
     input.value = "";
 
-    const typing = addMessage("bot", '<p class="typing">Консультант печатает…</p>', "msg-typing");
+    const typing = addMessage("bot", '<p class="typing">Консультант думает…</p>', "msg-typing");
 
-    getConsultantReply(question).then(function (reply) {
+    getConsultantReply(question, history.slice(-6)).then(function (reply) {
       typing.remove();
       addMessage("bot", replyHtml(reply), reply.type === "alarm" ? "msg-alarm" : "");
-      busy = false;
-      sendBtn.disabled = false;
+      if (serverMode && reply.type !== "error") {
+        history.push({ role: "user", content: question }, { role: "assistant", content: reply.answer || "" });
+        history.splice(0, Math.max(0, history.length - 6));
+      }
+      setBusy(false);
     });
   }
 
   // Первое сообщение консультанта
   addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+
+  // Через сервер консультант работает только для вошедших
+  if (serverMode && !getCurrentUser()) {
+    addMessage("bot",
+      "<p>Чтобы задать вопрос, войдите или зарегистрируйтесь.</p>" +
+      '<div class="msg-links">' +
+        '<a href="' + loginLinkBack() + '" class="btn btn-small btn-primary">Войти</a>' +
+        '<a href="login.html?tab=register&amp;back=' + encodeURIComponent(location.pathname.split("/").pop() + location.search) +
+          '" class="btn btn-small btn-secondary">Зарегистрироваться</a>' +
+      "</div>");
+    setBusy(true);
+    input.disabled = true;
+    hintsBox.hidden = true;
+    return;
+  }
 
   // Отправка кнопкой и клавишей Enter (Enter в поле формы отправляет её сам)
   form.addEventListener("submit", function (e) {
@@ -2162,19 +2250,19 @@ function setupConsultantPage() {
   // consultant.html?topic=burns — сразу спросить про тему и показать ответ именно по ней
   const topicId = new URLSearchParams(location.search).get("topic");
   const topic = TOPICS.find(function (t) { return t.id === topicId; });
-  if (topic) {
+  if (topic && serverMode) {
+    ask("Расскажите коротко главное по теме «" + topic.title + "»");
+  } else if (topic) {
     const answer = CONSULTANT.answers.find(function (a) { return a.topicId === topic.id; });
-    busy = true;
-    sendBtn.disabled = true;
+    setBusy(true);
     addMessage("user", "<p>" + escapeHtml("Расскажите про тему: " + topic.title) + "</p>");
-    const typing = addMessage("bot", '<p class="typing">Консультант печатает…</p>', "msg-typing");
+    const typing = addMessage("bot", '<p class="typing">Консультант думает…</p>', "msg-typing");
     setTimeout(function () {
       typing.remove();
       addMessage("bot", replyHtml(answer
         ? { type: "answer", text: answer.text, topicId: topic.id }
         : { type: "answer", text: topic.description, topicId: topic.id }));
-      busy = false;
-      sendBtn.disabled = false;
+      setBusy(false);
     }, 700);
   }
 }

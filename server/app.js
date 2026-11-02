@@ -9,6 +9,8 @@ const cookieParser = require("cookie-parser");
 const { rateLimit } = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { answerQuestion } = require("./consultant");
+const { createYandexModel } = require("./yandex");
 
 const SITE_ROOT = path.join(__dirname, "..");
 
@@ -21,6 +23,7 @@ const TOKEN_DAYS = 7;
 const PASSWORD_MIN = 8;
 const PASSWORD_MAX_BYTES = 72;  // bcrypt учитывает только первые 72 байта пароля
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const QUESTION_MAX = 500;       // длина вопроса консультанту
 
 /* Ошибка, которую можно показать человеку: текст по-русски и код ответа */
 function userError(status, message) {
@@ -57,11 +60,14 @@ function isPlainObject(value) {
     cookieSecure  — true на https-хостинге
     bcryptRounds  — сложность хеша (по умолчанию 12; в тестах меньше, чтобы было быстро)
     loginLimit    — сколько попыток входа можно сделать за 15 минут с одного адреса
+    callModel     — модель для консультанта (по умолчанию Яндекс из .env; в тестах — заглушка)
+    consultantLimit — сколько вопросов консультанту в минуту на одного пользователя (по умолчанию 10)
 */
 function createApp(options) {
   const db = options.db;
   const jwtSecret = options.jwtSecret;
   const bcryptRounds = options.bcryptRounds || 12;
+  const callModel = options.callModel || createYandexModel();
   const cookieOptions = {
     httpOnly: true,                 // JavaScript страницы не может прочитать токен
     sameSite: "lax",
@@ -173,6 +179,27 @@ function createApp(options) {
     if (!isPlainObject(progress)) throw userError(400, "Неверный формат прогресса.");
     const updatedAt = await db.saveProgress(req.user.id, progress);
     res.json({ ok: true, updatedAt: updatedAt });
+  });
+
+  /* ---------- Консультант ---------- */
+  const consultantLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: options.consultantLimit || 10,
+    keyGenerator: function (req) { return "user:" + req.user.id; },  // счёт — по пользователю, а не по адресу
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Слишком много вопросов подряд. Подождите минуту и спросите снова." }
+  });
+
+  api.post("/consultant", requireAuth, consultantLimiter, async function (req, res) {
+    const body = req.body || {};
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+    if (!message) throw userError(400, "Напишите вопрос.");
+    if (message.length > QUESTION_MAX) {
+      throw userError(400, "Вопрос слишком длинный: не больше " + QUESTION_MAX + " символов. Сократите его, пожалуйста.");
+    }
+    const reply = await answerQuestion(message, body.history, callModel);
+    res.json(reply);
   });
 
   api.use(function (req, res, next) {

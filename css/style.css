@@ -1134,6 +1134,25 @@ input:focus { border-color: var(--accent); outline: none; }
   min-width: 0;
   font-size: 1.1rem; /* не меньше 16px — иначе телефон увеличивает страницу при вводе */
 }
+/* Постоянная заметка над чатом консультанта */
+.chat-note {
+  margin: 0 0 20px;
+  padding: 14px 18px;
+  background: #fff6e8;
+  border: 1px solid #e8cfa4;
+  border-left: 6px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 1rem;
+}
+.chat-note a { font-weight: bold; }
+/* «Источники: урок …» под ответом консультанта */
+.msg-sources {
+  margin-top: 12px !important;
+  font-size: 0.95rem;
+}
+.msg-sources a { color: var(--accent); font-weight: bold; }
+.msg-alarm .alarm-phone + .alarm-phone { margin-left: 10px; }
+.msg-alarm .msg-sources a { color: #fff; }
 .chat-disclaimer {
   margin-top: 16px;
   text-align: center;
