@@ -101,11 +101,12 @@ function renderHeader() {
       ]
     },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
-    { href: "help.html", text: "Помощь", page: "help" },
-    user
-      ? { href: "cabinet.html", text: user.name || "Кабинет", page: "cabinet" }
-      : { href: "login.html", text: "Войти", page: "login" }
+    { href: "help.html", text: "Помощь", page: "help" }
   ];
+  // Справа в шапке: «Войти» или (после входа) «Кабинет»/имя и «Выйти»
+  const account = user
+    ? { href: "cabinet.html", text: user.name || "Кабинет", page: "cabinet" }
+    : { href: "login.html", text: "Войти", page: "login" };
 
   function linkHtml(link, active) {
     return '<a href="' + link.href + '"' + (active ? ' class="active" aria-current="page"' : "") + ">" +
@@ -130,14 +131,18 @@ function renderHeader() {
         '<ul class="submenu">' + sub + "</ul>" +
       "</li>"
     );
-  }).join("") +
-    (user ? '<li><button type="button" class="menu-logout">Выйти</button></li>' : "");
+  }).join("");
 
+  // Три колонки: слева «Опора», по центру меню, справа вход/выход (раскладка — в css/style.css)
   header.innerHTML =
     '<div class="container header-inner">' +
       '<a href="index.html" class="logo">Опора<span>Школа ухода</span></a>' +
       '<button class="menu-toggle" aria-expanded="false" aria-controls="main-menu">☰ Меню</button>' +
       '<nav aria-label="Главное меню"><ul id="main-menu" class="menu">' + items + "</ul></nav>" +
+      '<div class="header-actions">' +
+        linkHtml(account, account.page === page) +
+        (user ? '<button type="button" class="menu-logout">Выйти</button>' : "") +
+      "</div>" +
     "</div>";
 
   const logout = header.querySelector(".menu-logout");
@@ -153,6 +158,7 @@ function renderHeader() {
   const menu = header.querySelector(".menu");
   toggle.addEventListener("click", function () {
     const open = menu.classList.toggle("open");
+    header.querySelector(".header-actions").classList.toggle("open", open);  // на телефоне вход/выход — вместе с меню
     toggle.setAttribute("aria-expanded", open);
     toggle.textContent = open ? "✕ Закрыть" : "☰ Меню";
   });

@@ -20,17 +20,27 @@
 
 /* ===== Цвета и общие настройки (меняются в одном месте) ===== */
 :root {
-  --bg: #fbf8f3;        /* фон */
+  --page-bg: #f1e7e1;   /* фон всех страниц (тёплый бежево-розовый) */
+  --bg: #fbf8f3;        /* светлые плашки внутри белых карточек (вкладки, полоса прогресса, пузыри чата) */
   --text: #1f2a44;      /* текст */
-  --accent: #b4472f;    /* акцент */
+  --accent: #b2452d;    /* акцент (чуть темнее прежнего #b4472f, чтобы ссылки читались на --page-bg) */
   --accent-dark: #933823;
   --card: #ffffff;      /* карточки */
   --border: #d9d0c0;    /* рамки */
   --muted: #5b6478;     /* второстепенный текст */
   --radius: 14px;
 
-  /* Фоновая картинка на главной (images/hero.jpg) */
-  --hero-image-opacity: 0.7; /* прозрачность картинки: 0 — не видно, 1 — полная яркость */
+  /* Оранжевая шапка и главное фото */
+  --orange: 252, 80, 3;          /* цвет шапки #fc5003 — три числа R, G, B (для прозрачности rgba) */
+  --header-alpha: 0.45;          /* прозрачность оранжевой шапки поверх фото на главной (0 — нет цвета, 1 — сплошной) */
+  --header-alpha-solid: 0.92;    /* прозрачность шапки на остальных страницах, где под ней нет фото */
+  --hero-photo-opacity: 0.92;    /* непрозрачность главного фото (images/hero.jpg): 1 — полностью яркое */
+  --hero-shade: 0.38;            /* затемнение фото слева под текстом: 0 — нет, 0.5 — заметно темнее */
+  --hero-shade-end: 55%;         /* где затемнение сходит на нет (доля ширины фото); до 1100px — 62% */
+  --header-h: 84px;              /* примерная высота шапки — отступ текста на фото под ней */
+  --hero-fade: 30%;              /* высота плавного перехода фото в фон страницы (доля высоты блока фото) */
+  --hero-text-bottom: 27vh;      /* место под кнопками на фото — чтобы текст не заходил в зону перехода.
+                                    Увеличили --hero-fade — увеличьте и это (примерно --hero-fade × 0.9 в vh) */
 }
 
 * {
@@ -39,7 +49,7 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: var(--page-bg);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
   font-size: 20px;      /* крупный текст */
@@ -135,70 +145,126 @@ img { max-width: 100%; }
 }
 
 /* ===== Шапка и меню ===== */
+/* Оранжевая полупрозрачная шапка с размытием под ней; весь текст в ней белый */
 .site-header {
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  background: rgba(var(--orange), var(--header-alpha-solid));
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   position: sticky;
   top: 0;
   z-index: 10;
+  color: #fff;
+}
+/* Главная: шапка лежит поверх фото (фото начинается от самого верха окна) и уходит вверх вместе с ним */
+body[data-page="home"] .site-header {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(var(--orange), var(--header-alpha));
+}
+/* Открытое меню на телефоне ложится поверх текста на фото — делаем шапку плотной, как на других страницах */
+body[data-page="home"] .site-header:has(.menu.open) {
+  background: rgba(var(--orange), var(--header-alpha-solid));
 }
 .header-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  padding-top: 12px;
+  padding-bottom: 12px;
   flex-wrap: wrap;
+}
+/* Компьютер: три колонки 1fr auto 1fr — слева «Опора», строго по центру меню, справа вход/выход.
+   Боковые колонки одинаковой ширины, поэтому меню стоит ровно по центру окна */
+@media (min-width: 1001px) {
+  .site-header .container { max-width: none; padding: 0 32px; }
+  .header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: 16px;
+  }
+  .logo { justify-self: start; }
+  .site-header nav { justify-self: center; }
+  .header-actions { justify-self: end; }
+  .menu { flex-wrap: nowrap; }
 }
 .logo {
   font-size: 1.6rem;
   font-weight: bold;
-  color: var(--text);
+  color: #fff;
   text-decoration: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .logo span {
   display: block;
   font-size: 0.85rem;
   font-weight: normal;
-  color: var(--muted);
+  color: #fff;
 }
 .menu {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.menu a {
+.menu a,
+.header-actions a {
+  position: relative;
   display: block;
   padding: 10px 14px;
   border-radius: 10px;
-  color: var(--text);
+  color: #fff;
   text-decoration: none;
   font-size: 1.05rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
 }
-.menu a:hover { background: var(--bg); }
-/* «Выйти» в меню — кнопка, но выглядит как пункт меню */
+.menu a:hover,
+.header-actions a:hover { background: rgba(255, 255, 255, 0.16); }
+/* Выбранный пункт — белое подчёркивание 3 px под текстом, без заливки */
+.menu a.active::after,
+.header-actions a.active::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+/* Справа: «Войти» или «Кабинет»/имя и «Выйти» */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.header-actions a {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;   /* длинное имя не раздвигает шапку */
+}
+/* «Выйти» — кнопка, но выглядит как пункт меню */
 .menu-logout {
   display: block;
-  width: 100%;
   padding: 10px 14px;
   border: 0;
   border-radius: 10px;
   background: none;
-  color: var(--text);
+  color: #fff;
   font: inherit;
   font-size: 1.05rem;
   text-align: left;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
-.menu-logout:hover { background: var(--bg); }
-.menu a.active {
-  background: var(--accent);
-  color: #fff;
-}
+.menu-logout:hover { background: rgba(255, 255, 255, 0.16); }
+.site-header :focus-visible { outline-color: #fff; }
 /* Пункт меню с выпадающим списком («Справочник») */
 .has-sub { position: relative; }
 .sub-head {
@@ -208,15 +274,17 @@ img { max-width: 100%; }
 .sub-toggle {
   font-family: inherit;
   font-size: 1.1rem;
-  min-width: 44px;
+  min-width: 40px;
   min-height: 44px;
   background: none;
-  color: var(--text);
+  color: #fff;
   border: 0;
   border-radius: 10px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
-.sub-toggle:hover { background: var(--bg); }
+.sub-toggle:hover { background: rgba(255, 255, 255, 0.16); }
+/* Выпадающий список — оранжевый, почти сплошной, чтобы белый текст читался над любым фоном */
 .submenu {
   display: none;
   position: absolute;
@@ -227,10 +295,9 @@ img { max-width: 100%; }
   list-style: none;
   margin: 0;
   padding: 8px;
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: rgba(var(--orange), 0.96);
   border-radius: var(--radius);
-  box-shadow: 0 6px 18px rgba(31, 42, 68, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 .has-sub.open .submenu { display: block; }
 
@@ -239,12 +306,13 @@ img { max-width: 100%; }
   font-family: inherit;
   font-size: 1.05rem;
   font-weight: bold;
-  padding: 12px 18px;
+  padding: 10px 18px;
   min-height: 48px;
-  background: var(--card);
-  color: var(--text);
-  border: 2px solid var(--border);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border: 2px solid #fff;
   border-radius: var(--radius);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
@@ -256,72 +324,113 @@ img { max-width: 100%; }
   font-size: 1rem;
 }
 
-/* ===== Главный экран ===== */
+/* ===== Главный экран: фото во всё окно, белый текст прямо на фото ===== */
 .hero {
   position: relative;
-  isolation: isolate;        /* фон-картинка остаётся под текстом и не уходит под страницу */
+  isolation: isolate;        /* фото и затемнение остаются под текстом */
   overflow: hidden;
-  min-height: 75vh;          /* примерно три четверти окна */
-  min-height: 75svh;         /* на телефоне — без учёта прыгающей адресной строки */
+  min-height: 85vh;
+  min-height: 85svh;         /* на телефоне — без учёта прыгающей адресной строки */
   display: flex;
   align-items: center;
-  padding: 64px 0 120px;     /* снизу больше места под плавный переход */
-  text-align: left;          /* весь блок — по левому краю контейнера */
+  padding: calc(var(--header-h) + 40px) 0 var(--hero-text-bottom);  /* сверху — шапка, снизу — зона перехода */
+  /* Нижние --hero-fade высоты фото плавно уходят в цвет фона страницы: прозрачно → 25% → 60% → 100% */
+  --hero-fade-layer: linear-gradient(to bottom,
+    transparent calc(100% - var(--hero-fade)),
+    var(--page-bg) 100%);
+  text-align: left;
 }
-/* Сама картинка — отдельным слоем, чтобы прозрачной была только она, а не текст */
+/* Низкий экран: текст занимает большую долю высоты — оставляем под кнопками больше места,
+   чтобы они не заходили в зону перехода */
+@media (max-height: 700px) {
+  .hero { --hero-text-bottom: 34vh; }
+}
+@supports (background: color-mix(in srgb, red 50%, transparent)) {
+  .hero {
+    --hero-fade-layer: linear-gradient(to bottom,
+      color-mix(in srgb, var(--page-bg) 0%, transparent) calc(100% - var(--hero-fade)),
+      color-mix(in srgb, var(--page-bg) 25%, transparent) calc(100% - var(--hero-fade) * 0.62),
+      color-mix(in srgb, var(--page-bg) 60%, transparent) calc(100% - var(--hero-fade) * 0.3),
+      var(--page-bg) 100%);
+  }
+}
+/* Само фото — отдельным слоем: прозрачным может быть только оно, а не текст.
+   cover — фото заполняет блок и обрезается; 72% — человек справа остаётся в кадре */
 .hero::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: url("../images/hero.jpg") center / cover no-repeat;
-  opacity: var(--hero-image-opacity);
+  background: url("../images/hero.jpg") 72% center / cover no-repeat;
+  opacity: var(--hero-photo-opacity);
 }
-/* Плавный переход картинки в фон страницы внизу */
+/* Мягкое затемнение только слева, под текстом, и плавный переход в фон страницы внизу */
 .hero::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(to bottom, rgba(251, 248, 243, 0) 50%, var(--bg) 100%);
+  background:
+    var(--hero-fade-layer),
+    linear-gradient(to right, rgba(0, 0, 0, var(--hero-shade)) 0%,
+      rgba(0, 0, 0, calc(var(--hero-shade) * 0.75)) calc(var(--hero-shade-end) * 0.6),
+      rgba(0, 0, 0, 0) var(--hero-shade-end));
 }
+/* Окно поуже: текст занимает большую долю ширины — затемнение тянется чуть дальше вправо */
+@media (max-width: 1100px) {
+  .hero { --hero-shade-end: 62%; }
+}
+/* Текст начинается примерно с 11% ширины окна и занимает не больше 45% ширины */
 .hero .container {
   width: 100%;
-  position: relative;
+  max-width: none;
+  margin: 0;
+  padding: 0 20px 0 11vw;
 }
-/* Мягкое светлое пятно под текстом (как в первой версии: тот же цвет, плотность 0.75 в центре).
-   Размером с текстовый блок, слева под текстом, к краям плавно сходит на нет —
-   правая часть картинки с людьми остаётся без налёта */
-.hero .container::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: -70px;
-  bottom: -70px;
-  left: -90px;
-  width: calc(min(100%, 660px) + 180px);  /* ширина текста + запас на плавный край */
-  background: radial-gradient(closest-side, rgba(251, 248, 243, 0.9), rgba(251, 248, 243, 0));
-  pointer-events: none;
-}
-/* Заголовок «ОПОРА»: от 44px на телефоне до 88px на компьютере, плавно по ширине окна */
+
+.hero .container > * { max-width: 45vw; }
+/* «Опора»: от 56px на телефоне до 110px на компьютере */
 .hero h1 {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   font-family: "Lora", Georgia, serif;  /* шрифт только этого слова; подключён в начале файла */
-  font-size: clamp(44px, 5vw + 24px, 88px);
+  font-size: clamp(56px, 5vw + 34px, 110px);
   font-weight: 700;
-  line-height: 1.05;
+  line-height: 1.02;
   letter-spacing: 0;
-  color: var(--accent);
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
-/* Абзац под заголовком: от 17px на телефоне до 21px на компьютере */
+/* Подзаголовок: 22–24px на компьютере */
 .hero-text {
-  max-width: 660px;           /* строки не растягиваются на весь экран */
-  margin: 0 0 36px;
-  font-size: clamp(17px, 0.6vw + 14px, 21px);
+  max-width: min(560px, 45vw);
+  margin: 0 0 32px;
+  font-size: clamp(18px, 0.4vw + 17px, 24px);
   line-height: 1.5;
-  color: var(--text);
+  color: #fff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
-.hero .buttons { justify-content: flex-start; }
+/* Кнопки на фото: полупрозрачные, полностью скруглённые, с размытием под ними */
+.hero .buttons { justify-content: flex-start; gap: 14px; }
+.hero .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  padding: 0 28px;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: background 0.2s;
+}
+.hero .btn-primary { background: rgba(var(--orange), 0.6); border: 2px solid transparent; }
+.hero .btn-primary:hover { background: rgba(var(--orange), 0.8); border-color: transparent; }
+.hero .btn-secondary { background: rgba(255, 255, 255, 0.18); border: 2px solid #fff; }
+.hero .btn-secondary:hover { background: rgba(255, 255, 255, 0.32); }
+.hero .btn:focus-visible { outline-color: #fff; }
 
 /* ===== Блоки на главной ===== */
 .block { padding: 40px 0; }
@@ -1429,17 +1538,38 @@ input:focus { border-color: var(--accent); outline: none; }
 /* ===== Телефон и планшет ===== */
 @media (max-width: 860px) {
   .grid-3 { grid-template-columns: 1fr; }
+}
 
+/* Шапка: до 1000px меню и вход/выход прячутся под кнопку «☰ Меню»
+   (шире меню помещается ровно по центру между «Опорой» и входом) */
+@media (max-width: 1000px) {
   .menu-toggle { display: block; }
   .site-header nav { width: 100%; }
   .menu {
     display: none;           /* меню скрыто, пока не нажали «Меню» */
     flex-direction: column;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
   }
   .menu.open { display: flex; }
   .menu a,
-  .menu-logout { padding: 14px; font-size: 1.15rem; }
+  .menu-logout,
+  .header-actions a { padding: 14px; font-size: 1.15rem; }
+  /* В столбце подчёркивание — ровно по длине слова */
+  .menu a.active::after,
+  .header-actions a.active::after { display: none; }
+  .menu a.active,
+  .header-actions a.active { text-decoration: underline 3px #fff; text-underline-offset: 8px; }
+  .header-actions {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding-bottom: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.4);
+  }
+  .header-actions.open { display: flex; }
+  .header-actions a { max-width: none; }
+  .menu-logout { width: 100%; }
 
   /* Подменю на телефоне — внутри списка, с отступом, открывается стрелкой */
   .sub-head a { flex: 1; }
@@ -1453,7 +1583,7 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 
 /* Подменю на компьютере открывается и при наведении мыши */
-@media (hover: hover) and (min-width: 861px) {
+@media (hover: hover) and (min-width: 1001px) {
   .has-sub:hover .submenu { display: block; }
 }
 
@@ -1467,19 +1597,20 @@ input:focus { border-color: var(--accent); outline: none; }
   .rights-panel { padding: 4px 18px 20px; }
   .test-percent { font-size: 2.6rem; }
   body { font-size: 18px; }
-  .hero { padding: 40px 0 96px; }
-  /* На узком экране сдвигаем кадр вправо, чтобы были видны люди на картинке */
+  .hero { padding: calc(var(--header-h) + 24px) 0 var(--hero-text-bottom); }
+  /* На узком экране кадр сдвинут вправо, чтобы человек на фото был виден */
   .hero::before { background-position: 85% center; }
-  /* На телефоне текст на всю ширину — пятно шире экрана и чуть плотнее (0.8, как в первой версии) */
-  .hero .container::before {
-    left: -40px;
-    width: calc(100% + 80px);
-    top: -50px;
-    bottom: -50px;
-    background: radial-gradient(closest-side, rgba(251, 248, 243, 0.8), rgba(251, 248, 243, 0));
+  /* Текст на всю ширину — затемнение шире и плотнее книзу, чтобы белый текст читался */
+  .hero::after {
+    background:
+      var(--hero-fade-layer),
+      linear-gradient(to right, rgba(0, 0, 0, var(--hero-shade)) 0%, rgba(0, 0, 0, calc(var(--hero-shade) * 0.6)) 100%);
   }
-  .hero h1 { margin-bottom: 16px; }
-  .hero-text { margin-bottom: 28px; }
+  .hero .container { padding: 0 20px; }
+  .hero .container > *,
+  .hero-text { max-width: 100%; }
+  .hero h1 { margin-bottom: 14px; }
+  .hero-text { margin-bottom: 26px; }
   .buttons .btn { width: 100%; }
   .card { padding: 22px; }
   .lessons-grid { grid-template-columns: 1fr; }
@@ -1507,7 +1638,7 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 
 /* Тёплый фон страницы практики и широкий контейнер — чтобы картинка была крупной */
-body.page-practice { background: #f6efe6; }
+body.page-practice { background: var(--page-bg); }
 .practice-container { max-width: 1440px; }
 
 /* Три колонки: список заданий — задание — результаты; уже 1000px — друг под другом */
