@@ -624,6 +624,39 @@ const TOPICS = [
         "Отёк быстро нарастает: обратитесь за помощью срочно."
       ]
     },
+    practice: {
+      tasks: [
+        {
+          id: "spot-error-1",
+          type: "spot-error",
+          title: "Что здесь не так?",
+          description: "Вечер, человек после ампутации ноги готовится ко сну. Найдите в комнате то, что может навредить. Подсвечиваются все предметы, которые можно выбрать: часть из них опасна, часть — наоборот, помогает.",
+          width: 1024, height: 572,
+          background: "images/practice/amputaciya/00_fon.jpg",
+          alt: "Спальня вечером: кровать, костыли, тумбочка с зеркалом, стул, снятый протез ноги",
+          items: [
+            { id: "grelka", image: "images/practice/amputaciya/10_grelka.png", role: "error", label: "Грелка",
+              explanation: "Чувствительность кожи культи часто снижена: человек может не почувствовать, что слишком горячо, и получить ожог. Прогревать культю можно только по назначению врача." },
+            { id: "gruz_krovat", image: "images/practice/amputaciya/20_gruz_krovat.png", role: "error", group: "gruz", label: "Гантели и утяжелители",
+              explanation: "Силовые упражнения и нагрузку на культю начинают только по программе реабилитации, которую составил специалист." },
+            { id: "gruz_pol", image: "images/practice/amputaciya/21_gruz_pol.png", role: "error", group: "gruz", label: "Гантели и утяжелители",
+              explanation: "Силовые упражнения и нагрузку на культю начинают только по программе реабилитации, которую составил специалист." },
+            { id: "lainer", image: "images/practice/amputaciya/30_lainer.png", role: "error", label: "Лайнер на батарее",
+              explanation: "Лайнер — мягкий силиконовый чехол, который надевают на культю под протез. От горячей батареи он портится. Его моют по инструкции и сушат при комнатной температуре." },
+            { id: "binty", image: "images/practice/amputaciya/40_binty.png", role: "error", label: "Эластичные бинты и компрессионный чехол",
+              explanation: "Бинтовать культю и надевать компрессию можно только после обучения у специалиста и по его назначению: неправильная повязка может пережать ткани." },
+            { id: "kostyli", image: "images/practice/amputaciya/60_kostyli.png", role: "ok", label: "Костыли у кровати",
+              explanation: "Ночью человек может забыть об ампутации из-за фантомных ощущений, попытаться встать и упасть. Опора должна быть под рукой." },
+            { id: "zerkalo", image: "images/practice/amputaciya/61_zerkalo.png", role: "ok", label: "Зеркало",
+              explanation: "С зеркалом удобно каждый день осматривать кожу культи со всех сторон и вовремя заметить покраснение или потёртость." },
+            { id: "mylo_polotence", image: "images/practice/amputaciya/62_mylo_polotence.png", role: "ok", label: "Мыло и полотенце",
+              explanation: "Культю ежедневно моют мягким мылом и тщательно высушивают." },
+            { id: "protez", image: "images/practice/amputaciya/63_protez.png", role: "ok", label: "Протез снят на ночь",
+              explanation: "На ночь протез обычно снимают, чтобы кожа культи отдохнула." }
+          ]
+        }
+      ]
+    },
     quiz: [
       {
         question: "Что входит в основные задачи после ампутации?",
