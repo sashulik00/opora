@@ -1563,6 +1563,26 @@ body.page-practice { background: #f6efe6; }
 .practice-task-title { margin: 0 0 6px; font-size: 1.7rem; }
 .practice-task-desc { margin: 0 0 20px; font-size: 0.95rem; color: var(--muted); }
 
+/* Записка над картинкой (поле note задания): заголовок, нумерованный список, мелкая подпись */
+.practice-note-card {
+  margin: 0 0 22px;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid #eadfce;
+  border-left: 5px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(107, 74, 53, 0.07);
+}
+.practice-note-title { margin: 0 0 8px; font-size: 1.15rem; }
+.practice-note-card ol {
+  margin: 0;
+  padding-left: 1.6em;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.practice-note-card li + li { margin-top: 4px; }
+.practice-note-foot { margin: 10px 0 0; font-size: 0.85rem; color: var(--muted); }
+
 .practice-scene {
   position: relative;      /* от него считается положение окна «Выбрать эту деталь?» */
   margin: 8px 8px 0;       /* место под белую рамку картинки */

@@ -1255,6 +1255,19 @@ function setupPractice(topic, task, taskIndex, onDone) {
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
    Слева — список заданий темы, в центре — задание, справа — карточки результатов.
    Задания переключаются без перезагрузки: меняется только ?task= в адресе */
+/* Записка над картинкой (необязательное поле задания note: { title, items, footnote }).
+   Нет поля или оно пустое — ничего не выводится */
+function renderPracticeNote(note) {
+  if (!note || !(note.title || hasItems(note.items))) return "";
+  return (
+    '<aside class="practice-note-card" aria-label="' + escapeHtml(note.title || "Записка") + '">' +
+      (note.title ? '<h2 class="practice-note-title">' + escapeHtml(note.title) + "</h2>" : "") +
+      (hasItems(note.items) ? renderList(note.items, "ol") : "") +
+      (note.footnote ? '<p class="practice-note-foot">' + escapeHtml(note.footnote) + "</p>" : "") +
+    "</aside>"
+  );
+}
+
 function renderPracticePage() {
   const page = document.getElementById("practice-page");
   if (!page) return;
@@ -1284,6 +1297,7 @@ function renderPracticePage() {
       '<section class="practice-main-col">' +
         '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
         (task.description ? '<p class="practice-task-desc">' + escapeHtml(task.description) + "</p>" : "") +
+        renderPracticeNote(task.note) +
         '<div id="practice-task"></div>' +
       "</section>" +
       '<aside class="practice-side-col" id="practice-results" aria-label="Результаты"></aside>' +
