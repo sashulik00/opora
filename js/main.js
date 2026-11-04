@@ -624,9 +624,10 @@ function webUrl(url) {
   return /^https?:\/\//i.test(value) ? value : "";
 }
 
-/* Видео урока — необязательное поле videos в js/data.js:
+/* Видео урока или статьи — необязательное поле videos в js/data.js:
      videos: [{ title: "Название", org: "Кто снял", embedUrl: "адрес плеера для iframe", pageUrl: "страница ролика" }]
    embedUrl может не быть (площадка не разрешает встраивание) — тогда вместо плеера карточка со ссылкой на pageUrl.
+   org или pageUrl могут быть пустыми — тогда нет подписи под плеером или кнопки «Смотреть на сайте».
    Старое поле video (ссылка YouTube/Rutube) тоже работает, если списка videos нет. */
 function lessonVideos(topic) {
   if (Array.isArray(topic.videos) && topic.videos.length) {
@@ -643,7 +644,7 @@ function lessonVideoScreen(video) {
   if (embed) {
     return (
       '<iframe src="' + escapeHtml(embed) + '" title="' + escapeHtml(video.title || "Видео урока") + '" loading="lazy" ' +
-      'allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen ' +
+      'allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen ' +
       'referrerpolicy="strict-origin-when-cross-origin"></iframe>'
     );
   }
@@ -660,7 +661,7 @@ function lessonVideoOrg(video) {
   return video.org ? "Видео: " + video.org : "";
 }
 
-function renderLessonVideos(videos) {
+function renderLessonVideos(videos, label) {
   if (!videos.length) return "";
   const list = videos.length < 2 ? "" :
     '<ul class="lesson-video-list">' +
@@ -670,7 +671,7 @@ function renderLessonVideos(videos) {
       }).join("") +
     "</ul>";
   return (
-    '<section class="lesson-video" aria-label="Видео урока">' +
+    '<section class="lesson-video" aria-label="' + (label || "Видео урока") + '">' +
       '<div class="lesson-video-screen">' + lessonVideoScreen(videos[0]) + "</div>" +
       '<p class="lesson-video-org">' + escapeHtml(lessonVideoOrg(videos[0])) + "</p>" +
       list +
@@ -3378,17 +3379,19 @@ function renderVideoPage() {
     renderMoreOnTopic(topic, "video.html");
 }
 
-/* article.html — только статья (details) и источники */
+/* article.html — статья (details), видео (videos, если есть) и источники */
 function renderArticlePage() {
   const page = document.getElementById("article-page");
   if (!page) return;
   const topic = topicFromAddress(page, "articles.html", "К списку статей");
   if (!topic) return;
 
+  const videos = Array.isArray(topic.videos) ? lessonVideos(topic) : [];
   document.title = topic.title + " — Статья — Опора";
   page.innerHTML =
     renderMaterialHead(topic, "articles.html", "Статьи") +
     renderIntro(topic) +   // вводный абзац сверху
+    renderLessonVideos(videos, "Видео") +
     (hasArticle(topic)
       ? '<div class="card details article-text">' +
           topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
@@ -3396,6 +3399,7 @@ function renderArticlePage() {
       : renderSoon("Статья скоро появится")) +
     renderSources(topic) +
     renderMoreOnTopic(topic, "article.html");
+  setupLessonVideos(page, videos);
 }
 
 /* ---------- Помощь (help.html) ---------- */

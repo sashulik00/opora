@@ -17,6 +17,8 @@
     video       — ссылка на видео (пока пусто: ""). Подходят обычные ссылки
                   YouTube (youtube.com/watch?v=..., youtu.be/...) и Rutube (rutube.ru/video/...).
                   Это же видео показывается в справочнике на странице video.html
+    videos      — плееры в уроке и в статье: [{ title, org, embedUrl, pageUrl }, ...]. Если роликов несколько, под плеером список.
+                  org и pageUrl могут быть пустыми. Домен нового плеера нужно разрешить в frame-src (server/app.js).
     lessonMemo  — памятка урока: doList (что делать), dontList (чего нельзя),
                   urgentList (когда срочно к врачу / когда срочно обращаться)
     quiz        — тест (страница test.html): вопросы, варианты ответов, номер верного ответа
@@ -142,6 +144,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Ожоги", org: "",
+        embedUrl: "https://rutube.ru/play/embed/369e641b585d828ae4b1e9303013a412/",
+        pageUrl: "https://rutube.ru/video/369e641b585d828ae4b1e9303013a412/" }
+    ],
     lessonMemo: {
       doList: [
         "После выписки соблюдать назначения врача по перевязкам.",
@@ -402,6 +410,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Раны и швы", org: "",
+        embedUrl: "https://dzen.ru/embed/veeHnMKyNA0Q?mute=0&autoplay=0",
+        pageUrl: "" }
+    ],
     lessonMemo: {
       doList: [
         "Перед перевязкой тщательно вымыть руки и подготовить чистую поверхность и назначенные материалы.",
@@ -666,6 +680,16 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео 1: Пролежни", org: "",
+        embedUrl: "https://dzen.ru/embed/vkDTKn85ilF4?mute=0&autoplay=0",
+        pageUrl: "" },
+      // TODO: название и автор
+      { title: "Видео 2: Пролежни", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-195155417&id=456240576&hd=4",
+        pageUrl: "https://vkvideo.ru/video-195155417_456240576" }
+    ],
     lessonMemo: {
       doList: [
         "Осматривать кожу ежедневно: крестец, пятки, бёдра, лопатки, локти.",
@@ -933,6 +957,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Уход после ампутации", org: "",
+        embedUrl: "https://rutube.ru/play/embed/e78d00383550e363d2717709f190782c/",
+        pageUrl: "https://rutube.ru/video/e78d00383550e363d2717709f190782c/" }
+    ],
     lessonMemo: {
       doList: [
         "Соблюдать назначения хирурга по обработке раны и смене повязки.",
@@ -1192,6 +1222,16 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео 1: Перемещение и подвижность", org: "",
+        embedUrl: "https://dzen.ru/embed/vWfKtRI0O8Gc?mute=0&autoplay=0",
+        pageUrl: "" },
+      // TODO: название и автор
+      { title: "Видео 2: Перемещение и подвижность", org: "",
+        embedUrl: "https://dzen.ru/embed/vMR2P1XMAIiU?mute=0&autoplay=0",
+        pageUrl: "" }
+    ],
     lessonMemo: {
       doList: [
         "Сначала оценить, может ли человек безопасно вставать, опираться на ноги и удерживать равновесие.",
@@ -1451,6 +1491,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Питание и режим", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-168920485&id=456239208&hd=4",
+        pageUrl: "https://vkvideo.ru/video-168920485_456239208" }
+    ],
     lessonMemo: {
       doList: [
         "Организовать регулярные приёмы пищи, если врач не назначил другой режим.",
@@ -1767,6 +1813,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Бессонница и кошмары", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239021&hd=4",
+        pageUrl: "https://vkvideo.ru/video-227543018_456239021" }
+    ],
     lessonMemo: {
       doList: [
         "Поддерживать спокойный вечерний режим и привычное время сна.",
@@ -1930,6 +1982,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Приступы агрессии (что делать семье)", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-220870023&id=456239409&hd=3",
+        pageUrl: "https://vkvideo.ru/video-220870023_456239409" }
+    ],
     lessonMemo: {
       doList: [
         "Сохранять спокойный тон и говорить короткими фразами.",
@@ -2098,6 +2156,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Как разговаривать с раненым", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239026&hd=4",
+        pageUrl: "https://vkvideo.ru/video-227543018_456239026" }
+    ],
     lessonMemo: {
       doList: [
         "Спросить: «Тебе сейчас хочется поговорить или лучше просто побыть рядом?»",
@@ -2264,6 +2328,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Выгорание у ухаживающего", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239293&hd=4",
+        pageUrl: "https://vkvideo.ru/video-227543018_456239293" }
+    ],
     lessonMemo: {
       doList: [
         "Составить расписание ухода и распределить обязанности между родственниками.",
@@ -2327,6 +2397,12 @@ const TOPICS = [
 
     /* --- Урок --- */
     video: "",
+    videos: [
+      // TODO: название и автор
+      { title: "Видео: Поддержка детей в семье", org: "",
+        embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239212&hd=4",
+        pageUrl: "https://vkvideo.ru/video-227543018_456239212" }
+    ],
     lessonMemo: {
       doList: [
         "Объяснять происходящее простыми словами, соответствующими возрасту.",

@@ -84,12 +84,22 @@ function createApp(options) {
   app.use(helmet({
     contentSecurityPolicy: {
       directives: {
-        // Встроенные видео в уроках — YouTube и Rutube
-        "frame-src": ["https://www.youtube.com", "https://www.youtube-nocookie.com", "https://rutube.ru"],
+        // Встроенные видео в уроках и статьях: Rutube, Дзен, VK; YouTube — для старого поля video
+        "frame-src": [
+          "'self'",
+          "https://rutube.ru", "https://*.rutube.ru",
+          "https://dzen.ru", "https://*.dzen.ru",
+          "https://vkvideo.ru", "https://*.vkvideo.ru",
+          "https://vk.com", "https://*.vk.com",
+          "https://vk.ru", "https://*.vk.ru",
+          "https://www.youtube.com", "https://www.youtube-nocookie.com"
+        ],
         // На своём компьютере сайт открывается по http — не переводить запросы на https
         "upgrade-insecure-requests": options.cookieSecure ? [] : null
       }
-    }
+    },
+    // С no-referrer плееры VK и Дзена могут не загружаться
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" }
   }));
 
   /* ---------- API ---------- */

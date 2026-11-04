@@ -705,6 +705,7 @@ input:focus { border-color: var(--accent); outline: none; }
 .lesson-video-card .btn { margin-top: 8px; }
 .lesson-video-org { margin: 8px 0 0; font-size: 0.9rem; color: var(--muted); }
 .lesson-video-org:empty { display: none; }
+#article-page .lesson-video { margin-bottom: 24px; }   /* в статье видео стоит между вступлением и текстом */
 .lesson-video-list {
   list-style: none;
   margin: 10px 0 0;
