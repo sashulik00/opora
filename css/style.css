@@ -43,6 +43,17 @@
   --lesson-side: 360px;          /* урок: ширина правой колонки с карточками */
   --hero-text-bottom: 27vh;      /* место под кнопками на фото — чтобы текст не заходил в зону перехода.
                                     Увеличили --hero-fade — увеличьте и это (примерно --hero-fade × 0.9 в vh) */
+
+  /* Страница практики на компьютере (от 1000px): всё задание в окне без прокрутки */
+  --practice-nav-w: 260px;          /* ширина левой панели со списком заданий */
+  --practice-nav-folded-w: 48px;    /* ширина свёрнутой левой панели */
+  --practice-side-w: clamp(300px, 22vw, 400px);  /* ширина правой панели в заданиях с картинкой (меньше — крупнее картинка) */
+  --practice-btn-h: 44px;           /* высота кнопок в нижней строке */
+  --practice-btn-pad: 18px;         /* поля кнопок слева и справа */
+  --practice-desc-size: 18px;       /* размер описания под заголовком задания */
+  --practice-desc-color: #3c4557;   /* цвет описания */
+  --practice-zones-gap: 44px;       /* место для линий между зонами в «Подбери пару» */
+  --practice-explain-h: 58px;       /* высота строки «Пояснение» в «Подбери пару» */
 }
 
 * {
@@ -1908,20 +1919,12 @@ html.modal-open {
 body.page-practice { background: var(--page-bg); }
 .practice-container { max-width: 1440px; }
 
-/* Три колонки: список заданий — задание — результаты; уже 1000px — друг под другом */
+/* Уже 1000px всё идёт друг под другом; раскладка в три области — в блоке «Компьютер» в конце раздела */
 .practice-page-grid {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) clamp(300px, 30vw, 400px);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
   align-items: start;
-}
-/* Центр не уезжает, пока прокручиваются карточки справа. Только в три колонки и при низкой шапке
-   (высокой, с кнопкой «Меню», она становится при 1000px и уже) */
-@media (min-width: 1001px) {
-  .practice-main-col {
-    position: sticky;
-    top: var(--header-h);
-  }
 }
 .practice-nav,
 .practice-side-col,
@@ -1964,6 +1967,28 @@ body.page-practice { background: var(--page-bg); }
 }
 .practice-nav-check { color: #2e7d32; font-weight: bold; }
 .practice-nav-back { font-size: 1rem; color: var(--accent); }
+.practice-nav-circle { display: none; }
+/* Кнопка сворачивания — только на компьютере, кнопка выпадающего списка — только уже 1000px */
+.practice-nav-fold,
+.practice-nav-drop {
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.practice-nav-fold {
+  display: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 1.3rem;
+  font-weight: bold;
+  line-height: 1;
+}
+.practice-nav-fold:hover { background: #fbf5ee; }
 
 /* Центр: задание */
 .practice-task-title { margin: 0 0 6px; font-size: 1.7rem; }
@@ -2082,7 +2107,10 @@ body.page-practice { background: var(--page-bg); }
   pointer-events: none;
 }
 
-/* Под картинкой: сообщение, «Готово!», кнопки */
+/* Строка внизу задания: сообщение, «Готово!», кнопки. Что видно до завершения и после — решает класс is-done */
+.practice-bar:not(.is-done) .practice-after,
+.practice-bar:not(.is-done) .practice-finish,
+.practice-bar.is-done .practice-before { display: none; }
 .practice-message {
   margin: 22px 0 0;
   color: var(--accent-dark);
@@ -2102,7 +2130,6 @@ body.page-practice { background: var(--page-bg); }
   border-radius: 14px;
 }
 .practice-finish .success { margin: 0; }
-.practice-finish-back { margin-top: 12px; }
 .practice-note {
   margin: 8px 0 0;
   font-size: 0.95rem;
@@ -2131,13 +2158,7 @@ body.page-practice { background: var(--page-bg); }
   min-height: 56px;
   background: rgba(234, 223, 206, 0.45);
 }
-/* Первая строка — ярлык и рядом название, ниже — пояснение. Название занимает остаток строки;
-   если его самое длинное слово рядом с ярлыком не помещается, название целиком уходит на строку ниже */
 .practice-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 10px;
   padding: 12px 14px 14px;
   background: #fff;
   border: 1px solid #eadfce;
@@ -2149,15 +2170,29 @@ body.page-practice { background: var(--page-bg); }
   animation: practice-fade 0.4s ease;
 }
 .practice-card h3 {
-  flex: 1 1 0;
   margin: 0;
   font-size: 1.05rem;
   line-height: 1.25;
 }
-.practice-card p {
-  flex: 0 0 100%;
-  margin: 0;
+/* Первая строка — ярлык и рядом название, ниже — пояснение. Название занимает остаток строки;
+   если его самое длинное слово рядом с ярлыком не помещается, название целиком уходит на строку ниже */
+.practice-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.practice-card-head:disabled { cursor: default; }
+.practice-card-name { flex: 1 1 0; }
+.practice-card p { margin: 6px 0 0; }
 .practice-tag {
   flex: none;
   display: inline-block;
@@ -2242,22 +2277,10 @@ body.page-practice { background: var(--page-bg); }
   color: #b71c1c;
 }
 
-/* Задание «Расставь по порядку» (type "order"): рамки по центру и панель «Шаги» справа, примерно поровну */
-@media (min-width: 1000px) {
-  .practice-page-grid--order { grid-template-columns: 230px minmax(0, 1fr) minmax(0, 1fr); }
-}
-/* Здесь закреплена панель, а не центр: рамки прокручиваются, а шаги всегда под рукой (так же и у «Подбери пару») */
-@media (min-width: 1001px) {
-  .practice-page-grid--order .practice-main-col,
-  .practice-page-grid--match .practice-main-col { position: static; }
-  .practice-page-grid--order .practice-side-col,
-  .practice-page-grid--match .practice-side-col {
-    position: sticky;
-    top: var(--header-h);
-    max-height: calc(100vh - var(--header-h) - 16px);
-    overflow-y: auto;
-  }
-}
+/* Подпись зоны и то, что рядом с ней. Сама зона (подложка) есть только на компьютере; уже 1000px подписи слева нет */
+.practice-zone-title { display: none; }
+
+/* Задание «Расставь по порядку» (type "order"): зоны «Ваш порядок» и «Шаги» */
 .order-result {
   margin: 0 0 12px;
   padding: 10px 14px;
@@ -2392,21 +2415,38 @@ body.page-practice { background: var(--page-bg); }
   font-size: 0.85rem;
   line-height: 1.35;
 }
-.order-check { margin-top: 14px; }
 .order-pool-title { margin: 0 0 2px; font-size: 1.3rem; }
 .order-pool-title:focus { outline: none; }
 .order-pool-hint { margin: 0 0 12px; font-size: 0.9rem; color: var(--muted); }
 .order-pool { display: grid; gap: 8px; }
 .order-pool-empty { margin: 0; font-size: 0.95rem; color: var(--muted); }
-.practice-side-col.is-over { background: #fdf6ef; }
-
-/* Задание «Подбери пару» (type "match"): карточки по центру и панель «Ответы» справа, примерно поровну.
-   Пустая колонка между ними — место для линий */
-.practice-page-grid--match { position: relative; }
-@media (min-width: 1000px) {
-  .practice-page-grid--match { grid-template-columns: 230px minmax(0, 1fr) 16px minmax(0, 1fr); }
-  .practice-page-grid--match .practice-side-col { grid-column: 4; }
+.practice-page-grid .practice-side-col.is-over { background: #fdf6ef; }
+/* «Почему такой порядок» — только на компьютере; уже 1000px пояснения стоят под самими шагами */
+.order-why { display: none; }
+.order-why-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1.35;
 }
+.order-why-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.order-why-list li + li { margin-top: 8px; }
+.order-why-list .order-num {
+  width: 24px;
+  height: 24px;
+  border-color: #2e7d32;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 0.8rem;
+}
+
+/* Задание «Подбери пару» (type "match"): зоны с карточками и с ответами, между ними место для линий */
+.practice-page-grid--match { position: relative; }
 /* Слой с линиями поверх обеих колонок, под шапкой; нажатия проходят сквозь него */
 .match-lines {
   position: absolute;
@@ -2466,7 +2506,7 @@ body.page-practice { background: var(--page-bg); }
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* Вертикальный жест на карточке прокручивает страницу, остальные тянут линию */
+/* Вертикальный жест на карточке прокручивает страницу или список, остальные тянут линию */
 .match-left { cursor: grab; touch-action: pan-y; }
 @media (hover: hover) {
   .match-card:not(:disabled):hover { border-color: var(--accent); }
@@ -2532,6 +2572,60 @@ body.page-practice { background: var(--page-bg); }
 .match-num[data-color="5"] { background: #00796b; }
 .match-num[data-color="6"] { background: #5d4037; }
 
+/* Строка «Пояснение» и окно «Все пояснения» — только на компьютере; уже 1000px пояснения стоят под карточками */
+.match-explain { display: none; }
+.match-explain-label {
+  margin-right: 6px;
+  font-weight: bold;
+  color: var(--accent-dark);
+}
+.match-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(31, 42, 68, 0.3);
+  color: var(--text);
+}
+.match-dialog::backdrop { background: rgba(31, 42, 68, 0.45); }
+.match-dialog-box { padding: 18px 22px 22px; }
+.match-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.match-dialog-head h2 { margin: 0; font-size: 1.3rem; }
+.match-dialog-x {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.match-dialog-x:hover { background: #f6ece6; color: var(--accent-dark); }
+.match-dialog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.match-dialog-list li + li {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eadfce;
+}
+.match-dialog-list p { margin: 4px 0 0; color: var(--practice-desc-color); }
+
 /* Нет картинок — серый блок вместо задания */
 .practice-missing {
   aspect-ratio: 1024 / 572;
@@ -2548,26 +2642,504 @@ body.page-practice { background: var(--page-bg); }
   padding: 20px;
 }
 
-/* Узкий экран: список заданий — полосой над картинкой, результаты — под картинкой */
-@media (max-width: 999px) {
-  .practice-page-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
-  .practice-nav {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 14px;
-    padding: 12px 14px;
+/* ===== Компьютер (от 1000px): страница ровно в высоту окна под шапкой и сама не прокручивается =====
+   Числа, которые можно менять, собраны в начале файла: --practice-nav-w, --practice-btn-h, --practice-desc-size и другие */
+@media (min-width: 1000px) {
+  body.page-practice { height: 100vh; overflow: hidden; }
+  .page-practice main { min-height: 0; }
+  .page-practice .site-footer { display: none; }
+  .page-practice .block { height: 100%; padding: 0; }
+  .practice-container { height: 100%; max-width: none; padding: 0; }
+  .practice-none { margin: 16px; }
+
+  /* Три области: левая панель | центр | правая панель */
+  .practice-page-grid {
+    --practice-nav-now: var(--practice-nav-w);
+    height: 100%;
+    grid-template-columns: var(--practice-nav-now) 12px minmax(0, 1fr) 12px var(--practice-side-w);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    align-items: stretch;
+    padding-right: 12px;
   }
-  .practice-nav-title { margin: 0; font-size: 1.1rem; }
-  .practice-nav-count { margin: 0; }
+  .practice-page-grid.is-nav-folded { --practice-nav-now: var(--practice-nav-folded-w); }
+
+  /* Левая панель: прижата к краю окна и к шапке */
+  .practice-nav {
+    grid-column: 1;
+    grid-row: 1 / -1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 14px 12px 12px 16px;
+    border: 0;
+    border-right: 1px solid #eadfce;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .practice-nav-fold {
+    display: block;
+    position: absolute;
+    top: 10px;
+    right: 8px;
+  }
+  .practice-nav-drop { display: none; }
+  .practice-nav-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .practice-nav-title { padding-right: 30px; }
   .practice-nav-list {
-    flex-direction: row;
-    flex-basis: 100%;
-    overflow-x: auto;
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin: 0 -4px 12px;
+    padding: 2px 4px;
+  }
+  .practice-nav-back { margin-top: auto; }
+
+  /* Свёрнутая панель: полоска с номерами в кружках */
+  .is-nav-folded .practice-nav { align-items: center; padding: 10px 0; }
+  .is-nav-folded .practice-nav-fold { position: static; flex: none; margin-bottom: 10px; }
+  .is-nav-folded .practice-nav-title,
+  .is-nav-folded .practice-nav-topic,
+  .is-nav-folded .practice-nav-count,
+  .is-nav-folded .practice-nav-back,
+  .is-nav-folded .practice-nav-label { display: none; }
+  .is-nav-folded .practice-nav-list {
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 6px;
+  }
+  .is-nav-folded .practice-nav-item {
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+  }
+  .is-nav-folded .practice-nav-circle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 2px solid #cdb9a3;
+    border-radius: 50%;
+    font-size: 0.95rem;
+    font-weight: bold;
+    line-height: 1;
+  }
+  .is-nav-folded .is-current .practice-nav-circle {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+  .is-nav-folded .is-done .practice-nav-circle::after {
+    content: "✓";
+    position: absolute;
+    top: -5px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #2e7d32;
+    color: #fff;
+    font-size: 0.6rem;
+  }
+
+  /* Центр: заголовок, описание, рабочая область на всё оставшееся место, строка кнопок */
+  .practice-main-col {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 0;
+  }
+  .practice-task-title { margin-bottom: 2px; }
+  .practice-task-desc {
+    margin-bottom: 10px;
+    font-size: var(--practice-desc-size);
+    line-height: 1.35;
+    color: var(--practice-desc-color);
+  }
+  .practice-note-card { margin-bottom: 8px; padding: 8px 14px; }
+  .practice-note-title { margin-bottom: 4px; }
+  .practice-note-card ol { columns: 2; column-gap: 28px; line-height: 1.3; }
+  .practice-note-card li { break-inside: avoid; }
+  .practice-note-card li + li { margin-top: 0; padding-top: 2px; }
+  .practice-note-foot { margin-top: 4px; }
+  #practice-task {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .practice-work { flex: 1; min-height: 0; }
+  .practice-missing { flex: 1; aspect-ratio: auto; }
+
+  /* Картинка вписана в рабочую область и по ширине, и по высоте. 16px — белая рамка вокруг картинки.
+     Размер считает сам браузер, поэтому он меняется вместе с окном и при сворачивании панели */
+  .practice-work--scene {
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .practice-scene,
+  .zones-scene {
+    flex: none;
+    width: min(100cqw - 16px, (100cqh - 16px) * var(--practice-ratio));
     margin: 0;
   }
-  .practice-nav-item { white-space: nowrap; padding: 6px 12px; }
-  .practice-nav-back { margin-left: auto; }
+
+  /* Строка кнопок: сообщение слева, кнопки справа; её высота не меняется, и страница от сообщения не растёт */
+  .practice-bar {
+    container: practice-bar / inline-size;
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: center;
+    min-height: var(--practice-btn-h);
+    margin-top: 10px;
+  }
+  .practice-bar-msg {
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: 0.95rem;
+    line-height: 1.25;
+  }
+  .practice-message {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  .practice-message:empty { display: none; }
+  .order-result {
+    margin: 0;
+    padding: 6px 12px;
+  }
+  .practice-bar-msg > * { margin-right: 12px; }   /* зазор до кнопок: когда места нет, он не занимает его у кнопок */
+  .practice-actions {
+    flex: 0 1 auto;
+    justify-content: flex-end;
+    gap: 8px;
+    margin: 0;
+  }
+  .practice-bar .btn,
+  .match-explain .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--practice-btn-h);
+    padding: 0 var(--practice-btn-pad);
+    white-space: nowrap;
+  }
+  /* «К уроку» шириной с «Вернуться к уроку»: «Пройти ещё раз» после завершения остаётся на месте */
+  .practice-lesson { min-width: 11.8em; }
+
+  /* «Готово!» — в строке слева от кнопок, а если там тесно — небольшой плашкой над строкой */
+  .practice-finish {
+    padding: 0;
+    border: 0;
+    margin-top: 0;
+    background: none;
+  }
+  .practice-finish .success { font-size: 0.95rem; line-height: 1.2; }
+  .practice-finish.has-note {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 8px);
+    z-index: 6;
+    max-width: 100%;
+    padding: 8px 14px;
+    background: #fff;
+    border: 2px solid #2e7d32;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(107, 74, 53, 0.18);
+  }
+  .practice-note { margin-top: 2px; font-size: 0.9rem; line-height: 1.3; }
+  @container practice-bar (max-width: 940px) {
+    .practice-finish {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 8px);
+      z-index: 6;
+      max-width: 100%;
+      padding: 8px 14px;
+      background: #fff;
+      border: 2px solid #2e7d32;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(107, 74, 53, 0.18);
+    }
+  }
+
+  /* Правая панель во всю высоту: прокручивается только список карточек */
+  .practice-side-col {
+    grid-column: 5;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin: 12px 0;
+    padding: 12px 14px;
+  }
+  .practice-count { flex: none; margin-bottom: 8px; }
+  .practice-cells {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: start;
+    gap: 6px;
+    margin: 0 -6px;
+    padding: 2px 6px;
+  }
+  .practice-cell.is-empty { min-height: 44px; }
+  .practice-card { padding: 9px 12px; }
+  .practice-card-head { flex-wrap: nowrap; align-items: center; }
+  .practice-card-head::after {
+    content: "▾";
+    flex: none;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .practice-card.is-open .practice-card-head::after { transform: rotate(180deg); }
+  .practice-card-name { min-width: 0; }
+  .practice-card:not(.is-open) { min-height: 44px; }
+  .practice-card:not(.is-open) .practice-card-name {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .practice-card:not(.is-open) p { display: none; }
+
+  /* «Расставь по порядку» и «Подбери пару»: две зоны рядом. Заголовок, «Пояснение» и кнопки идут над и под обеими —
+     иначе зоны не будут одной высоты. display: contents ставит содержимое центра прямо в сетку страницы */
+  .practice-page-grid--order,
+  .practice-page-grid--match {
+    grid-template-columns: var(--practice-nav-now) 12px minmax(0, 1fr) var(--practice-zones-gap) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  }
+  .practice-page-grid--order { --practice-zones-gap: 12px; }
+  .practice-page-grid--order .practice-main-col,
+  .practice-page-grid--match .practice-main-col,
+  .practice-page-grid--order #practice-task,
+  .practice-page-grid--match #practice-task { display: contents; }
+  .practice-page-grid--order .practice-head,
+  .practice-page-grid--match .practice-head { grid-column: 3 / -1; grid-row: 1; padding-top: 12px; }
+  .practice-page-grid--order .practice-note-card,
+  .practice-page-grid--match .practice-note-card { grid-column: 3 / -1; grid-row: 2; }
+  .practice-page-grid--order .practice-bar,
+  .practice-page-grid--match .practice-bar { grid-column: 3 / -1; grid-row: 5; margin-bottom: 12px; }
+
+  /* Подложка-зона: одна и та же слева и справа */
+  .practice-zone,
+  .practice-page-grid--order .practice-side-col,
+  .practice-page-grid--match .practice-side-col {
+    grid-row: 3;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin: 0;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid #eadfce;
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(107, 74, 53, 0.07);
+  }
+  .practice-zone { grid-column: 3; }
+  .practice-zone-head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px 14px;
+    min-height: 40px;
+    margin-bottom: 4px;
+  }
+  .practice-zone-title,
+  .order-pool-title,
+  .match-title {
+    display: block;
+    flex: none;
+    margin: 0;
+    font-size: 1.15rem;
+  }
+  .order-pool-hint,
+  .match-hint,
+  .match-picked {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+  .match-count { margin: 0 0 0 auto; }
+
+  /* Содержимое зон. Не влезло (низкое окно) — прокручивается только список внутри зоны.
+     Поля нужны, чтобы рамка выбранной карточки и дрожь неверной пары не обрезались краем списка */
+  .order-slots,
+  .order-pool,
+  .match-list {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    align-content: start;
+    gap: 6px;
+    margin: 0 -6px;
+    padding: 3px 6px;
+  }
+  .order-slots { grid-auto-rows: minmax(min-content, 96px); }
+  .order-slot { min-height: 52px; padding: 4px 8px; gap: 10px; }
+  .order-num { width: 28px; height: 28px; }
+  .order-card { padding: 5px 10px; }
+  .order-card-note { display: none; }
+  .order-card-x { width: 28px; height: 28px; }
+  .order-pool:empty { display: none; }
+  .order-pool-empty { margin-top: 6px; }
+
+  /* После проверки зона «Шаги» превращается в «Почему такой порядок» */
+  .practice-side-col.is-done .practice-zone-head,
+  .practice-side-col.is-done .order-pool,
+  .practice-side-col.is-done .order-pool-empty { display: none; }
+  .order-why {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .order-why .order-pool-title { padding: 8px 0 10px; }
+  .order-why-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* «Подбери пару»: компактные карточки, пояснение — в отдельной строке под зонами */
+  .match-list { align-content: space-evenly; }   /* в высоком окне карточки равномерно занимают зону */
+  .match-card { min-height: 64px; padding: 4px 12px 4px 6px; }
+  .match-right { padding-left: 12px; }
+  .match-left:not(:has(img)) { padding-left: 12px; }
+  .match-img { width: 56px; height: 56px; }
+  .match-note { display: none; }
+  .match-explain {
+    grid-column: 3 / -1;
+    grid-row: 4;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: var(--practice-explain-h);
+    margin-top: 10px;
+    padding: 6px 14px;
+    background: #fff;
+    border: 1px solid #eadfce;
+    border-radius: 12px;
+  }
+  .match-explain-text {
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: calc(var(--practice-explain-h) - 12px);
+    overflow-y: auto;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+  }
+  .match-explain-body:not(:has(strong)) { color: var(--muted); }
+  .match-explain .btn { flex: none; }
+}
+
+/* Низкое окно (например, ноутбук 1366×768: вкладки браузера оставляют около 630px) — меньше воздуха, размер текста и картинок тот же */
+@media (min-width: 1000px) and (max-height: 720px) {
+  :root { --practice-explain-h: 54px; }
+  .practice-main-col { padding: 6px 0; }
+  .practice-page-grid--order .practice-head,
+  .practice-page-grid--match .practice-head { padding-top: 6px; }
+  .practice-task-desc { margin-bottom: 4px; }
+  .practice-side-col { margin: 6px 0; }
+  .practice-bar { margin-top: 4px; }
+  .practice-page-grid--order .practice-bar,
+  .practice-page-grid--match .practice-bar { margin-bottom: 4px; }
+  .match-explain { margin-top: 4px; padding-top: 4px; padding-bottom: 4px; }
+  .practice-zone,
+  .practice-page-grid--order .practice-side-col,
+  .practice-page-grid--match .practice-side-col { padding: 4px 12px 6px; }
+  .practice-zone-head { min-height: 36px; margin-bottom: 0; }
+  .order-slots,
+  .order-pool,
+  .match-list { gap: 3px; padding-top: 2px; padding-bottom: 2px; }
+  .order-slot { min-height: 44px; padding: 2px 8px; }
+  .order-card { padding: 2px 10px; }
+  .match-card { padding-top: 2px; padding-bottom: 2px; }
+  .practice-cells { gap: 4px; }
+}
+
+/* В низком окне записка над картинкой отняла бы у неё почти всю высоту, поэтому она стоит рядом с картинкой */
+@media (min-width: 1300px) and (max-height: 720px) {
+  .practice-main-col:has(> .practice-note-card) {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 12px;
+  }
+  .practice-main-col:has(> .practice-note-card) .practice-head { grid-column: 1 / -1; }
+  .practice-main-col:has(> .practice-note-card) #practice-task { display: contents; }
+  .practice-main-col > .practice-note-card {
+    grid-column: 1;
+    grid-row: 2;
+    min-height: 0;
+    margin: 0;
+    overflow-y: auto;
+  }
+  .practice-main-col > .practice-note-card ol { columns: 1; }
+  .practice-main-col:has(> .practice-note-card) .practice-work { grid-column: 2; grid-row: 2; }
+  .practice-main-col:has(> .practice-note-card) .practice-bar { grid-column: 1 / -1; grid-row: 3; }
+}
+/* Совсем маленькое окно: картинка не сжимается в точку, а центр прокручивается внутри себя. Страница по-прежнему стоит */
+@media (min-width: 1000px) and (max-width: 1299px), (min-width: 1000px) and (max-height: 600px) {
+  .practice-main-col { overflow-y: auto; }
+  .practice-work--scene { flex: 1 0 220px; }
+}
+/* Страница не прокручивается, и карточки помещаются: любой жест пальцем по карточке тянет линию.
+   В окне ниже 600px список может прокручиваться, там вертикальный жест остаётся за ним */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .match-left { touch-action: none; }
+}
+
+/* Узкий экран: обычная прокрутка страницы; список заданий — выпадающий, результаты — под заданием */
+@media (max-width: 999px) {
+  .practice-nav { padding: 0; }
+  .practice-nav-drop {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    text-align: left;
+  }
+  .practice-nav-drop-count { font-size: 0.95rem; color: var(--muted); }
+  .practice-nav-drop::after {
+    content: "▾";
+    margin-left: auto;
+    color: var(--accent);
+  }
+  .practice-nav.is-open .practice-nav-drop::after { transform: rotate(180deg); }
+  .practice-nav-body { display: none; padding: 2px 14px 14px; }
+  .practice-nav.is-open .practice-nav-body { display: block; }
+  .practice-nav-count { display: none; }   /* он уже есть в кнопке «Задания» */
   .practice-side-col { padding: 16px; }
   /* «Расставь по порядку»: панель с шагами прижата к низу окна, чтобы при выборе нажатием не прокручивать
      между шагами и рамками. Рамку под панелью откроет прокрутка: панель стоит после рамок */
