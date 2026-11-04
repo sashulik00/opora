@@ -54,6 +54,7 @@
   --practice-desc-color: #3c4557;   /* цвет описания */
   --practice-zones-gap: 44px;       /* место для линий между зонами в «Подбери пару» */
   --practice-explain-h: 58px;       /* высота строки «Пояснение» в «Подбери пару» */
+  --practice-fill-size: 18px;       /* размер текста в «Заполни пропуск» */
 }
 
 * {
@@ -2626,6 +2627,93 @@ body.page-practice { background: var(--page-bg); }
 }
 .match-dialog-list p { margin: 4px 0 0; color: var(--practice-desc-color); }
 
+/* Задание «Заполни пропуск» (type "fill"): зоны «Текст» и «Пояснения» */
+.fill-text {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  font-size: var(--practice-fill-size);
+  line-height: 1.7;
+}
+.fill-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.fill-line .order-num { margin-top: 1px; font-size: 1rem; }
+.fill-line.is-ok .order-num {
+  border-color: #2e7d32;
+  background: #2e7d32;
+  color: #fff;
+}
+.fill-sentence {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: break-word;
+}
+/* Пропуск в строке: пунктир снизу; после проверки — цвет и значок, чтобы различать не только по цвету */
+.fill-blank {
+  padding: 0 3px;
+  border-bottom: 2px dashed var(--accent);
+  border-radius: 4px 4px 0 0;
+  color: var(--accent-dark);
+  font-weight: bold;
+  cursor: pointer;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  -webkit-tap-highlight-color: transparent;
+}
+.fill-blank:hover,
+.fill-blank.is-open { background: #fbe6d8; }
+.fill-blank.is-filled { color: var(--text); }
+.fill-arrow { font-size: 0.8em; color: var(--accent); }
+.fill-blank.is-ok {
+  border-bottom: 2px solid #2e7d32;
+  background: #e6f3e1;
+  color: #1f5e23;
+  cursor: default;
+}
+.fill-blank.is-ok .fill-arrow { display: none; }
+.fill-blank.is-ok::after { content: "\00a0✓"; }
+.fill-blank.is-wrong {
+  border-bottom: 2px solid #c62828;
+  background: #fdecea;
+  color: #a31515;
+}
+.fill-blank.is-wrong::after { content: "\00a0✕"; }
+/* Меню вариантов: положение в координатах окна считает js/main.js (placeMenu) */
+.fill-menu {
+  position: fixed;
+  z-index: 20;
+  list-style: none;
+  width: max-content;
+  min-width: 170px;
+  max-width: min(420px, calc(100vw - 12px));
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(107, 74, 53, 0.22);
+  font-size: 1rem;
+  line-height: 1.3;
+}
+.fill-option {
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.fill-option:hover,
+.fill-option:focus { background: #fbe6d8; outline: none; }
+.fill-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.fill-option[aria-selected="true"] { font-weight: bold; }
+.fill-hint { margin: 0; font-size: 1rem; color: var(--muted); }
+.order-why-list.fill-why { font-size: 1rem; }
+
 /* Нет картинок — серый блок вместо задания */
 .practice-missing {
   aspect-ratio: 1024 / 572;
@@ -2924,29 +3012,27 @@ body.page-practice { background: var(--page-bg); }
   }
   .practice-card:not(.is-open) p { display: none; }
 
-  /* «Расставь по порядку» и «Подбери пару»: две зоны рядом. Заголовок, «Пояснение» и кнопки идут над и под обеими —
+  /* «Расставь по порядку», «Подбери пару», «Заполни пропуск»: две зоны рядом. Заголовок, «Пояснение» и кнопки идут над и под обеими —
      иначе зоны не будут одной высоты. display: contents ставит содержимое центра прямо в сетку страницы */
-  .practice-page-grid--order,
-  .practice-page-grid--match {
+  .practice-page-grid--zones {
     grid-template-columns: var(--practice-nav-now) 12px minmax(0, 1fr) var(--practice-zones-gap) minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   }
   .practice-page-grid--order { --practice-zones-gap: 12px; }
-  .practice-page-grid--order .practice-main-col,
-  .practice-page-grid--match .practice-main-col,
-  .practice-page-grid--order #practice-task,
-  .practice-page-grid--match #practice-task { display: contents; }
-  .practice-page-grid--order .practice-head,
-  .practice-page-grid--match .practice-head { grid-column: 3 / -1; grid-row: 1; padding-top: 12px; }
-  .practice-page-grid--order .practice-note-card,
-  .practice-page-grid--match .practice-note-card { grid-column: 3 / -1; grid-row: 2; }
-  .practice-page-grid--order .practice-bar,
-  .practice-page-grid--match .practice-bar { grid-column: 3 / -1; grid-row: 5; margin-bottom: 12px; }
+  /* Текст с пропусками длиннее пояснений, поэтому его зона шире */
+  .practice-page-grid--fill {
+    --practice-zones-gap: 12px;
+    grid-template-columns: var(--practice-nav-now) 12px minmax(0, 1.35fr) var(--practice-zones-gap) minmax(0, 1fr);
+  }
+  .practice-page-grid--zones .practice-main-col,
+  .practice-page-grid--zones #practice-task { display: contents; }
+  .practice-page-grid--zones .practice-head { grid-column: 3 / -1; grid-row: 1; padding-top: 12px; }
+  .practice-page-grid--zones .practice-note-card { grid-column: 3 / -1; grid-row: 2; }
+  .practice-page-grid--zones .practice-bar { grid-column: 3 / -1; grid-row: 5; margin-bottom: 12px; }
 
   /* Подложка-зона: одна и та же слева и справа */
   .practice-zone,
-  .practice-page-grid--order .practice-side-col,
-  .practice-page-grid--match .practice-side-col {
+  .practice-page-grid--zones .practice-side-col {
     grid-row: 3;
     display: flex;
     flex-direction: column;
@@ -2991,6 +3077,7 @@ body.page-practice { background: var(--page-bg); }
      Поля нужны, чтобы рамка выбранной карточки и дрожь неверной пары не обрезались краем списка */
   .order-slots,
   .order-pool,
+  .fill-text,
   .match-list {
     flex: 1;
     min-height: 0;
@@ -3002,6 +3089,7 @@ body.page-practice { background: var(--page-bg); }
     padding: 3px 6px;
   }
   .order-slots { grid-auto-rows: minmax(min-content, 96px); }
+  .fill-text { gap: 12px; }
   .order-slot { min-height: 52px; padding: 4px 8px; gap: 10px; }
   .order-num { width: 28px; height: 28px; }
   .order-card { padding: 5px 10px; }
@@ -3064,21 +3152,19 @@ body.page-practice { background: var(--page-bg); }
 @media (min-width: 1000px) and (max-height: 720px) {
   :root { --practice-explain-h: 54px; }
   .practice-main-col { padding: 6px 0; }
-  .practice-page-grid--order .practice-head,
-  .practice-page-grid--match .practice-head { padding-top: 6px; }
+  .practice-page-grid--zones .practice-head { padding-top: 6px; }
   .practice-task-desc { margin-bottom: 4px; }
   .practice-side-col { margin: 6px 0; }
   .practice-bar { margin-top: 4px; }
-  .practice-page-grid--order .practice-bar,
-  .practice-page-grid--match .practice-bar { margin-bottom: 4px; }
+  .practice-page-grid--zones .practice-bar { margin-bottom: 4px; }
   .match-explain { margin-top: 4px; padding-top: 4px; padding-bottom: 4px; }
   .practice-zone,
-  .practice-page-grid--order .practice-side-col,
-  .practice-page-grid--match .practice-side-col { padding: 4px 12px 6px; }
+  .practice-page-grid--zones .practice-side-col { padding: 4px 12px 6px; }
   .practice-zone-head { min-height: 36px; margin-bottom: 0; }
   .order-slots,
   .order-pool,
   .match-list { gap: 3px; padding-top: 2px; padding-bottom: 2px; }
+  .fill-text { gap: 6px; padding-top: 2px; padding-bottom: 2px; }
   .order-slot { min-height: 44px; padding: 2px 8px; }
   .order-card { padding: 2px 10px; }
   .match-card { padding-top: 2px; padding-bottom: 2px; }

@@ -2452,6 +2452,247 @@ function setupMatch(topic, task, taskIndex, onDone) {
   render();
 }
 
+/* Задание «Заполни пропуск» (type "fill") на странице practice.html.
+   В тексте предложения (поле sentences) ровно один ___ — на этом месте пропуск; варианты = answer + wrong, сайт их перемешивает.
+   Нажатие на пропуск (или Enter) открывает меню: выбор щелчком или стрелками и Enter, Esc закрывает.
+   После проверки верные пропуски закрепляются, неверные краснеют, и их можно выбрать заново; правильный ответ не показывается.
+   onDone() вызывается, когда все пропуски верны (чтобы обновить список заданий слева) */
+const FILL_MENU_GAP = 6;   // зазор между меню и пропуском или краем окна, px
+
+function setupFill(topic, task, taskIndex, onDone) {
+  const box = document.getElementById("practice-task");
+  const side = document.getElementById("practice-results");
+  if (!box || !side) return;
+
+  // Обработчики прошлого задания (или прошлого прохождения этого) снимаются
+  if (practiceListeners) practiceListeners.abort();
+  practiceListeners = new AbortController();
+  const listen = { signal: practiceListeners.signal };
+
+  const items = (task.sentences || []).map(function (sentence, i) {
+    return Object.assign({}, sentence, {
+      index: i,
+      options: shuffled([sentence.answer].concat(sentence.wrong || [])),
+      chosen: null,
+      ok: false,
+      wrongNow: false
+    });
+  });
+  let opened = null;   // пропуск, для которого открыто меню
+
+  box.innerHTML =
+    '<div class="practice-work practice-zone">' +
+    '<div class="practice-zone-head"><h2 class="practice-zone-title">Текст</h2></div>' +
+    '<ol class="fill-text">' +
+      items.map(function (item) {
+        const parts = item.text.split("___");
+        return '<li class="fill-line">' +
+          '<span class="order-num" aria-hidden="true">' + (item.index + 1) + "</span>" +
+          '<p class="fill-sentence">' + escapeHtml(parts[0]) +
+            // Не кнопка, а строчный элемент: длинный ответ переносится вместе со строкой
+            '<span class="fill-blank" data-item="' + item.index + '" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false">' +
+              '<span class="fill-arrow" aria-hidden="true">▾</span>&nbsp;<span class="fill-value"></span>' +
+            "</span>" +
+            escapeHtml(parts[1] || "") +
+          "</p>" +
+        "</li>";
+      }).join("") +
+    "</ol>" +
+    "</div>" +
+
+    // Внизу: сообщения, «Проверить», а когда все пропуски верны — «Готово!» и кнопки дальше
+    practiceBar(topic, taskIndex, "Готово! Все пропуски заполнены верно",
+      '<p class="order-result" aria-live="polite"></p><p class="fill-say visually-hidden" aria-live="polite"></p>',
+      '<button type="button" class="btn btn-primary fill-check" disabled>Проверить</button>') +
+
+    // Меню одно на все пропуски; стоит вне текста, чтобы его не обрезала прокрутка внутри зоны
+    '<ul class="fill-menu" role="listbox" hidden></ul>';
+
+  side.classList.remove("is-done");
+  side.setAttribute("aria-label", "Пояснения");
+  side.innerHTML =
+    '<div class="practice-zone-head"><h2 class="order-pool-title" tabindex="-1">Пояснения</h2></div>' +
+    '<p class="fill-hint">Пояснения появятся после проверки</p>' +
+    '<ol class="order-why-list fill-why" hidden></ol>';
+
+  const textBox = box.querySelector(".fill-text");
+  const menu = box.querySelector(".fill-menu");
+  const result = box.querySelector(".order-result");
+  const message = box.querySelector(".fill-say");
+  const check = box.querySelector(".fill-check");
+  const bar = box.querySelector(".practice-bar");
+  const firstAction = bar.querySelector(".practice-after");
+  const hint = side.querySelector(".fill-hint");
+  const why = side.querySelector(".fill-why");
+
+  items.forEach(function (item) {
+    item.el = textBox.querySelector('.fill-blank[data-item="' + item.index + '"]');
+  });
+
+  function renderBlank(item) {
+    const el = item.el;
+    el.querySelector(".fill-value").textContent = item.chosen || "выбрать";
+    el.classList.toggle("is-filled", Boolean(item.chosen));
+    el.classList.toggle("is-ok", item.ok);
+    el.classList.toggle("is-wrong", item.wrongNow);
+    el.closest(".fill-line").classList.toggle("is-ok", item.ok);
+    if (item.ok) {
+      ["role", "tabindex", "aria-haspopup", "aria-expanded", "aria-label"].forEach(function (name) { el.removeAttribute(name); });
+    } else {
+      el.setAttribute("aria-label", "Пропуск " + (item.index + 1) + ": " + (item.chosen || "не выбрано") + (item.wrongNow ? ", неверно" : ""));
+    }
+  }
+
+  /* --- Меню --- */
+  function optionEls() {
+    return Array.from(menu.querySelectorAll(".fill-option"));
+  }
+
+  /* Меню под пропуском, а если снизу не хватает места — над ним. Не влезает и там — прокрутка внутри меню.
+     Положение считается в координатах окна; у пропуска в две строки берётся нижняя строка или верхняя */
+  function placeMenu(item) {
+    const lines = item.el.getClientRects();
+    const first = lines[0], last = lines[lines.length - 1];
+    const top = document.querySelector(".site-header").getBoundingClientRect().bottom;
+    const below = window.innerHeight - last.bottom - FILL_MENU_GAP * 2;
+    const above = first.top - top - FILL_MENU_GAP * 2;
+    menu.style.maxHeight = "";
+    const height = menu.offsetHeight;
+    const down = height <= below || below >= above;
+    const shown = Math.min(height, down ? below : above);
+    menu.style.maxHeight = shown + "px";
+    menu.style.top = (down ? last.bottom + FILL_MENU_GAP : first.top - FILL_MENU_GAP - shown) + "px";
+    const left = Math.min((down ? last : first).left, window.innerWidth - menu.offsetWidth - FILL_MENU_GAP);
+    menu.style.left = Math.max(FILL_MENU_GAP, left) + "px";
+  }
+
+  function openMenu(item) {
+    closeMenu(false);
+    opened = item;
+    item.el.setAttribute("aria-expanded", "true");
+    item.el.classList.add("is-open");
+    menu.setAttribute("aria-label", "Варианты для пропуска " + (item.index + 1));
+    menu.innerHTML = item.options.map(function (option, i) {
+      return '<li class="fill-option" role="option" tabindex="-1" data-option="' + i + '" aria-selected="' + (option === item.chosen) + '">' + escapeHtml(option) + "</li>";
+    }).join("");
+    menu.hidden = false;
+    placeMenu(item);
+    (menu.querySelector('[aria-selected="true"]') || menu.firstElementChild).focus({ preventScroll: true });
+  }
+
+  function closeMenu(returnFocus) {
+    if (!opened) return;
+    const item = opened;
+    opened = null;
+    menu.hidden = true;
+    item.el.classList.remove("is-open");
+    item.el.setAttribute("aria-expanded", "false");
+    if (returnFocus) item.el.focus({ preventScroll: true });
+  }
+
+  function choose(optionEl) {
+    const item = opened;
+    item.chosen = item.options[Number(optionEl.dataset.option)];
+    item.wrongNow = false;
+    closeMenu(true);
+    renderBlank(item);
+    check.disabled = items.some(function (it) { return !it.chosen; });
+    message.textContent = "Пропуск " + (item.index + 1) + ": " + item.chosen;
+  }
+
+  /* Щелчки: по варианту, по пропуску (закреплённый не отвечает), мимо меню */
+  document.addEventListener("click", function (e) {
+    const option = e.target.closest(".fill-option");
+    const blank = e.target.closest(".fill-blank");
+    if (option && opened) choose(option);
+    else if (blank && !blank.classList.contains("is-ok") && !blank.classList.contains("is-open")) openMenu(items[Number(blank.dataset.item)]);
+    else closeMenu(false);
+  }, listen);
+
+  /* Клавиатура: Enter, пробел или стрелка вниз на пропуске открывают меню */
+  textBox.addEventListener("keydown", function (e) {
+    const blank = e.target.closest(".fill-blank");
+    if (!blank || blank.classList.contains("is-ok") || ["Enter", " ", "ArrowDown"].indexOf(e.key) < 0) return;
+    e.preventDefault();
+    if (!e.repeat) openMenu(items[Number(blank.dataset.item)]);
+  });
+
+  menu.addEventListener("keydown", function (e) {
+    const list = optionEls();
+    const at = list.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      list[(at + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length].focus();
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      list[e.key === "Home" ? 0 : list.length - 1].focus();
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (at >= 0 && !e.repeat) choose(list[at]);
+    } else if (e.key === "Tab") {
+      closeMenu(true);  // фокус вернулся на пропуск, и Tab идёт дальше от него
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeMenu(true);
+  }, listen);
+
+  // Меню стоит в координатах окна: окно изменилось — закрываем; текст прокрутили — меню едет за пропуском,
+  // а если пропуск скрылся за краем текста или окна, закрываем
+  window.addEventListener("resize", function () { closeMenu(false); }, listen);
+  window.addEventListener("scroll", function (e) {
+    if (!opened || e.target === menu) return;
+    const rect = opened.el.getBoundingClientRect(), area = textBox.getBoundingClientRect();
+    const top = Math.max(area.top, document.querySelector(".site-header").getBoundingClientRect().bottom);
+    if (rect.bottom < top || rect.top > Math.min(area.bottom, window.innerHeight)) closeMenu(false);
+    else placeMenu(opened);
+  }, { capture: true, passive: true, signal: listen.signal });
+
+  /* --- Проверка --- */
+  function renderWhy() {
+    const right = items.filter(function (item) { return item.ok; });
+    why.innerHTML = right.map(function (item) {
+      return '<li><span class="order-num" aria-hidden="true">' + (item.index + 1) + "</span><span>" + escapeHtml(item.explanation) + "</span></li>";
+    }).join("");
+    why.hidden = right.length === 0;
+    hint.hidden = right.length > 0;
+  }
+
+  function finish(byKey) {
+    bar.classList.add("is-done");
+    check.hidden = true;
+    result.textContent = "";
+    saveTaskDone(topic, task);
+    message.textContent = "Готово! Все пропуски заполнены верно";
+    if (byKey) firstAction.focus();
+    if (onDone) onDone();
+  }
+
+  check.addEventListener("click", function (e) {
+    items.forEach(function (item) {
+      item.ok = item.chosen === item.answer;
+      item.wrongNow = !item.ok;
+      renderBlank(item);
+    });
+    renderWhy();
+    const right = items.filter(function (item) { return item.ok; }).length;
+    if (right === items.length) {
+      finish(e.detail === 0);
+      return;
+    }
+    result.textContent = "Верно " + right + " из " + items.length;
+    if (e.detail === 0) items.find(function (item) { return !item.ok; }).el.focus();
+  });
+
+  box.querySelector(".practice-again").addEventListener("click", function () {
+    setupFill(topic, task, taskIndex, onDone);
+    side.querySelector(".order-pool-title").focus({ preventScroll: true });
+  });
+
+  items.forEach(renderBlank);
+}
+
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
    Слева — список заданий темы (сворачивается; уже 1000px — выпадающий список), в центре — задание, справа — карточки результатов.
    Задания переключаются без перезагрузки: меняется только ?task= в адресе */
@@ -2492,7 +2733,7 @@ function renderPracticePage() {
   document.title = "Практика: " + topic.title + " — Опора. Школа ухода";
 
   page.innerHTML =
-    '<div class="practice-page-grid' + (task.type === "order" || task.type === "match" ? " practice-page-grid--" + task.type : "") + (practiceNavFolded ? " is-nav-folded" : "") + '">' +
+    '<div class="practice-page-grid' + (["order", "match", "fill"].indexOf(task.type) >= 0 ? " practice-page-grid--zones practice-page-grid--" + task.type : "") + (practiceNavFolded ? " is-nav-folded" : "") + '">' +
       '<nav class="practice-nav" aria-label="Задания практики"></nav>' +
       '<section class="practice-main-col">' +
         '<div class="practice-head">' +
@@ -2565,6 +2806,7 @@ function renderPracticePage() {
   if (task.type === "find-zones") setupFindZones(topic, task, index, renderNav);
   if (task.type === "order") setupOrder(topic, task, index, renderNav);
   if (task.type === "match") setupMatch(topic, task, index, renderNav);
+  if (task.type === "fill") setupFill(topic, task, index, renderNav);
 
   // Переход к другому заданию (список слева и кнопка «К следующему заданию») — без перезагрузки.
   // Обработчик вешается один раз: сам блок страницы при переключении не пересоздаётся
