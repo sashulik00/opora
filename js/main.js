@@ -1459,22 +1459,29 @@ function setupPractice(topic, task, taskIndex, onDone) {
 
 /* Задание «Найди на картинке» (type "find-zones") на странице practice.html.
    Одна картинка и невидимые зоны-эллипсы (поле zones) в пикселях исходной картинки (width × height).
+   У зоны может быть несколько мест (areas): клик в любое находит всю зону, отметки появляются на всех местах.
+   Зона с role "wrong" — ловушка: только предупреждение, в счётчик и ячейки не входит.
    Положение клика пересчитывается в эти пиксели, поэтому зоны попадают точно при любом размере картинки.
    onDone() вызывается, когда найдены все зоны (чтобы обновить список заданий слева) */
-const ZONES_MISS_TIME = 2000;   // сколько держится подсказка о промахе, мс
+const ZONES_MISS_TIME = 2000;    // сколько держится подсказка о промахе, мс
+const ZONES_WRONG_TIME = 4000;   // сколько держится предупреждение ловушки, мс
+const ZONES_MIN_HEIGHT = 240;    // в низком окне картинка не меньше этой высоты (остальное — прокруткой)
 
 function setupFindZones(topic, task, taskIndex, onDone) {
   const box = document.getElementById("practice-task");
   const side = document.getElementById("practice-results");
   if (!box || !side) return;
 
-  // Обработчики открытого перед этим задания «Что здесь не так» больше не нужны
+  // Общие обработчики (Esc, клик мимо, размер окна) снимаются, когда открывают другое задание
   if (practiceListeners) practiceListeners.abort();
-  practiceListeners = null;
+  practiceListeners = new AbortController();
+  const listen = { signal: practiceListeners.signal };
 
+  // Места зоны: список areas или один эллипс из полей самой зоны
   const zones = (task.zones || []).map(function (zone) {
-    return Object.assign({}, zone, { found: false });
+    return Object.assign({}, zone, { found: false, areas: zone.areas || [zone] });
   });
+  const targets = zones.filter(function (z) { return z.role !== "wrong"; });  // зоны, которые ищут (без ловушек)
 
   const tasks = practiceTasks(topic);
   const nextIndex = taskIndex + 1 < tasks.length ? taskIndex + 1 : -1;
@@ -1484,20 +1491,21 @@ function setupFindZones(topic, task, taskIndex, onDone) {
   }
 
   box.innerHTML =
-    '<div class="practice-scene">' +
-      '<div class="practice-stage is-pointer" style="aspect-ratio: ' + task.width + " / " + task.height + '">' +
+    '<div class="practice-scene zones-scene">' +
+      '<div class="practice-stage zones-stage is-pointer" style="aspect-ratio: ' + task.width + " / " + task.height + '">' +
         '<img class="practice-bg" src="' + escapeHtml(task.image) + '" alt="' + escapeHtml(task.alt || "") + '" draggable="false">' +
         // Кнопки лежат точно на зонах: для мыши они прозрачны и невидимы, нужны для клавиатуры (Tab + Enter)
-        // и программ чтения с экрана
+        // и программ чтения с экрана. У зоны из нескольких мест кнопка одна — на первом месте
         '<div role="group" aria-label="Места на картинке">' +
           zones.map(function (zone, i) {
+            const area = zone.areas[0];
             return '<button type="button" class="zones-spot" data-zone="' + i + '" aria-label="' + escapeHtml(zone.label) + '" style="' +
-              "left: " + percent(zone.cx - zone.rx, task.width) + "; top: " + percent(zone.cy - zone.ry, task.height) + "; " +
-              "width: " + percent(zone.rx * 2, task.width) + "; height: " + percent(zone.ry * 2, task.height) + '"></button>';
+              "left: " + percent(area.cx - area.rx, task.width) + "; top: " + percent(area.cy - area.ry, task.height) + "; " +
+              "width: " + percent(area.rx * 2, task.width) + "; height: " + percent(area.ry * 2, task.height) + '"></button>';
           }).join("") +
         "</div>" +
       "</div>" +
-      // Подсказка у места промаха; программа чтения узнает о промахе из строки ниже
+      // Подсказка у места клика (промах или ловушка); программа чтения узнает о ней из строки ниже
       '<div class="zones-miss" aria-hidden="true" hidden></div>' +
     "</div>" +
     '<p class="visually-hidden" aria-live="polite"></p>' +
@@ -1519,15 +1527,16 @@ function setupFindZones(topic, task, taskIndex, onDone) {
       "</div>" +
     "</div>";
 
-  // Справа: счётчик и ячейки — по одной на каждую зону
+  // Справа: счётчик и ячейки — по одной на каждую зону, которую ищут
   side.innerHTML =
     '<p class="practice-count" tabindex="-1"></p>' +
     '<div class="practice-cells">' +
-      zones.map(function () { return '<div class="practice-cell is-empty"></div>'; }).join("") +
+      targets.map(function () { return '<div class="practice-cell is-empty"></div>'; }).join("") +
     "</div>";
 
+  const scene = box.querySelector(".practice-scene");
   const stage = box.querySelector(".practice-stage");
-  const missTip = box.querySelector(".zones-miss");
+  const tip = box.querySelector(".zones-miss");
   const message = box.querySelector("p.visually-hidden");
   const done = box.querySelector(".zones-done");
   const firstAction = done.querySelector(".practice-actions .btn");
@@ -1538,7 +1547,8 @@ function setupFindZones(topic, task, taskIndex, onDone) {
     zone.button = stage.querySelector('[data-zone="' + i + '"]');
   });
 
-  let missTimer = null;
+  let tipTimer = null;
+  let tipZone = null;  // ловушка, предупреждение которой сейчас открыто
 
   // Картинки нет — серый блок вместо задания
   stage.querySelector("img").addEventListener("error", function () {
@@ -1547,46 +1557,62 @@ function setupFindZones(topic, task, taskIndex, onDone) {
   });
 
   function foundCount() {
-    return zones.filter(function (z) { return z.found; }).length;
+    return targets.filter(function (z) { return z.found; }).length;
   }
 
   function updateCount() {
-    count.innerHTML = "Найдено: <strong>" + foundCount() + "</strong> из " + zones.length;
+    count.innerHTML = "Найдено: <strong>" + foundCount() + "</strong> из " + targets.length;
   }
 
-  function hideMiss() {
-    clearTimeout(missTimer);
-    missTip.hidden = true;
+  function hideTip() {
+    clearTimeout(tipTimer);
+    tipZone = null;
+    tip.hidden = true;
   }
 
-  /* Подсказка о промахе: над точкой клика (не помещается — под ней), в пределах ширины картинки */
-  function showMiss(x, y) {
-    hideMiss();
-    missTip.textContent = task.missText || "Попробуйте ещё";
-    missTip.hidden = false;
+  /* Подсказка: над точкой клика (не помещается — под ней), в пределах ширины картинки */
+  function showTip(x, y, time) {
+    tip.hidden = false;
     const gap = 12;
-    const top = y - missTip.offsetHeight - gap;
-    const maxLeft = Math.max(0, stage.offsetWidth - missTip.offsetWidth);
-    missTip.style.left = Math.round(Math.min(Math.max(0, x - missTip.offsetWidth / 2), maxLeft)) + "px";
-    missTip.style.top = Math.round(top >= 0 ? top : y + gap) + "px";
-    missTimer = setTimeout(hideMiss, ZONES_MISS_TIME);
+    const top = y - tip.offsetHeight - gap;
+    const maxLeft = Math.max(0, stage.offsetWidth - tip.offsetWidth);
+    tip.style.left = Math.round(Math.min(Math.max(0, x - tip.offsetWidth / 2), maxLeft)) + "px";
+    tip.style.top = Math.round(top >= 0 ? top : y + gap) + "px";
+    tipTimer = setTimeout(hideTip, time);
   }
 
   function miss(x, y) {
-    if (foundCount() === zones.length) return;
-    showMiss(x, y);
-    message.textContent = missTip.textContent;
+    hideTip();
+    if (foundCount() === targets.length) return;
+    tip.className = "zones-miss";
+    tip.textContent = task.missText || "Попробуйте ещё";
+    showTip(x, y, ZONES_MISS_TIME);
+    message.textContent = tip.textContent;
   }
 
-  /* Отметка на картинке и карточка в первой свободной ячейке */
+  /* Клик по ловушке: предупреждение; повторный клик по той же ловушке его закрывает */
+  function warn(zone, x, y) {
+    const wasOpen = tipZone === zone;
+    hideTip();
+    if (wasOpen) return;
+    tipZone = zone;
+    tip.className = "zones-miss zones-miss--wrong";
+    tip.innerHTML = "<strong>" + escapeHtml(zone.label) + "</strong>" + escapeHtml(zone.explanation);
+    showTip(x, y, ZONES_WRONG_TIME);
+    message.textContent = zone.label + ". " + zone.explanation;
+  }
+
+  /* Отметки на всех местах зоны и карточка в первой свободной ячейке */
   function markZone(zone, number) {
-    const mark = document.createElement("span");
-    mark.className = "zones-mark";
-    mark.setAttribute("aria-hidden", "true");
-    mark.style.left = percent(zone.cx, task.width);
-    mark.style.top = percent(zone.cy, task.height);
-    mark.textContent = number;
-    stage.appendChild(mark);
+    zone.areas.forEach(function (area) {
+      const mark = document.createElement("span");
+      mark.className = "zones-mark";
+      mark.setAttribute("aria-hidden", "true");
+      mark.style.left = percent(area.cx, task.width);
+      mark.style.top = percent(area.cy, task.height);
+      mark.textContent = number;
+      stage.appendChild(mark);
+    });
 
     const cell = cells.querySelector(".practice-cell.is-empty");
     if (!cell) return;
@@ -1599,23 +1625,27 @@ function setupFindZones(topic, task, taskIndex, onDone) {
 
   function findZone(zone, byKey) {
     zone.found = true;
-    hideMiss();
+    hideTip();
     zone.button.hidden = true;
 
     const n = foundCount();
     markZone(zone, n);
     updateCount();
-    message.textContent = zone.label + ". " + zone.explanation + " Найдено: " + n + " из " + zones.length + ".";
+    message.textContent = zone.label + ". " + zone.explanation + " Найдено: " + n + " из " + targets.length + ".";
 
-    if (n === zones.length) {
+    if (n === targets.length) {
       done.hidden = false;
       saveTaskDone(topic, task);
       message.textContent += " Готово! Вы нашли все места на картинке";
       if (byKey) firstAction.focus();
+      else {
+        // Крупная картинка занимает всё окно — показываем «Готово!» и кнопки под ней
+        done.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      }
       if (onDone) onDone();
     } else if (byKey) {
       // После выбора с клавиатуры — фокус на следующую ненайденную зону
-      zones.find(function (z) { return !z.found; }).button.focus();
+      targets.find(function (z) { return !z.found; }).button.focus();
     }
   }
 
@@ -1625,20 +1655,51 @@ function setupFindZones(topic, task, taskIndex, onDone) {
     const x = (e.clientX - rect.left) / rect.width * task.width;
     const y = (e.clientY - rect.top) / rect.height * task.height;
     const hits = zones.filter(function (z) {
-      const dx = (x - z.cx) / z.rx, dy = (y - z.cy) / z.ry;
-      return dx * dx + dy * dy <= 1;
+      return z.areas.some(function (area) {
+        const dx = (x - area.cx) / area.rx, dy = (y - area.cy) / area.ry;
+        return dx * dx + dy * dy <= 1;
+      });
     });
-    const zone = hits.find(function (z) { return !z.found; });
+    const zone = hits.find(function (z) { return z.role !== "wrong" && !z.found; });
+    const wrong = hits.find(function (z) { return z.role === "wrong"; });
     if (zone) findZone(zone, false);
-    else if (!hits.length) miss(e.clientX - rect.left, e.clientY - rect.top);
+    else if (wrong) warn(wrong, e.clientX - rect.left, e.clientY - rect.top);
+    else if (hits.length) hideTip();
+    else miss(e.clientX - rect.left, e.clientY - rect.top);
   });
 
   stage.querySelector('[role="group"]').addEventListener("click", function (e) {
     const button = e.target.closest(".zones-spot");
     if (!button) return;
     e.stopPropagation();
-    findZone(zones[Number(button.dataset.zone)], true);
+    const zone = zones[Number(button.dataset.zone)];
+    if (zone.role !== "wrong") { findZone(zone, true); return; }
+    const area = zone.areas[0];
+    warn(zone, area.cx / task.width * stage.offsetWidth, area.cy / task.height * stage.offsetHeight);
   });
+
+  // Предупреждение закрывается и по клику: по нему самому, мимо картинки или клавишей Esc
+  tip.addEventListener("click", hideTip);
+  document.addEventListener("click", function (e) {
+    if (!scene.contains(e.target)) hideTip();
+  }, listen);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") hideTip();
+  }, listen);
+
+  /* Картинка как можно крупнее, но целиком в окне под шапкой вместе с заголовком и описанием.
+     Широкие картинки упираются в ширину колонки, квадратные и вертикальные — в высоту окна */
+  function fitImage() {
+    const col = scene.closest(".practice-main-col");
+    const above = stage.getBoundingClientRect().top - col.getBoundingClientRect().top;  // заголовок и описание над картинкой
+    // В три колонки блок стоит ниже шапки сразу; в одну колонку список заданий уезжает при прокрутке
+    const top = getComputedStyle(col).position === "sticky"
+      ? col.parentElement.getBoundingClientRect().top + window.scrollY
+      : document.querySelector(".site-header").offsetHeight + 8;
+    const height = Math.max(ZONES_MIN_HEIGHT, window.innerHeight - top - above - 20);  // 20 — рамка картинки и зазор снизу
+    scene.style.maxWidth = Math.round(height * task.width / task.height) + "px";
+  }
+  window.addEventListener("resize", fitImage, listen);
 
   box.querySelector(".practice-again").addEventListener("click", function () {
     zones.forEach(function (z) {
@@ -1650,7 +1711,7 @@ function setupFindZones(topic, task, taskIndex, onDone) {
       cell.className = "practice-cell is-empty";
       cell.innerHTML = "";
     });
-    hideMiss();
+    hideTip();
     done.hidden = true;
     updateCount();
     message.textContent = "";
@@ -1658,6 +1719,7 @@ function setupFindZones(topic, task, taskIndex, onDone) {
   });
 
   updateCount();
+  fitImage();
 }
 
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------

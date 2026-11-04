@@ -2170,7 +2170,13 @@ body.page-practice { background: var(--page-bg); }
 .practice-tag--ok { background: #e1f0dc; color: #2e6b30; }
 
 /* Задание «Найди на картинке» (type "find-zones").
-   Кнопка лежит на зоне: мышь её не замечает (клик считается по картинке), подсветки при наведении нет */
+   Сцена по центру колонки: её наибольшую ширину считает fitImage в js/main.js, чтобы картинка помещалась в окно */
+.zones-scene {
+  width: calc(100% - 16px);
+  margin: 8px auto 0;
+}
+.zones-stage { container-type: inline-size; }  /* от её ширины считается размер цифр на отметках */
+/* Кнопка лежит на зоне: мышь её не замечает (клик считается по картинке), подсветки при наведении нет */
 .zones-spot {
   position: absolute;
   padding: 0;
@@ -2179,12 +2185,13 @@ body.page-practice { background: var(--page-bg); }
   background: transparent;
   pointer-events: none;
 }
-/* Отметка найденной зоны: центр кружка — в центре зоны */
+/* Отметка найденной зоны: центр кружка — в центре места. Размер — от размера картинки,
+   чтобы на телефоне отметки близких мест (пальцы) не закрывали друг друга */
 .zones-mark {
   position: absolute;
-  width: 32px;
-  height: 32px;
-  margin: -16px 0 0 -16px;
+  width: clamp(18px, 4.5%, 32px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2193,7 +2200,7 @@ body.page-practice { background: var(--page-bg); }
   background: var(--accent);
   background: color-mix(in srgb, var(--accent) 80%, transparent);
   color: #fff;
-  font-size: 0.95rem;
+  font-size: clamp(0.65rem, 2.6cqw, 0.95rem);
   font-weight: bold;
   line-height: 1;
   pointer-events: none;
@@ -2218,6 +2225,21 @@ body.page-practice { background: var(--page-bg); }
   line-height: 1.4;
   pointer-events: none;
   animation: practice-fade 0.2s ease;
+}
+
+/* Предупреждение ловушки (role "wrong"): можно закрыть щелчком по нему */
+.zones-miss--wrong {
+  max-width: 280px;
+  background: #fdecea;
+  border: 2px solid #c62828;
+  color: #4e1512;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.zones-miss--wrong strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #b71c1c;
 }
 
 /* Нет картинок — серый блок вместо задания */
@@ -2261,7 +2283,7 @@ body.page-practice { background: var(--page-bg); }
 @media (max-width: 480px) {
   .practice-task-title { font-size: 1.4rem; }
   .practice-actions .btn { flex: 1 1 100%; }
-  .zones-mark { width: 22px; height: 22px; margin: -11px 0 0 -11px; font-size: 0.75rem; border-width: 1px; }
+  .zones-mark { border-width: 1px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .practice-layer,
