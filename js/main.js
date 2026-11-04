@@ -1457,6 +1457,209 @@ function setupPractice(topic, task, taskIndex, onDone) {
   updateCount();
 }
 
+/* Задание «Найди на картинке» (type "find-zones") на странице practice.html.
+   Одна картинка и невидимые зоны-эллипсы (поле zones) в пикселях исходной картинки (width × height).
+   Положение клика пересчитывается в эти пиксели, поэтому зоны попадают точно при любом размере картинки.
+   onDone() вызывается, когда найдены все зоны (чтобы обновить список заданий слева) */
+const ZONES_MISS_TIME = 2000;   // сколько держится подсказка о промахе, мс
+
+function setupFindZones(topic, task, taskIndex, onDone) {
+  const box = document.getElementById("practice-task");
+  const side = document.getElementById("practice-results");
+  if (!box || !side) return;
+
+  // Обработчики открытого перед этим задания «Что здесь не так» больше не нужны
+  if (practiceListeners) practiceListeners.abort();
+  practiceListeners = null;
+
+  const zones = (task.zones || []).map(function (zone) {
+    return Object.assign({}, zone, { found: false });
+  });
+
+  const tasks = practiceTasks(topic);
+  const nextIndex = taskIndex + 1 < tasks.length ? taskIndex + 1 : -1;
+
+  function percent(value, total) {
+    return (value / total * 100) + "%";
+  }
+
+  box.innerHTML =
+    '<div class="practice-scene">' +
+      '<div class="practice-stage is-pointer" style="aspect-ratio: ' + task.width + " / " + task.height + '">' +
+        '<img class="practice-bg" src="' + escapeHtml(task.image) + '" alt="' + escapeHtml(task.alt || "") + '" draggable="false">' +
+        // Кнопки лежат точно на зонах: для мыши они прозрачны и невидимы, нужны для клавиатуры (Tab + Enter)
+        // и программ чтения с экрана
+        '<div role="group" aria-label="Места на картинке">' +
+          zones.map(function (zone, i) {
+            return '<button type="button" class="zones-spot" data-zone="' + i + '" aria-label="' + escapeHtml(zone.label) + '" style="' +
+              "left: " + percent(zone.cx - zone.rx, task.width) + "; top: " + percent(zone.cy - zone.ry, task.height) + "; " +
+              "width: " + percent(zone.rx * 2, task.width) + "; height: " + percent(zone.ry * 2, task.height) + '"></button>';
+          }).join("") +
+        "</div>" +
+      "</div>" +
+      // Подсказка у места промаха; программа чтения узнает о промахе из строки ниже
+      '<div class="zones-miss" aria-hidden="true" hidden></div>' +
+    "</div>" +
+    '<p class="visually-hidden" aria-live="polite"></p>' +
+
+    // Под картинкой, когда найдены все зоны: «Готово!» и кнопки
+    '<div class="zones-done" hidden>' +
+      '<div class="practice-finish">' +
+        '<p class="success">Готово! Вы нашли все места на картинке</p>' +
+        (getCurrentUser() ? "" :
+          '<p class="practice-note">Вы не вошли, поэтому отметка о практике не сохранится. <a href="' + loginLinkBack() + '">Войти</a></p>') +
+      "</div>" +
+      '<div class="practice-actions">' +
+        (nextIndex >= 0
+          ? '<a href="' + practiceLink(topic, nextIndex + 1) + '" data-task="' + (nextIndex + 1) + '" class="btn btn-primary">К следующему заданию</a>'
+          : "") +
+        '<a href="' + topicTestLink(topic) + '" class="btn ' + (nextIndex >= 0 ? "btn-secondary" : "btn-primary") + '">К тесту</a>' +
+        '<button type="button" class="btn btn-secondary practice-again">Пройти ещё раз</button>' +
+        '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Вернуться к уроку</a>' +
+      "</div>" +
+    "</div>";
+
+  // Справа: счётчик и ячейки — по одной на каждую зону
+  side.innerHTML =
+    '<p class="practice-count" tabindex="-1"></p>' +
+    '<div class="practice-cells">' +
+      zones.map(function () { return '<div class="practice-cell is-empty"></div>'; }).join("") +
+    "</div>";
+
+  const stage = box.querySelector(".practice-stage");
+  const missTip = box.querySelector(".zones-miss");
+  const message = box.querySelector("p.visually-hidden");
+  const done = box.querySelector(".zones-done");
+  const firstAction = done.querySelector(".practice-actions .btn");
+  const count = side.querySelector(".practice-count");
+  const cells = side.querySelector(".practice-cells");
+
+  zones.forEach(function (zone, i) {
+    zone.button = stage.querySelector('[data-zone="' + i + '"]');
+  });
+
+  let missTimer = null;
+
+  // Картинки нет — серый блок вместо задания
+  stage.querySelector("img").addEventListener("error", function () {
+    box.innerHTML = '<div class="practice-missing">Картинка практики пока не добавлена</div>';
+    side.innerHTML = "";
+  });
+
+  function foundCount() {
+    return zones.filter(function (z) { return z.found; }).length;
+  }
+
+  function updateCount() {
+    count.innerHTML = "Найдено: <strong>" + foundCount() + "</strong> из " + zones.length;
+  }
+
+  function hideMiss() {
+    clearTimeout(missTimer);
+    missTip.hidden = true;
+  }
+
+  /* Подсказка о промахе: над точкой клика (не помещается — под ней), в пределах ширины картинки */
+  function showMiss(x, y) {
+    hideMiss();
+    missTip.textContent = task.missText || "Попробуйте ещё";
+    missTip.hidden = false;
+    const gap = 12;
+    const top = y - missTip.offsetHeight - gap;
+    const maxLeft = Math.max(0, stage.offsetWidth - missTip.offsetWidth);
+    missTip.style.left = Math.round(Math.min(Math.max(0, x - missTip.offsetWidth / 2), maxLeft)) + "px";
+    missTip.style.top = Math.round(top >= 0 ? top : y + gap) + "px";
+    missTimer = setTimeout(hideMiss, ZONES_MISS_TIME);
+  }
+
+  function miss(x, y) {
+    if (foundCount() === zones.length) return;
+    showMiss(x, y);
+    message.textContent = missTip.textContent;
+  }
+
+  /* Отметка на картинке и карточка в первой свободной ячейке */
+  function markZone(zone, number) {
+    const mark = document.createElement("span");
+    mark.className = "zones-mark";
+    mark.setAttribute("aria-hidden", "true");
+    mark.style.left = percent(zone.cx, task.width);
+    mark.style.top = percent(zone.cy, task.height);
+    mark.textContent = number;
+    stage.appendChild(mark);
+
+    const cell = cells.querySelector(".practice-cell.is-empty");
+    if (!cell) return;
+    cell.className = "practice-cell practice-card";
+    cell.innerHTML =
+      '<span class="practice-tag practice-tag--ok">✓ Найдено</span>' +
+      "<h3>" + escapeHtml(zone.label) + "</h3>" +
+      "<p>" + escapeHtml(zone.explanation) + "</p>";
+  }
+
+  function findZone(zone, byKey) {
+    zone.found = true;
+    hideMiss();
+    zone.button.hidden = true;
+
+    const n = foundCount();
+    markZone(zone, n);
+    updateCount();
+    message.textContent = zone.label + ". " + zone.explanation + " Найдено: " + n + " из " + zones.length + ".";
+
+    if (n === zones.length) {
+      done.hidden = false;
+      saveTaskDone(topic, task);
+      message.textContent += " Готово! Вы нашли все места на картинке";
+      if (byKey) firstAction.focus();
+      if (onDone) onDone();
+    } else if (byKey) {
+      // После выбора с клавиатуры — фокус на следующую ненайденную зону
+      zones.find(function (z) { return !z.found; }).button.focus();
+    }
+  }
+
+  /* Клик по картинке: повторный клик по найденной зоне ничего не делает и промахом не считается */
+  stage.addEventListener("click", function (e) {
+    const rect = stage.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width * task.width;
+    const y = (e.clientY - rect.top) / rect.height * task.height;
+    const hits = zones.filter(function (z) {
+      const dx = (x - z.cx) / z.rx, dy = (y - z.cy) / z.ry;
+      return dx * dx + dy * dy <= 1;
+    });
+    const zone = hits.find(function (z) { return !z.found; });
+    if (zone) findZone(zone, false);
+    else if (!hits.length) miss(e.clientX - rect.left, e.clientY - rect.top);
+  });
+
+  stage.querySelector('[role="group"]').addEventListener("click", function (e) {
+    const button = e.target.closest(".zones-spot");
+    if (!button) return;
+    e.stopPropagation();
+    findZone(zones[Number(button.dataset.zone)], true);
+  });
+
+  box.querySelector(".practice-again").addEventListener("click", function () {
+    zones.forEach(function (z) {
+      z.found = false;
+      z.button.hidden = false;
+    });
+    stage.querySelectorAll(".zones-mark").forEach(function (mark) { mark.remove(); });
+    cells.querySelectorAll(".practice-cell").forEach(function (cell) {
+      cell.className = "practice-cell is-empty";
+      cell.innerHTML = "";
+    });
+    hideMiss();
+    done.hidden = true;
+    updateCount();
+    message.textContent = "";
+    count.focus();
+  });
+
+  updateCount();
+}
+
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
    Слева — список заданий темы, в центре — задание, справа — карточки результатов.
    Задания переключаются без перезагрузки: меняется только ?task= в адресе */
@@ -1531,6 +1734,7 @@ function renderPracticePage() {
   renderNav();
 
   if (task.type === "spot-error") setupPractice(topic, task, index, renderNav);
+  if (task.type === "find-zones") setupFindZones(topic, task, index, renderNav);
 
   // Переход к другому заданию (список слева и кнопка «К следующему заданию») — без перезагрузки.
   // Обработчик вешается один раз: сам блок страницы при переключении не пересоздаётся

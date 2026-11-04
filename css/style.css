@@ -1911,9 +1911,17 @@ body.page-practice { background: var(--page-bg); }
 /* Три колонки: список заданий — задание — результаты; уже 1000px — друг под другом */
 .practice-page-grid {
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  grid-template-columns: 230px minmax(0, 1fr) clamp(300px, 30vw, 400px);
   gap: 24px;
   align-items: start;
+}
+/* Центр не уезжает, пока прокручиваются карточки справа. Только в три колонки и при низкой шапке
+   (высокой, с кнопкой «Меню», она становится при 1000px и уже) */
+@media (min-width: 1001px) {
+  .practice-main-col {
+    position: sticky;
+    top: var(--header-h);
+  }
 }
 .practice-nav,
 .practice-side-col,
@@ -2107,7 +2115,7 @@ body.page-practice { background: var(--page-bg); }
   margin-top: 22px;
 }
 
-/* Правая колонка: счётчик и ячейки результатов (2 в ряд) */
+/* Правая колонка: счётчик и ячейки результатов (одна под другой) */
 .practice-count {
   margin: 0 0 14px;
   font-size: 1.1rem;
@@ -2115,32 +2123,43 @@ body.page-practice { background: var(--page-bg); }
 .practice-count:focus { outline: none; }
 .practice-cells {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
 }
-.practice-cell {
-  min-height: 120px;
-  border-radius: 12px;
+.practice-cell { border-radius: 12px; }
+.practice-cell.is-empty {
+  min-height: 56px;
+  background: rgba(234, 223, 206, 0.45);
 }
-.practice-cell.is-empty { background: rgba(234, 223, 206, 0.45); }
+/* Первая строка — ярлык и рядом название, ниже — пояснение. Название занимает остаток строки;
+   если его самое длинное слово рядом с ярлыком не помещается, название целиком уходит на строку ниже */
 .practice-card {
-  padding: 10px 11px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  padding: 12px 14px 14px;
   background: #fff;
   border: 1px solid #eadfce;
   box-shadow: 0 2px 8px rgba(107, 74, 53, 0.08);
-  font-size: 0.85rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;   /* длинные слова («Противопролежневая») переносятся, а не вылезают за ячейку */
-  hyphens: auto;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+  hyphens: manual;
   animation: practice-fade 0.4s ease;
 }
 .practice-card h3 {
-  margin: 6px 0 4px;
-  font-size: 0.95rem;
+  flex: 1 1 0;
+  margin: 0;
+  font-size: 1.05rem;
   line-height: 1.25;
 }
-.practice-card p { margin: 0; }
+.practice-card p {
+  flex: 0 0 100%;
+  margin: 0;
+}
 .practice-tag {
+  flex: none;
   display: inline-block;
   padding: 2px 8px;
   border-radius: 999px;
@@ -2149,6 +2168,57 @@ body.page-practice { background: var(--page-bg); }
 }
 .practice-tag--error { background: #fbe1cf; color: #9a3f1b; }
 .practice-tag--ok { background: #e1f0dc; color: #2e6b30; }
+
+/* Задание «Найди на картинке» (type "find-zones").
+   Кнопка лежит на зоне: мышь её не замечает (клик считается по картинке), подсветки при наведении нет */
+.zones-spot {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: none;
+}
+/* Отметка найденной зоны: центр кружка — в центре зоны */
+.zones-mark {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 80%, transparent);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: bold;
+  line-height: 1;
+  pointer-events: none;
+  animation: zones-mark-in 0.3s ease;
+}
+@keyframes zones-mark-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* Подсказка у места промаха */
+.zones-miss {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  max-width: 230px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(107, 74, 53, 0.18);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: practice-fade 0.2s ease;
+}
 
 /* Нет картинок — серый блок вместо задания */
 .practice-missing {
@@ -2191,10 +2261,13 @@ body.page-practice { background: var(--page-bg); }
 @media (max-width: 480px) {
   .practice-task-title { font-size: 1.4rem; }
   .practice-actions .btn { flex: 1 1 100%; }
+  .zones-mark { width: 22px; height: 22px; margin: -11px 0 0 -11px; font-size: 0.75rem; border-width: 1px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .practice-layer,
   .practice-layer.is-gone { transition-duration: 0.2s; }
   .practice-message.is-shown,
-  .practice-card { animation: none; opacity: 1; }
+  .practice-card,
+  .zones-mark,
+  .zones-miss { animation: none; opacity: 1; }
 }
