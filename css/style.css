@@ -2246,10 +2246,12 @@ body.page-practice { background: var(--page-bg); }
 @media (min-width: 1000px) {
   .practice-page-grid--order { grid-template-columns: 230px minmax(0, 1fr) minmax(0, 1fr); }
 }
-/* Здесь закреплена панель, а не центр: рамки прокручиваются, а шаги всегда под рукой */
+/* Здесь закреплена панель, а не центр: рамки прокручиваются, а шаги всегда под рукой (так же и у «Подбери пару») */
 @media (min-width: 1001px) {
-  .practice-page-grid--order .practice-main-col { position: static; }
-  .practice-page-grid--order .practice-side-col {
+  .practice-page-grid--order .practice-main-col,
+  .practice-page-grid--match .practice-main-col { position: static; }
+  .practice-page-grid--order .practice-side-col,
+  .practice-page-grid--match .practice-side-col {
     position: sticky;
     top: var(--header-h);
     max-height: calc(100vh - var(--header-h) - 16px);
@@ -2398,6 +2400,138 @@ body.page-practice { background: var(--page-bg); }
 .order-pool-empty { margin: 0; font-size: 0.95rem; color: var(--muted); }
 .practice-side-col.is-over { background: #fdf6ef; }
 
+/* Задание «Подбери пару» (type "match"): карточки по центру и панель «Ответы» справа, примерно поровну.
+   Пустая колонка между ними — место для линий */
+.practice-page-grid--match { position: relative; }
+@media (min-width: 1000px) {
+  .practice-page-grid--match { grid-template-columns: 230px minmax(0, 1fr) 16px minmax(0, 1fr); }
+  .practice-page-grid--match .practice-side-col { grid-column: 4; }
+}
+/* Слой с линиями поверх обеих колонок, под шапкой; нажатия проходят сквозь него */
+.match-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.match-line {
+  fill: none;
+  stroke: #2e7d32;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.match-line--drag { stroke: var(--accent); }
+.match-count {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.match-count:focus { outline: none; }
+.match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.match-title { margin: 0 0 2px; font-size: 1.3rem; }
+.match-hint,
+.match-picked { margin: 0 0 12px; font-size: 0.9rem; min-height: 2.6em; line-height: 1.3; }
+.match-hint { color: var(--muted); }
+.match-picked { color: var(--accent-dark); font-weight: bold; }
+.match-hint-narrow { display: none; }
+.match-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 2px solid #e0d2c0;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(107, 74, 53, 0.1);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: break-word;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Вертикальный жест на карточке прокручивает страницу, остальные тянут линию */
+.match-left { cursor: grab; touch-action: pan-y; }
+@media (hover: hover) {
+  .match-card:not(:disabled):hover { border-color: var(--accent); }
+}
+.match-img {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.match-text { flex: 1 1 0; min-width: 0; }
+.match-text--name { font-weight: bold; }
+.match-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+  background: #fdf6ef;
+}
+.match-answers.is-choosing .match-right:not(:disabled) { border-color: var(--accent); }
+.match-card.is-over { background: #fbe6d8; }
+.match-card.is-found {
+  border-color: #2e7d32;
+  background: #e6f3e1;
+  box-shadow: none;
+  color: var(--text);
+  cursor: default;
+}
+.match-card.is-wrong { animation: match-wrong 0.6s ease; }
+@keyframes match-wrong {
+  0%, 85% { border-color: #c62828; background: #fdecea; }
+  15% { transform: translateX(-5px); }
+  30% { transform: translateX(5px); }
+  45% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  75% { transform: none; }
+}
+@keyframes match-wrong-still {
+  0%, 85% { border-color: #c62828; background: #fdecea; }
+}
+.match-note {
+  margin: 6px 12px 4px;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+/* Номер пары виден только на узком экране, вместо линии */
+.match-num {
+  display: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1;
+}
+.match-num[data-color="1"] { background: #2e7d32; }
+.match-num[data-color="2"] { background: #1565c0; }
+.match-num[data-color="3"] { background: #7b1fa2; }
+.match-num[data-color="4"] { background: #ad4a00; }
+.match-num[data-color="5"] { background: #00796b; }
+.match-num[data-color="6"] { background: #5d4037; }
+
 /* Нет картинок — серый блок вместо задания */
 .practice-missing {
   aspect-ratio: 1024 / 572;
@@ -2453,6 +2587,26 @@ body.page-practice { background: var(--page-bg); }
   .order-slot .order-card-x,
   .order-check { scroll-margin: 116px 0 calc(38vh + 12px); }
 }
+/* «Подбери пару» шире 900px остаётся в две колонки: без них негде рисовать линии */
+@media (min-width: 901px) and (max-width: 999px) {
+  .practice-page-grid--match { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr); }
+  .practice-page-grid--match .practice-nav { grid-column: 1 / -1; }
+  .practice-page-grid--match .practice-side-col { grid-column: 3; }
+}
+/* Уже 900px — вопросы сверху, ответы снизу: только нажатия, вместо линий номера на карточках */
+@media (max-width: 900px) {
+  .match-lines { display: none; }
+  .match-left { cursor: pointer; touch-action: manipulation; }
+  .match-card.is-found .match-num { display: flex; }
+  .match-hint-wide { display: none; }
+  .match-hint-narrow { display: inline; }
+  .match-hint,
+  .match-picked { min-height: 0; }
+  /* Отступ сверху при прокрутке к элементу — на высоту шапки */
+  .match-row,
+  .match-card,
+  .practice-page-grid--match .practice-side-col { scroll-margin-top: 116px; }
+}
 @media (max-width: 480px) {
   .practice-task-title { font-size: 1.4rem; }
   .practice-actions .btn { flex: 1 1 100%; }
@@ -2466,4 +2620,5 @@ body.page-practice { background: var(--page-bg); }
   .zones-mark,
   .zones-miss,
   .order-card.is-back { animation: none; opacity: 1; }
+  .match-card.is-wrong { animation-name: match-wrong-still; }
 }

@@ -765,11 +765,8 @@ function renderLessonPracticeCard(topic) {
   const done = countTasksDone(topic);
   const mark = !done ? "" :
     '<span class="lesson-done">' + (done === tasks.length ? "Выполнено" : done + " из " + tasks.length) + " ✓</span>";
-  // В заданиях «Расставь по порядку» картинок нет — тогда просто «3 задания»
-  const onPictures = tasks.every(function (t) { return t.type !== "order"; });
   return lessonSideCard(LESSON_ICONS.practice, "Практика",
-    '<p class="lesson-side-note">' + tasks.length + " " + plural(tasks.length, "задание", "задания", "заданий") +
-      (onPictures ? " на " + (tasks.length === 1 ? "картинке" : "картинках") : "") + "</p>" +
+    '<p class="lesson-side-note">' + tasks.length + " " + plural(tasks.length, "задание", "задания", "заданий") + "</p>" +
     '<div class="lesson-side-row">' +
       '<a href="' + practiceLink(topic, 1) + '" class="btn btn-primary">Перейти</a>' + mark +
     "</div>");
@@ -1724,7 +1721,7 @@ function setupFindZones(topic, task, taskIndex, onDone) {
   fitImage();
 }
 
-/* Шаги в случайном порядке, но не в правильном */
+/* Шаги (или пары) в случайном порядке, но не в правильном */
 function orderShuffled(steps) {
   const list = steps.slice();
   do {
@@ -2073,6 +2070,361 @@ function setupOrder(topic, task, taskIndex, onDone) {
   render();
 }
 
+/* Задание «Подбери пару» (type "match") на странице practice.html.
+   Пары (поле pairs) записаны в правильном соответствии; ответы в панели справа перемешаны.
+   Соединяют перетаскиванием: потянуть линию от карточки слева к ответу, или нажатием: карточка, затем ответ (так же Tab и Enter).
+   Верная пара закрепляется, неверная «вздрагивает», линия не остаётся.
+   Уже 900px колонки идут друг под другом: только нажатия, а вместо линий — номера на карточках (их переключают стили).
+   onDone() вызывается, когда все пары найдены (чтобы обновить список заданий слева) */
+const MATCH_NARROW = "(max-width: 900px)";
+const MATCH_DRAG_START = 6;   // на сколько пикселей сдвинуть указатель, чтобы нажатие стало перетаскиванием
+const MATCH_COLORS = 6;       // сколько цветов у номеров (задаются в стилях)
+
+function setupMatch(topic, task, taskIndex, onDone) {
+  const box = document.getElementById("practice-task");
+  const side = document.getElementById("practice-results");
+  if (!box || !side) return;
+
+  // Обработчики прошлого задания (или прошлого прохождения этого) снимаются
+  if (practiceListeners) practiceListeners.abort();
+  practiceListeners = new AbortController();
+  const listen = { signal: practiceListeners.signal };
+
+  const pairs = (task.pairs || []).map(function (pair, i) {
+    return Object.assign({}, pair, { index: i, number: 0 });
+  });
+  const answers = orderShuffled(pairs);
+  let found = 0;
+  let selected = null;       // пара, выбранная нажатием на левую карточку
+  let drag = null;           // перетаскивание: { pair, id, x0, y0, x, y, moved }
+  let ignoreClick = false;   // после перетаскивания браузер присылает ещё и щелчок
+
+  const tasks = practiceTasks(topic);
+  const nextIndex = taskIndex + 1 < tasks.length ? taskIndex + 1 : -1;
+
+  box.innerHTML =
+    '<p class="match-count" tabindex="-1" aria-live="polite"></p>' +
+    '<ul class="match-list">' +
+      pairs.map(function (pair) {
+        return '<li class="match-row">' +
+          '<button type="button" class="match-card match-left" data-pair="' + pair.index + '" aria-pressed="false">' +
+            (pair.left.image ? '<img class="match-img" src="' + escapeHtml(pair.left.image) + '" alt="" draggable="false">' : "") +
+            '<span class="match-text' + (pair.left.image ? " match-text--name" : "") + '">' + escapeHtml(pair.left.label) + "</span>" +
+            '<span class="match-num" aria-hidden="true"></span>' +
+          "</button>" +
+          '<p class="match-note" hidden>' +
+            '<span class="visually-hidden">Ответ: ' + escapeHtml(pair.right) + ". </span>" + escapeHtml(pair.explanation) +
+          "</p>" +
+        "</li>";
+      }).join("") +
+    "</ul>" +
+    '<p class="match-say visually-hidden" aria-live="polite"></p>' +
+
+    // Когда все пары найдены: «Готово!» и кнопки
+    '<div class="zones-done" hidden>' +
+      '<div class="practice-finish">' +
+        '<p class="success">Готово! Все пары найдены</p>' +
+        (getCurrentUser() ? "" :
+          '<p class="practice-note">Вы не вошли, поэтому отметка о практике не сохранится. <a href="' + loginLinkBack() + '">Войти</a></p>') +
+      "</div>" +
+      '<div class="practice-actions">' +
+        (nextIndex >= 0
+          ? '<a href="' + practiceLink(topic, nextIndex + 1) + '" data-task="' + (nextIndex + 1) + '" class="btn btn-primary">К следующему заданию</a>'
+          : "") +
+        '<a href="' + topicTestLink(topic) + '" class="btn ' + (nextIndex >= 0 ? "btn-secondary" : "btn-primary") + '">К тесту</a>' +
+        '<button type="button" class="btn btn-secondary practice-again">Пройти ещё раз</button>' +
+        '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Вернуться к уроку</a>' +
+      "</div>" +
+    "</div>";
+
+  side.setAttribute("aria-label", "Ответы");
+  side.innerHTML =
+    '<h2 class="match-title">Ответы</h2>' +
+    '<p class="match-hint">' +
+      '<span class="match-hint-wide">Потяните линию от карточки слева к ответу или нажмите на карточку, а затем на ответ.</span>' +
+      '<span class="match-hint-narrow">Нажмите на карточку выше, а затем на подходящий ответ.</span>' +
+    "</p>" +
+    '<p class="match-picked" hidden></p>' +
+    '<ul class="match-list match-answers">' +
+      answers.map(function (pair) {
+        return "<li>" +
+          '<button type="button" class="match-card match-right" data-pair="' + pair.index + '">' +
+            '<span class="match-text">' + escapeHtml(pair.right) + "</span>" +
+            '<span class="match-num" aria-hidden="true"></span>' +
+          "</button>" +
+        "</li>";
+      }).join("") +
+    "</ul>";
+
+  // Слой с линиями лежит поверх обеих колонок; координаты в нём — от его левого верхнего угла
+  const grid = box.closest(".practice-page-grid");
+  const oldLines = grid.querySelector(".match-lines");
+  if (oldLines) oldLines.remove();
+  const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  lines.setAttribute("class", "match-lines");
+  lines.setAttribute("aria-hidden", "true");
+  grid.appendChild(lines);
+
+  function addLine(cls) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("class", cls);
+    lines.appendChild(path);
+    return path;
+  }
+  const dragLine = addLine("match-line match-line--drag");
+
+  const count = box.querySelector(".match-count");
+  const message = box.querySelector(".match-say");
+  const done = box.querySelector(".zones-done");
+  const firstAction = done.querySelector(".practice-actions .btn");
+  const hint = side.querySelector(".match-hint");
+  const picked = side.querySelector(".match-picked");
+  const answersBox = side.querySelector(".match-answers");
+
+  pairs.forEach(function (pair) {
+    pair.leftEl = box.querySelector('.match-left[data-pair="' + pair.index + '"]');
+    pair.rightEl = answersBox.querySelector('.match-right[data-pair="' + pair.index + '"]');
+    pair.noteEl = pair.leftEl.parentNode.querySelector(".match-note");
+    const img = pair.leftEl.querySelector("img");
+    if (img) img.addEventListener("error", function () { img.remove(); });  // нет файла — остаётся один текст
+  });
+
+  function pairOf(el) {
+    return pairs[Number(el.dataset.pair)];
+  }
+
+  function isNarrow() {
+    return matchMedia(MATCH_NARROW).matches;
+  }
+
+  function reveal(el) {
+    el.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+
+  /* --- Линии --- */
+  function curve(x1, y1, x2, y2) {
+    const bend = Math.max(24, Math.abs(x2 - x1) / 2);
+    return "M" + x1 + " " + y1 + " C" + (x1 + bend) + " " + y1 + " " + (x2 - bend) + " " + y2 + " " + x2 + " " + y2;
+  }
+
+  /* Перерисовывает все линии по текущему положению карточек */
+  function draw() {
+    const origin = lines.getBoundingClientRect();
+    const panel = side.getBoundingClientRect();
+    function leftEnd(pair) {
+      const rect = pair.leftEl.getBoundingClientRect();
+      return { x: rect.right - origin.left, y: rect.top + rect.height / 2 - origin.top };
+    }
+    pairs.forEach(function (pair) {
+      if (!pair.line) return;
+      const from = leftEnd(pair);
+      const to = pair.rightEl.getBoundingClientRect();
+      // Ответ прокручен за край панели — линия идёт к её краю
+      const y = Math.min(Math.max(to.top + to.height / 2, panel.top), panel.bottom) - origin.top;
+      pair.line.setAttribute("d", curve(from.x, from.y, to.left - origin.left, y));
+    });
+    if (drag && drag.moved) {
+      const from = leftEnd(drag.pair);
+      dragLine.setAttribute("d", curve(from.x, from.y, drag.x - origin.left, drag.y - origin.top));
+    } else {
+      dragLine.removeAttribute("d");
+    }
+  }
+
+  /* --- Состояние карточек --- */
+  function render() {
+    const dragging = drag && drag.moved ? drag.pair : null;
+    pairs.forEach(function (pair) {
+      const isFound = pair.number > 0;
+      [pair.leftEl, pair.rightEl].forEach(function (el) {
+        el.disabled = isFound;
+        el.classList.toggle("is-found", isFound);
+      });
+      pair.leftEl.classList.toggle("is-selected", selected === pair || dragging === pair);
+      if (isFound) pair.leftEl.removeAttribute("aria-pressed");
+      else pair.leftEl.setAttribute("aria-pressed", selected === pair ? "true" : "false");
+      pair.noteEl.hidden = !isFound;
+    });
+    answersBox.classList.toggle("is-choosing", Boolean(selected || dragging));
+    draw();
+  }
+
+  function updateCount() {
+    count.textContent = "Найдено пар: " + found + " из " + pairs.length;
+  }
+
+  /* Строка над ответами заменяет подсказку: что выбрано (карточка слева на телефоне уже за краем окна) */
+  function setPicked(text) {
+    picked.textContent = text;
+    picked.hidden = !text;
+    hint.hidden = Boolean(text);
+  }
+
+  /* Неверная пара: красная вспышка с дрожью, класс снимается по концу анимации */
+  function flagWrong(el) {
+    el.classList.remove("is-wrong");
+    void el.offsetWidth;  // перезапуск анимации
+    el.classList.add("is-wrong");
+  }
+  [box, side].forEach(function (area) {
+    area.addEventListener("animationend", function (e) {
+      if (e.target.classList.contains("is-wrong")) e.target.classList.remove("is-wrong");
+    }, listen);
+  });
+
+  /* Соединить левую карточку пары с ответом другой пары (или той же). Выбор при ошибке остаётся — можно сразу пробовать другой ответ */
+  function connect(pair, answer, byKey) {
+    if (pair !== answer) {
+      flagWrong(pair.leftEl);
+      flagWrong(answer.rightEl);
+      message.textContent = "Не подходит: " + answer.right;
+      render();
+      return;
+    }
+    found += 1;
+    pair.number = found;
+    pair.line = addLine("match-line");
+    [pair.leftEl, pair.rightEl].forEach(function (el) {
+      el.classList.remove("is-wrong");  // карточка могла ещё дрожать — линия пойдёт от её настоящего места
+      const num = el.querySelector(".match-num");
+      num.textContent = found;
+      num.dataset.color = (found - 1) % MATCH_COLORS + 1;
+    });
+    selected = null;
+    setPicked("");
+    updateCount();
+    render();
+    message.textContent = "Верно: " + pair.left.label + " — " + pair.right;
+    if (found === pairs.length) finish(byKey);
+    else if (byKey) box.querySelector(".match-left:not(:disabled)").focus();
+    else reveal(pair.leftEl.parentNode);
+  }
+
+  function finish(byKey) {
+    done.hidden = false;
+    setPicked("Все пары найдены");
+    saveTaskDone(topic, task);
+    message.textContent = "Готово! Все пары найдены";
+    if (byKey) firstAction.focus();
+    else reveal(done);
+    if (onDone) onDone();
+  }
+
+  /* --- Нажатия и клавиатура: кнопки сами превращают Enter и пробел в щелчок (у него e.detail === 0) --- */
+  function pressLeft(pair, byKey) {
+    selected = selected === pair ? null : pair;
+    setPicked(selected ? "Выбрано: " + pair.left.label + ". Теперь выберите ответ." : "");
+    render();
+    message.textContent = selected ? "Выбрано: " + pair.left.label + ". Теперь выберите ответ." : "Выбор снят";
+    if (!selected) return;
+    if (byKey) answersBox.querySelector(".match-right:not(:disabled)").focus();
+    else if (isNarrow()) reveal(side);
+  }
+
+  function pressRight(pair, byKey) {
+    if (selected) {
+      connect(selected, pair, byKey);
+      return;
+    }
+    setPicked("Сначала выберите, к чему подобрать ответ");
+    message.textContent = "Сначала выберите, к чему подобрать ответ";
+  }
+
+  box.addEventListener("click", function (e) {
+    const left = e.target.closest(".match-left");
+    if (left && !ignoreClick) pressLeft(pairOf(left), e.detail === 0);
+  }, listen);
+  side.addEventListener("click", function (e) {
+    const right = e.target.closest(".match-right");
+    if (right && !ignoreClick) pressRight(pairOf(right), e.detail === 0);
+  }, listen);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (drag) {
+      drag = null;
+      setOver(null);
+      render();
+    } else if (selected) {
+      const back = selected;
+      selected = null;
+      setPicked("");
+      render();
+      message.textContent = "Выбор снят";
+      if (side.contains(document.activeElement)) back.leftEl.focus();
+    }
+  }, listen);
+
+  /* --- Перетаскивание: мышь и палец. Сенсорный экран отдаёт вертикальный жест прокрутке (touch-action в стилях) --- */
+  function setOver(answer) {
+    pairs.forEach(function (pair) { pair.rightEl.classList.toggle("is-over", pair === answer); });
+  }
+
+  function answerAt(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const right = el && el.closest(".match-right");
+    return right && !right.disabled ? pairOf(right) : null;
+  }
+
+  box.addEventListener("pointerdown", function (e) {
+    const left = e.target.closest(".match-left");
+    if (!left || left.disabled || drag || e.button !== 0 || isNarrow()) return;
+    drag = { pair: pairOf(left), id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false };
+  }, listen);
+
+  document.addEventListener("pointermove", function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    if (!drag.moved) {
+      if (Math.hypot(drag.x - drag.x0, drag.y - drag.y0) < MATCH_DRAG_START) return;
+      drag.moved = true;
+      drag.pair.leftEl.setPointerCapture(drag.id);  // отпустили за краем окна — всё равно узнаем об этом
+      selected = null;
+      setPicked("");
+      render();
+    }
+    setOver(answerAt(drag.x, drag.y));
+    draw();
+  }, listen);
+
+  document.addEventListener("pointerup", function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const current = drag;
+    drag = null;
+    setOver(null);
+    if (!current.moved) return;  // обычное нажатие — его обработает щелчок
+    ignoreClick = true;
+    setTimeout(function () { ignoreClick = false; }, 50);
+    const answer = answerAt(e.clientX, e.clientY);
+    if (answer) connect(current.pair, answer, false);
+    else render();
+  }, listen);
+
+  document.addEventListener("pointercancel", function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    setOver(null);
+    render();
+  }, listen);
+
+  /* Линии следуют за карточками: окно, прокрутка (и страницы, и панели), изменение высоты колонок */
+  window.addEventListener("resize", draw, listen);
+  window.addEventListener("scroll", draw, { capture: true, passive: true, signal: listen.signal });
+  const resized = new ResizeObserver(draw);
+  resized.observe(grid);
+  resized.observe(side);
+  listen.signal.addEventListener("abort", function () { resized.disconnect(); });
+
+  box.querySelector(".practice-again").addEventListener("click", function () {
+    setupMatch(topic, task, taskIndex, onDone);
+    box.querySelector(".match-count").focus();
+  });
+
+  updateCount();
+  render();
+}
+
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
    Слева — список заданий темы, в центре — задание, справа — карточки результатов.
    Задания переключаются без перезагрузки: меняется только ?task= в адресе */
@@ -2113,7 +2465,7 @@ function renderPracticePage() {
   document.title = "Практика: " + topic.title + " — Опора. Школа ухода";
 
   page.innerHTML =
-    '<div class="practice-page-grid' + (task.type === "order" ? " practice-page-grid--order" : "") + '">' +
+    '<div class="practice-page-grid' + (task.type === "order" || task.type === "match" ? " practice-page-grid--" + task.type : "") + '">' +
       '<nav class="practice-nav" aria-label="Задания практики"></nav>' +
       '<section class="practice-main-col">' +
         '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
@@ -2149,6 +2501,7 @@ function renderPracticePage() {
   if (task.type === "spot-error") setupPractice(topic, task, index, renderNav);
   if (task.type === "find-zones") setupFindZones(topic, task, index, renderNav);
   if (task.type === "order") setupOrder(topic, task, index, renderNav);
+  if (task.type === "match") setupMatch(topic, task, index, renderNav);
 
   // Переход к другому заданию (список слева и кнопка «К следующему заданию») — без перезагрузки.
   // Обработчик вешается один раз: сам блок страницы при переключении не пересоздаётся
