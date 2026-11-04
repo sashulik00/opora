@@ -39,6 +39,8 @@
   --hero-shade-end: 55%;         /* где затемнение сходит на нет (доля ширины фото); до 1100px — 62% */
   --header-h: 84px;              /* примерная высота шапки — отступ текста на фото под ней */
   --hero-fade: 30%;              /* высота плавного перехода фото в фон страницы (доля высоты блока фото) */
+  --lesson-max: 1320px;          /* урок: наибольшая ширина содержимого */
+  --lesson-side: 360px;          /* урок: ширина правой колонки с карточками */
   --hero-text-bottom: 27vh;      /* место под кнопками на фото — чтобы текст не заходил в зону перехода.
                                     Увеличили --hero-fade — увеличьте и это (примерно --hero-fade × 0.9 в vh) */
 }
@@ -619,8 +621,284 @@ input:focus { border-color: var(--accent); outline: none; }
   font-weight: bold;
 }
 
-/* ===== Страница урока ===== */
-.lesson-container { max-width: 900px; }
+/* ===== Страница урока: слева видео и статья, справа три карточки ===== */
+.lesson-block { padding: 22px 0 40px; }
+.lesson-page { max-width: var(--lesson-max); }
+.lesson-page .breadcrumbs { margin-bottom: 8px; }
+.lesson-page h1 { margin-bottom: 4px; }
+.lesson-page .lead { margin-bottom: 18px; font-size: 1.1rem; }
+
+.lesson-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--lesson-side);
+  grid-template-rows: auto 1fr;
+  gap: 14px 22px;
+}
+.lesson-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.lesson-side {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.lesson-consult {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: bold;
+}
+.lesson-page .lesson-article,
+.lesson-side-card {
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(107, 74, 53, 0.08);
+}
+
+/* Видео: плеер или карточка 16:9; под ними организация и список роликов */
+.lesson-video-screen {
+  display: grid;             /* содержимое растянуто на весь блок; длинный текст карточки растит блок, а не обрезается */
+  aspect-ratio: 16 / 9;
+  border-radius: 20px;
+  background: #3a2d29;
+}
+.lesson-video-screen iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 20px;
+}
+.lesson-video-card {
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(135deg, #3a2d29, #6b4a35);
+}
+.lesson-video-card p { margin: 0; }
+.lesson-video-card-title { font-size: 1.25rem; font-weight: bold; line-height: 1.3; }
+.lesson-video-card-org { font-size: 1rem; opacity: 0.9; }
+.lesson-video-card .btn { margin-top: 8px; }
+.lesson-video-org { margin: 8px 0 0; font-size: 0.9rem; color: var(--muted); }
+.lesson-video-org:empty { display: none; }
+.lesson-video-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lesson-video-item {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.lesson-video-item:hover { border-color: var(--border); }
+.lesson-video-item.is-current { border-color: var(--accent); font-weight: bold; }
+
+/* Статья: в свёрнутом виде абзацы идут одним потоком и обрезаются многоточием на 4-й строке */
+.lesson-page .lesson-article {
+  padding: 24px 28px;
+  font-size: 1.1rem;
+  line-height: 1.55;
+  scroll-margin-top: 120px;  /* при сворачивании начало карточки не прячется под шапкой */
+}
+.lesson-article-intro { margin-bottom: 0.8em; }
+.lesson-article-intro:last-child { margin-bottom: 0; }
+.lesson-article-body p:last-child { margin-bottom: 0; }
+.lesson-article.is-collapsed .lesson-article-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+.lesson-article.is-collapsed .lesson-article-body p {
+  display: inline;
+  margin: 0;
+}
+.lesson-article-sources {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.lesson-article-sources h2 { margin: 0 0 6px; font-size: 1rem; }
+.lesson-article-sources ul { margin: 0; padding-left: 1.2em; }
+.lesson-article-sources li { margin-bottom: 0.3em; }
+.lesson-article-toggle {
+  display: block;
+  margin-top: 12px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+.lesson-article-toggle:hover { text-decoration: underline; }
+
+/* Карточки справа */
+.lesson-side-card { padding: 18px 20px 20px; }
+.lesson-side-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 1.25rem;
+}
+.lesson-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.lesson-icon--memo { color: #8a5a2b; }
+.lesson-icon--practice { color: #2e7d32; }
+.lesson-icon--test { color: #2e7d32; }
+.lesson-side-note {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.lesson-side-card .btn {
+  min-height: 48px;
+  padding: 10px 26px;
+  border-radius: 12px;
+  font-size: 1.05rem;
+}
+.lesson-side-card .lesson-side-btn { display: block; width: 100%; margin-top: 10px; text-align: left; }
+.lesson-side-row {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.lesson-side-mark { margin: 6px 0 0; }
+/* Зелёная отметка «1 из 2 ✓», «Выполнено ✓», «Тест сдан ✓» */
+.lesson-done {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid #a5d6a7;
+  border-radius: 999px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  font-size: 0.95rem;
+  font-weight: bold;
+  line-height: 1.3;
+}
+.lesson-side-hint {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* Окно памятки поверх страницы. Содержимое занимает окно целиком: щелчок по самому dialog — это щелчок по фону */
+html.modal-open {
+  overflow: hidden;
+  scrollbar-gutter: stable;   /* страница не дёргается, когда исчезает полоса прокрутки */
+}
+.lesson-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: var(--page-bg);
+  color: var(--text);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.lesson-modal[open] { display: flex; }
+.lesson-modal::backdrop { background: rgba(31, 22, 18, 0.55); }
+.lesson-modal-box {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lesson-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 14px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.lesson-modal-head h2 { margin: 0; font-size: 1.4rem; }
+.lesson-modal-close {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+.lesson-modal-close:hover { background: var(--border); }
+.lesson-modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* До 900px — одна колонка: видео, статья, Памятка, Практика, Тест */
+@media (max-width: 900px) {
+  .lesson-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .lesson-side { grid-column: 1; grid-row: auto; }
+  .lesson-consult { grid-column: 1; grid-row: auto; margin-top: 4px; }
+}
+/* Телефон: окно памятки на весь экран, прокрутка внутри */
+@media (max-width: 600px) {
+  .lesson-page .lesson-article { padding: 20px; }
+  .lesson-modal {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border-radius: 0;
+  }
+  .lesson-modal-body { padding: 16px; }
+}
 
 .breadcrumbs {
   font-size: 1rem;
@@ -734,8 +1012,6 @@ input:focus { border-color: var(--accent); outline: none; }
 }
 
 /* Блок «Проверь себя» на странице урока */
-.test-start p:last-child { margin-bottom: 0; }
-.best-result { margin: 16px 0 0; }
 
 /* ===== Страница теста (test.html) ===== */
 .back-link {
@@ -1628,15 +1904,6 @@ input:focus { border-color: var(--accent); outline: none; }
 
 /* ===== Практика (страница practice.html; поле practice.tasks в js/data.js) ===== */
 
-/* Карточка «Практика» на странице урока */
-.practice-start p { margin: 0 0 16px; }
-.practice-start-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-}
-
 /* Тёплый фон страницы практики и широкий контейнер — чтобы картинка была крупной */
 body.page-practice { background: var(--page-bg); }
 .practice-container { max-width: 1440px; }
@@ -1827,6 +2094,7 @@ body.page-practice { background: var(--page-bg); }
   border-radius: 14px;
 }
 .practice-finish .success { margin: 0; }
+.practice-finish-back { margin-top: 12px; }
 .practice-note {
   margin: 8px 0 0;
   font-size: 0.95rem;

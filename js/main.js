@@ -570,17 +570,6 @@ function renderMemo(memo, section, withHeading) {
   );
 }
 
-/* «Подробнее» — абзацы из поля details */
-function renderDetails(topic) {
-  if (!hasItems(topic.details)) return "";
-  return (
-    '<h2 class="lesson-h2" id="details">Подробнее</h2>' +
-    '<div class="card details">' +
-      topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
-    "</div>"
-  );
-}
-
 /* Название источника: ссылкой, если адрес есть (только http/https), иначе обычным текстом */
 function sourceHtml(source) {
   const url = (source.url || "").trim();
@@ -608,6 +597,225 @@ function renderIntro(topic) {
   return topic.intro ? '<p class="card topic-intro">' + escapeHtml(topic.intro) + "</p>" : "";
 }
 
+/* ---------- Страница урока: всё на одном экране ---------- */
+
+/* Склонение: plural(2, "задание", "задания", "заданий") → «задания» */
+function plural(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n10 === 1 && n100 !== 11) return one;
+  if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) return few;
+  return many;
+}
+
+/* Значки карточек — простые рисунки SVG: выглядят одинаково во всех браузерах */
+const LESSON_ICONS = {
+  memo: '<svg class="lesson-icon lesson-icon--memo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<rect x="5" y="4" width="14" height="17" rx="2.5"/><rect x="9" y="2.5" width="6" height="4" rx="1.2"/>' +
+    '<path d="M9 11h6M9 15h6"/></svg>',
+  practice: '<svg class="lesson-icon lesson-icon--practice" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<path d="M10 4.5a2 2 0 0 1 4 0V7h4a1 1 0 0 1 1 1v3.5h-1.5a2.2 2.2 0 0 0 0 4.4H19V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-4.1h1.5a2.2 2.2 0 0 0 0-4.4H5V8a1 1 0 0 1 1-1h4z"/></svg>',
+  test: '<svg class="lesson-icon lesson-icon--test" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+    '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M8 12.5l3 3 5.5-6.5"/></svg>'
+};
+
+/* Адрес только http/https, иначе пустая строка */
+function webUrl(url) {
+  const value = (url || "").trim();
+  return /^https?:\/\//i.test(value) ? value : "";
+}
+
+/* Видео урока — необязательное поле videos в js/data.js:
+     videos: [{ title: "Название", org: "Кто снял", embedUrl: "адрес плеера для iframe", pageUrl: "страница ролика" }]
+   embedUrl может не быть (площадка не разрешает встраивание) — тогда вместо плеера карточка со ссылкой на pageUrl.
+   Старое поле video (ссылка YouTube/Rutube) тоже работает, если списка videos нет. */
+function lessonVideos(topic) {
+  if (Array.isArray(topic.videos) && topic.videos.length) {
+    return topic.videos.filter(function (v) { return v && (webUrl(v.embedUrl) || webUrl(v.pageUrl)); });
+  }
+  const url = (topic.video || "").trim();
+  return url ? [{ title: topic.title, embedUrl: getEmbedUrl(url), pageUrl: url }] : [];
+}
+
+/* Плеер на странице или, если встроить нельзя, карточка 16:9 со ссылкой на сайт ролика */
+function lessonVideoScreen(video) {
+  const embed = webUrl(video.embedUrl);
+  const pageUrl = webUrl(video.pageUrl);
+  if (embed) {
+    return (
+      '<iframe src="' + escapeHtml(embed) + '" title="' + escapeHtml(video.title || "Видео урока") + '" loading="lazy" ' +
+      'allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen ' +
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe>'
+    );
+  }
+  return (
+    '<div class="lesson-video-card">' +
+      (video.title ? '<p class="lesson-video-card-title">' + escapeHtml(video.title) + "</p>" : "") +
+      (video.org ? '<p class="lesson-video-card-org">' + escapeHtml(video.org) + "</p>" : "") +
+      (pageUrl ? '<a href="' + escapeHtml(pageUrl) + '" class="btn btn-primary" target="_blank" rel="noopener">Смотреть на сайте</a>' : "") +
+    "</div>"
+  );
+}
+
+function lessonVideoOrg(video) {
+  return video.org ? "Видео: " + video.org : "";
+}
+
+function renderLessonVideos(videos) {
+  if (!videos.length) return "";
+  const list = videos.length < 2 ? "" :
+    '<ul class="lesson-video-list">' +
+      videos.map(function (v, i) {
+        return '<li><button type="button" class="lesson-video-item' + (i === 0 ? " is-current" : "") + '" data-video="' + i + '"' +
+          ' aria-pressed="' + (i === 0) + '">' + escapeHtml(v.title || "Видео " + (i + 1)) + "</button></li>";
+      }).join("") +
+    "</ul>";
+  return (
+    '<section class="lesson-video" aria-label="Видео урока">' +
+      '<div class="lesson-video-screen">' + lessonVideoScreen(videos[0]) + "</div>" +
+      '<p class="lesson-video-org">' + escapeHtml(lessonVideoOrg(videos[0])) + "</p>" +
+      list +
+    "</section>"
+  );
+}
+
+/* Клик по названию ролика — этот ролик в том же плеере */
+function setupLessonVideos(page, videos) {
+  const box = page.querySelector(".lesson-video");
+  if (!box) return;
+  box.addEventListener("click", function (e) {
+    const button = e.target.closest(".lesson-video-item");
+    if (!button || button.classList.contains("is-current")) return;
+    const video = videos[Number(button.dataset.video)];
+    box.querySelector(".lesson-video-screen").innerHTML = lessonVideoScreen(video);
+    box.querySelector(".lesson-video-org").textContent = lessonVideoOrg(video);
+    box.querySelectorAll(".lesson-video-item").forEach(function (b) {
+      b.classList.toggle("is-current", b === button);
+      b.setAttribute("aria-pressed", b === button);
+    });
+  });
+}
+
+/* Статья: вступление и начало текста, остальное раскрывается на месте; внизу раскрытой статьи — источники */
+function renderLessonArticle(topic) {
+  const details = (topic.details || []).filter(Boolean);
+  const sources = (topic.sources || []).filter(function (s) { return s && (s.title || s.url); });
+  if (!topic.intro && !details.length) return "";
+  return (
+    '<article class="card lesson-article" aria-label="Текст урока">' +
+      (topic.intro ? '<p class="lesson-article-intro">' + escapeHtml(topic.intro) + "</p>" : "") +
+      (details.length
+        ? '<div class="lesson-article-body">' +
+            details.map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join(" ") +
+          "</div>"
+        : "") +
+      (sources.length
+        ? '<div class="lesson-article-sources">' +
+            "<h2>Источники</h2>" +
+            "<ul>" + sources.map(function (s) { return "<li>" + sourceHtml(s) + "</li>"; }).join("") + "</ul>" +
+          "</div>"
+        : "") +
+      '<button type="button" class="lesson-article-toggle" aria-expanded="false"></button>' +
+    "</article>"
+  );
+}
+
+/* Раскрытие статьи. Кнопка нужна, только если текст обрезан: это проверяется и при изменении ширины окна */
+function setupLessonArticle(page) {
+  const card = page.querySelector(".lesson-article");
+  if (!card) return;
+  const body = card.querySelector(".lesson-article-body");
+  const sources = card.querySelector(".lesson-article-sources");
+  const toggle = card.querySelector(".lesson-article-toggle");
+  let expanded = false;
+
+  function update() {
+    card.classList.toggle("is-collapsed", !expanded);
+    const isCut = !expanded && Boolean(body) && body.scrollHeight > body.clientHeight + 1;
+    if (!expanded && !isCut) card.classList.remove("is-collapsed");  // весь текст и так помещается
+    toggle.hidden = !expanded && !isCut;
+    toggle.textContent = expanded ? "Свернуть ▴" : "Читать полностью ▾";
+    toggle.setAttribute("aria-expanded", expanded);
+    if (sources) sources.hidden = isCut;
+  }
+
+  toggle.addEventListener("click", function () {
+    expanded = !expanded;
+    update();
+    if (!expanded) card.scrollIntoView({ block: "start" });
+  });
+  window.addEventListener("resize", update);
+  update();
+}
+
+/* Карточка правой колонки: значок, заголовок, содержимое */
+function lessonSideCard(icon, title, content) {
+  return '<section class="card lesson-side-card"><h2>' + icon + escapeHtml(title) + "</h2>" + content + "</section>";
+}
+
+function renderLessonMemoCard(hasMemoBlocks) {
+  if (!hasMemoBlocks) return "";
+  return lessonSideCard(LESSON_ICONS.memo, "Памятка",
+    '<p class="lesson-side-note">Можно · нельзя · когда срочно к врачу</p>' +
+    '<button type="button" class="btn btn-secondary lesson-side-btn" id="lesson-memo-open">Открыть памятку</button>');
+}
+
+function renderLessonPracticeCard(topic) {
+  const tasks = practiceTasks(topic);
+  if (!tasks.length) return "";
+  const done = countTasksDone(topic);
+  const mark = !done ? "" :
+    '<span class="lesson-done">' + (done === tasks.length ? "Выполнено" : done + " из " + tasks.length) + " ✓</span>";
+  return lessonSideCard(LESSON_ICONS.practice, "Практика",
+    '<p class="lesson-side-note">' + tasks.length + " " + plural(tasks.length, "задание", "задания", "заданий") +
+      " на " + (tasks.length === 1 ? "картинке" : "картинках") + "</p>" +
+    '<div class="lesson-side-row">' +
+      '<a href="' + practiceLink(topic, 1) + '" class="btn btn-primary">Перейти</a>' + mark +
+    "</div>");
+}
+
+function renderLessonTestCard(topic, record, user) {
+  const count = (topic.quiz || []).length;
+  if (!count) return "";
+  const hasResult = Boolean(record && record.total);
+  const passed = hasResult && (record.passed || record.best / record.total >= PASS_RATE);
+  return lessonSideCard(LESSON_ICONS.test, "Тест",
+    '<p class="lesson-side-note">' + count + " " + plural(count, "вопрос", "вопроса", "вопросов") +
+      " · зачёт от " + Math.round(PASS_RATE * 100) + "%</p>" +
+    (hasResult ? '<p class="lesson-side-note">Лучший результат: ' + record.best + " из " + record.total + "</p>" : "") +
+    (passed ? '<p class="lesson-side-mark"><span class="lesson-done">Тест сдан ✓</span></p>' : "") +
+    '<a href="' + topicTestLink(topic) + '" class="btn btn-primary lesson-side-btn">' +
+      (passed ? "Пройти ещё раз" : "Приступить к тесту") + "</a>" +
+    (!user
+      ? '<p class="lesson-side-hint">Тест можно пройти и без входа, но результат не сохранится. ' +
+        '<a href="' + loginLinkBack() + '">Войти</a></p>'
+      : ""));
+}
+
+/* Окно памятки: тег dialog сам держит фокус внутри и закрывается по Esc.
+   Здесь — крестик, щелчок по затемнённому фону и запрет прокрутки страницы под окном */
+function setupLessonMemoDialog(page) {
+  const open = page.querySelector("#lesson-memo-open");
+  const dialog = page.querySelector(".lesson-modal");
+  if (!open || !dialog) return;
+  let pressedOutside = false;
+
+  open.addEventListener("click", function () {
+    document.documentElement.classList.add("modal-open");
+    dialog.showModal();
+    dialog.querySelector(".lesson-modal-close").focus();
+  });
+  dialog.addEventListener("close", function () {
+    document.documentElement.classList.remove("modal-open");
+    open.focus();
+  });
+  dialog.querySelector(".lesson-modal-close").addEventListener("click", function () { dialog.close(); });
+  // Фон — это сам dialog: содержимое занимает его целиком. Выделение текста с отпусканием на фоне окно не закрывает
+  dialog.addEventListener("pointerdown", function (e) { pressedOutside = e.target === dialog; });
+  dialog.addEventListener("click", function (e) {
+    if (e.target === dialog && pressedOutside) dialog.close();
+  });
+}
+
 function renderLessonPage() {
   const page = document.getElementById("lesson-page");
   if (!page) return;
@@ -633,6 +841,8 @@ function renderLessonPage() {
   const section = sectionOf(topic);
   const user = getCurrentUser();
   const record = getProgress()[topic.id];
+  const videos = lessonVideos(topic);
+  const memoBlocks = renderMemo(topic.lessonMemo, section, false);
 
   document.title = topic.title + " — Опора. Школа ухода";
 
@@ -646,44 +856,45 @@ function renderLessonPage() {
     "<h1>" + escapeHtml(topic.title) + "</h1>" +
     '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
 
-    renderIntro(topic) +   // вводный текст — над видео
-    renderVideo(topic) +
-    renderDetails(topic) +
-    renderMemo(topic.lessonMemo, section, true) +
-    renderPracticeBlock(topic) +   // практика «Что здесь не так» — только если у темы есть поле practice
-
-    // Тест — на отдельной странице test.html
-    '<h2 class="lesson-h2" id="test">Проверь себя</h2>' +
-    '<div class="card test-start">' +
-      "<p>Вопросов в тесте: " + topic.quiz.length + ". Для зачёта нужно не меньше " +
-        Math.round(PASS_RATE * 100) + "% верных ответов.</p>" +
-      '<a href="' + topicTestLink(topic) + '" class="btn btn-primary">Приступить к тесту</a>' +
-      (record ? renderBestResult(record) : "") +
-      (!user
-        ? '<p class="hint">Тест можно пройти и без входа, но результат не сохранится. ' +
-          '<a href="' + loginLinkBack() + '">Войти</a></p>'
-        : "") +
+    '<div class="lesson-layout">' +
+      '<div class="lesson-main">' +
+        renderLessonVideos(videos) +
+        renderLessonArticle(topic) +
+      "</div>" +
+      '<aside class="lesson-side" aria-label="Материалы урока">' +
+        renderLessonMemoCard(Boolean(memoBlocks)) +
+        renderLessonPracticeCard(topic) +   // только если у темы есть поле practice
+        renderLessonTestCard(topic, record, user) +   // сам тест — на отдельной странице test.html
+      "</aside>" +
+      '<p class="lesson-consult">' +
+        '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '">Спросить консультанта по этой теме</a>' +
+      "</p>" +
     "</div>" +
 
-    renderSources(topic) +
+    (memoBlocks
+      ? '<dialog class="lesson-modal" aria-labelledby="lesson-modal-title">' +
+          '<div class="lesson-modal-box">' +
+            '<div class="lesson-modal-head">' +
+              '<h2 id="lesson-modal-title">Памятка</h2>' +
+              '<button type="button" class="lesson-modal-close" aria-label="Закрыть памятку">✕</button>' +
+            "</div>" +
+            '<div class="lesson-modal-body">' + memoBlocks + "</div>" +
+          "</div>" +
+        "</dialog>"
+      : "");
 
-    '<div class="consult-box">' +
-      '<a href="consultant.html?topic=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Спросить консультанта по этой теме</a>' +
-    "</div>";
+  setupLessonVideos(page, videos);
+  setupLessonArticle(page);
+  setupLessonMemoDialog(page);
 }
+
+/* Возврат на урок кнопкой браузера «Назад»: браузер может показать страницу из памяти, со старыми отметками */
+window.addEventListener("pageshow", function (e) {
+  if (e.persisted && document.getElementById("lesson-page")) location.reload();
+});
 
 function topicTestLink(topic) {
   return "test.html?topic=" + encodeURIComponent(topic.id);
-}
-
-/* «Лучший результат: 8 из 10 (80%) — урок пройден ✓» */
-function renderBestResult(record) {
-  const percent = record.total ? Math.round(record.best / record.total * 100) : 0;
-  return (
-    '<p class="best-result">Лучший результат: ' + record.best + " из " + record.total + " (" + percent + "%)" +
-      (record.passed ? ' — <span class="status status-done">урок пройден ✓</span>' : "") +
-    "</p>"
-  );
 }
 
 /* Сообщение для темы справочника, открытой как урок или тест */
@@ -755,21 +966,6 @@ function saveTaskDone(topic, task) {
 
 function practiceLink(topic, taskNumber) {
   return "practice.html?topic=" + encodeURIComponent(topic.id) + (taskNumber > 1 ? "&task=" + taskNumber : "");
-}
-
-/* Карточка «Практика» на странице урока (только если у темы есть задания практики) */
-function renderPracticeBlock(topic) {
-  if (!practiceTasks(topic).length) return "";
-  return (
-    '<h2 class="lesson-h2" id="practice">Практика</h2>' +
-    '<div class="card practice-start">' +
-      "<p>Закрепите тему на картинках</p>" +
-      '<div class="practice-start-row">' +
-        '<a href="' + practiceLink(topic, 1) + '" class="btn btn-primary">Перейти к практике</a>' +
-        (isPracticeDone(topic) ? '<span class="status status-done">Практика выполнена ✓</span>' : "") +
-      "</div>" +
-    "</div>"
-  );
 }
 
 /* Маска слоя из js/practice-masks.js: { width, height, cell, cols, rows, bits } → с битами в виде массива */
@@ -909,6 +1105,7 @@ function setupPractice(topic, task, taskIndex, onDone) {
       '<p class="success">Готово! Вы нашли все ошибки</p>' +
       (getCurrentUser() ? "" :
         '<p class="practice-note">Вы не вошли, поэтому отметка о практике не сохранится. <a href="' + loginLinkBack() + '">Войти</a></p>') +
+      '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary practice-finish-back" hidden>Вернуться к уроку</a>' +
     "</div>" +
     '<div class="practice-actions">' +
       (nextIndex >= 0
@@ -1203,6 +1400,8 @@ function setupPractice(topic, task, taskIndex, onDone) {
     if (n === errorUnits.length) {
       finish.hidden = false;
       saveTaskDone(topic, task);
+      // Без входа отметки не сохраняются, поэтому единственное задание считаем выполненным по факту
+      finish.querySelector(".practice-finish-back").hidden = !(isPracticeDone(topic) || tasks.length === 1);
       mainButton.classList.replace("btn-secondary", "btn-primary");
       say("Готово! Вы нашли все ошибки");
       message.classList.add("visually-hidden");  // на экране это уже есть в блоке «Готово!»; программа чтения прочитает
