@@ -765,9 +765,11 @@ function renderLessonPracticeCard(topic) {
   const done = countTasksDone(topic);
   const mark = !done ? "" :
     '<span class="lesson-done">' + (done === tasks.length ? "Выполнено" : done + " из " + tasks.length) + " ✓</span>";
+  // В заданиях «Расставь по порядку» картинок нет — тогда просто «3 задания»
+  const onPictures = tasks.every(function (t) { return t.type !== "order"; });
   return lessonSideCard(LESSON_ICONS.practice, "Практика",
     '<p class="lesson-side-note">' + tasks.length + " " + plural(tasks.length, "задание", "задания", "заданий") +
-      " на " + (tasks.length === 1 ? "картинке" : "картинках") + "</p>" +
+      (onPictures ? " на " + (tasks.length === 1 ? "картинке" : "картинках") : "") + "</p>" +
     '<div class="lesson-side-row">' +
       '<a href="' + practiceLink(topic, 1) + '" class="btn btn-primary">Перейти</a>' + mark +
     "</div>");
@@ -1722,6 +1724,355 @@ function setupFindZones(topic, task, taskIndex, onDone) {
   fitImage();
 }
 
+/* Шаги в случайном порядке, но не в правильном */
+function orderShuffled(steps) {
+  const list = steps.slice();
+  do {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const swap = list[i];
+      list[i] = list[j];
+      list[j] = swap;
+    }
+  } while (list.length > 1 && list.every(function (step, i) { return step.index === i; }));
+  return list;
+}
+
+/* Задание «Расставь по порядку» (type "order") на странице practice.html.
+   Шаги (поле steps) записаны в правильном порядке; в панели справа они перемешаны.
+   Карточку ставят в рамку перетаскиванием или выбором: нажать на карточку, затем на рамку (так же Tab и Enter).
+   После проверки верные карточки закрепляются, неверные возвращаются в панель.
+   onDone() вызывается, когда все шаги на своих местах (чтобы обновить список заданий слева) */
+function setupOrder(topic, task, taskIndex, onDone) {
+  const box = document.getElementById("practice-task");
+  const side = document.getElementById("practice-results");
+  if (!box || !side) return;
+
+  // Обработчики прошлого задания (или прошлого прохождения этого) снимаются
+  if (practiceListeners) practiceListeners.abort();
+  practiceListeners = new AbortController();
+  const listen = { signal: practiceListeners.signal };
+
+  const steps = (task.steps || []).map(function (step, i) {
+    return Object.assign({}, step, { index: i, locked: false });
+  });
+  const shuffled = orderShuffled(steps);
+  const slots = steps.map(function () { return null; });  // какой шаг стоит в каждой рамке
+  let selected = null;  // шаг, выбранный нажатием
+  let dragged = null;   // шаг, который сейчас тянут мышью
+
+  const tasks = practiceTasks(topic);
+  const nextIndex = taskIndex + 1 < tasks.length ? taskIndex + 1 : -1;
+
+  box.innerHTML =
+    '<p class="order-result" aria-live="polite"></p>' +
+    '<ol class="order-slots">' +
+      steps.map(function (step, i) {
+        return '<li class="order-slot" data-slot="' + i + '">' +
+          '<span class="order-num" aria-hidden="true">' + (i + 1) + "</span>" +
+          '<button type="button" class="order-slot-target" aria-label="Рамка ' + (i + 1) + ', пусто"></button>' +
+        "</li>";
+      }).join("") +
+    "</ol>" +
+    '<button type="button" class="btn btn-primary order-check" disabled>Проверить</button>' +
+    '<p class="order-say visually-hidden" aria-live="polite"></p>' +
+
+    // Когда все шаги на своих местах: «Готово!» и кнопки
+    '<div class="zones-done" hidden>' +
+      '<div class="practice-finish">' +
+        '<p class="success">Готово! Все шаги на своих местах</p>' +
+        (getCurrentUser() ? "" :
+          '<p class="practice-note">Вы не вошли, поэтому отметка о практике не сохранится. <a href="' + loginLinkBack() + '">Войти</a></p>') +
+      "</div>" +
+      '<div class="practice-actions">' +
+        (nextIndex >= 0
+          ? '<a href="' + practiceLink(topic, nextIndex + 1) + '" data-task="' + (nextIndex + 1) + '" class="btn btn-primary">К следующему заданию</a>'
+          : "") +
+        '<a href="' + topicTestLink(topic) + '" class="btn ' + (nextIndex >= 0 ? "btn-secondary" : "btn-primary") + '">К тесту</a>' +
+        '<button type="button" class="btn btn-secondary practice-again">Пройти ещё раз</button>' +
+        '<a href="lesson.html?id=' + encodeURIComponent(topic.id) + '" class="btn btn-secondary">Вернуться к уроку</a>' +
+      "</div>" +
+    "</div>";
+
+  side.classList.remove("is-done");
+  side.setAttribute("aria-label", "Шаги");
+  side.innerHTML =
+    '<h2 class="order-pool-title" tabindex="-1">Шаги</h2>' +
+    '<p class="order-pool-hint">Перетащите шаг в рамку или нажмите на шаг, а затем на рамку.</p>' +
+    '<div class="order-pool">' +
+      shuffled.map(function (step) {
+        return '<div class="order-card" data-step="' + step.index + '" draggable="true">' +
+          '<div class="order-card-text" role="button" tabindex="0">' + escapeHtml(step.text) + "</div>" +
+          '<span class="order-card-ok" role="img" aria-label="Верно" hidden>✓</span>' +
+          '<button type="button" class="order-card-x" aria-label="Вернуть шаг в панель: ' + escapeHtml(step.text) + '" hidden>×</button>' +
+          '<p class="order-card-note" hidden>' + escapeHtml(step.explanation) + "</p>" +
+        "</div>";
+      }).join("") +
+    "</div>" +
+    '<p class="order-pool-empty" hidden>Все шаги в рамках</p>';
+
+  const result = box.querySelector(".order-result");
+  const slotsBox = box.querySelector(".order-slots");
+  const slotEls = Array.from(box.querySelectorAll(".order-slot"));
+  const check = box.querySelector(".order-check");
+  const message = box.querySelector(".order-say");
+  const done = box.querySelector(".zones-done");
+  const firstAction = done.querySelector(".practice-actions .btn");
+  const pool = side.querySelector(".order-pool");
+  const poolEmpty = side.querySelector(".order-pool-empty");
+  const poolHint = side.querySelector(".order-pool-hint");
+
+  steps.forEach(function (step) {
+    step.card = pool.querySelector('[data-step="' + step.index + '"]');
+    step.textEl = step.card.querySelector(".order-card-text");
+  });
+
+  function stepOf(el) {
+    return steps[Number(el.closest(".order-card").dataset.step)];
+  }
+
+  /* Раскладывает карточки по рамкам и панели. Карточка, которая уже на месте, не переставляется:
+     иначе с неё слетел бы фокус клавиатуры */
+  function render() {
+    slots.forEach(function (step, i) {
+      if (step && step.card.parentNode !== slotEls[i]) slotEls[i].appendChild(step.card);
+      slotEls[i].querySelector(".order-slot-target").hidden = Boolean(step);
+      slotEls[i].classList.toggle("is-filled", Boolean(step));
+      slotEls[i].classList.toggle("is-locked", Boolean(step && step.locked));
+    });
+    shuffled.filter(function (step) { return slots.indexOf(step) < 0; }).forEach(function (step, i) {
+      if (pool.children[i] !== step.card) pool.insertBefore(step.card, pool.children[i] || null);
+    });
+    steps.forEach(function (step) {
+      const place = slots.indexOf(step);
+      step.card.draggable = !step.locked;
+      step.card.classList.toggle("is-selected", selected === step);
+      step.card.classList.toggle("is-locked", step.locked);
+      step.card.querySelector(".order-card-x").hidden = place < 0 || step.locked;
+      step.card.querySelector(".order-card-ok").hidden = !step.locked;
+      step.card.querySelector(".order-card-note").hidden = !step.locked;
+      if (step.locked) {
+        ["role", "tabindex", "aria-pressed", "aria-label"].forEach(function (name) { step.textEl.removeAttribute(name); });
+      } else {
+        step.textEl.setAttribute("aria-pressed", selected === step ? "true" : "false");
+        step.textEl.setAttribute("aria-label", (place >= 0 ? "Рамка " + (place + 1) + ": " : "") + step.text);
+      }
+    });
+    slotsBox.classList.toggle("is-choosing", Boolean(selected || dragged));
+    check.disabled = slots.some(function (step) { return !step; });
+    poolEmpty.hidden = pool.children.length > 0;
+    poolHint.hidden = pool.children.length === 0;
+  }
+
+  /* Показать элемент, если он за краем окна. На узком экране панель прижата к низу:
+     отступ на её высоту задан в стилях (scroll-margin), поэтому элемент окажется над панелью */
+  function reveal(el, block) {
+    el.scrollIntoView({ block: block || "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+
+  /* Шаг выбран или его тянут из панели — показать первую пустую рамку, чтобы и шаг, и рамка были на экране.
+     Панель прижата к низу (узкий экран): если над ней не видно рамку и ещё две за ней, рамка встаёт под шапку */
+  function revealEmptySlot() {
+    const empty = slotsBox.querySelector(".order-slot:not(.is-filled)");
+    if (!empty) return;
+    if (getComputedStyle(side).bottom !== "0px") {
+      reveal(empty);
+      return;
+    }
+    const rect = empty.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom + rect.height * 2 > side.getBoundingClientRect().top) reveal(empty, "start");
+  }
+
+  /* После действия с клавиатуры — фокус на следующий шаг в панели, а если их нет — на «Проверить» */
+  function focusNext() {
+    const next = pool.querySelector(".order-card-text");
+    if (next) next.focus();
+    else if (!check.disabled) check.focus();
+  }
+
+  /* Ставит шаг в рамку: шаг из другой рамки меняется местами с тем, что там стоял; шаг из панели вытесняет его в панель */
+  function placeStep(step, slot, byKey) {
+    const other = slots[slot];
+    if (other && other.locked) return;
+    const from = slots.indexOf(step);
+    if (from >= 0) slots[from] = other;
+    slots[slot] = step;
+    selected = null;
+    render();
+    message.textContent = "Рамка " + (slot + 1) + ": " + step.text;
+    if (byKey) focusNext();
+    else if (!check.disabled) reveal(check);
+  }
+
+  function returnStep(step, byKey) {
+    slots[slots.indexOf(step)] = null;
+    if (selected === step) selected = null;
+    render();
+    message.textContent = "Шаг возвращён в панель: " + step.text;
+    if (byKey) step.textEl.focus();
+  }
+
+  /* Нажатие на карточку: выбрать её или снять выбор. Если выбрана другая, а эта стоит в рамке — поставить выбранную сюда */
+  function pressCard(step, byKey) {
+    if (step.locked) return;
+    if (selected && selected !== step && slots.indexOf(step) >= 0) {
+      placeStep(selected, slots.indexOf(step), byKey);
+      return;
+    }
+    selected = selected === step ? null : step;
+    render();
+    message.textContent = selected ? "Выбран шаг: " + step.text + ". Теперь выберите рамку." : "Выбор снят";
+    if (selected && byKey) {
+      const empty = slotsBox.querySelector(".order-slot:not(.is-filled) .order-slot-target");
+      if (empty) empty.focus();
+    } else if (selected && slots.indexOf(step) < 0) {
+      revealEmptySlot();
+    }
+  }
+
+  function pressSlot(slot, byKey) {
+    if (slots[slot] && slots[slot].locked) return;
+    if (selected) placeStep(selected, slot, byKey);
+    else result.textContent = "Сначала выберите шаг";
+  }
+
+  /* Нажатия: на рамку, на карточку, на крестик, на свободное место панели (вернуть выбранную карточку) */
+  slotsBox.addEventListener("click", function (e) {
+    const cross = e.target.closest(".order-card-x");
+    const card = e.target.closest(".order-card");
+    const slot = e.target.closest(".order-slot");
+    if (cross) returnStep(stepOf(cross), e.detail === 0);
+    else if (card) pressCard(stepOf(card), false);
+    else if (slot) pressSlot(Number(slot.dataset.slot), e.detail === 0);
+  });
+  side.addEventListener("click", function (e) {
+    const card = e.target.closest(".order-card");
+    if (card) pressCard(stepOf(card), false);
+    else if (selected && slots.indexOf(selected) >= 0) returnStep(selected, false);
+  }, listen);
+
+  /* Клавиатура: у карточки текст с ролью кнопки (настоящая кнопка не даёт перетаскивать в Firefox) */
+  function onKey(e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if (!e.target.classList.contains("order-card-text") || !e.target.hasAttribute("role")) return;
+    e.preventDefault();
+    if (!e.repeat) pressCard(stepOf(e.target), true);
+  }
+  box.addEventListener("keydown", onKey, listen);
+  side.addEventListener("keydown", onKey, listen);
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape" || !selected) return;
+    selected = null;
+    render();
+    message.textContent = "Выбор снят";
+  }, listen);
+
+  /* --- Перетаскивание мышью --- */
+  function setOver(el) {
+    [side].concat(slotEls).forEach(function (other) { other.classList.toggle("is-over", other === el); });
+  }
+
+  function onDragStart(e) {
+    const card = e.target.closest && e.target.closest(".order-card");
+    if (!card) return;
+    dragged = stepOf(card);
+    selected = null;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("application/x-order-step", String(dragged.index));
+    const fromPool = slots.indexOf(dragged) < 0;
+    render();
+    setTimeout(function () {
+      card.classList.add("is-dragging");  // сразу нельзя: поблёкнет и то, что тянется за курсором
+      if (fromPool) revealEmptySlot();
+    }, 0);
+  }
+
+  function onDragEnd() {
+    if (dragged) dragged.card.classList.remove("is-dragging");
+    dragged = null;
+    setOver(null);
+    render();
+  }
+
+  /* Куда можно бросить: в рамку без закреплённого шага или (для шага из рамки) в панель */
+  function dropPlace(e) {
+    if (!dragged) return null;
+    if (side.contains(e.target)) return slots.indexOf(dragged) >= 0 ? side : null;
+    const slot = e.target.closest(".order-slot");
+    return slot && !slot.classList.contains("is-locked") ? slot : null;
+  }
+
+  function onDragOver(e) {
+    const place = dropPlace(e);
+    setOver(place);
+    if (!place) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+
+  function onDrop(e) {
+    const place = dropPlace(e);
+    if (!place) return;
+    e.preventDefault();
+    if (place === side) returnStep(dragged, false);
+    else placeStep(dragged, Number(place.dataset.slot), false);
+  }
+
+  [box, side].forEach(function (area) {
+    area.addEventListener("dragstart", onDragStart, listen);
+    area.addEventListener("dragend", onDragEnd, listen);
+    area.addEventListener("dragover", onDragOver, listen);
+    area.addEventListener("drop", onDrop, listen);
+  });
+
+  /* --- Проверка --- */
+  function finish(byKey) {
+    done.hidden = false;
+    check.hidden = true;
+    result.textContent = "";
+    side.classList.add("is-done");
+    poolEmpty.textContent = "Все шаги на своих местах";
+    saveTaskDone(topic, task);
+    message.textContent = "Готово! Все шаги на своих местах";
+    if (byKey) firstAction.focus();
+    else reveal(done);
+    if (onDone) onDone();
+  }
+
+  check.addEventListener("click", function (e) {
+    const wrong = [];
+    slots.forEach(function (step, i) {
+      if (step.index === i) {
+        step.locked = true;
+      } else {
+        slots[i] = null;
+        wrong.push(step);
+      }
+    });
+    selected = null;
+    render();
+    wrong.forEach(function (step) {
+      step.card.classList.remove("is-back");
+      void step.card.offsetWidth;  // перезапуск анимации
+      step.card.classList.add("is-back");
+    });
+    if (!wrong.length) {
+      finish(e.detail === 0);
+      return;
+    }
+    result.textContent = "Верно " + (steps.length - wrong.length) + " из " + steps.length + ". Переставьте остальные шаги";
+    reveal(result);
+    if (e.detail === 0) focusNext();
+  });
+
+  box.querySelector(".practice-again").addEventListener("click", function () {
+    setupOrder(topic, task, taskIndex, onDone);
+    side.querySelector(".order-pool-title").focus();
+  });
+
+  render();
+}
+
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
    Слева — список заданий темы, в центре — задание, справа — карточки результатов.
    Задания переключаются без перезагрузки: меняется только ?task= в адресе */
@@ -1762,7 +2113,7 @@ function renderPracticePage() {
   document.title = "Практика: " + topic.title + " — Опора. Школа ухода";
 
   page.innerHTML =
-    '<div class="practice-page-grid">' +
+    '<div class="practice-page-grid' + (task.type === "order" ? " practice-page-grid--order" : "") + '">' +
       '<nav class="practice-nav" aria-label="Задания практики"></nav>' +
       '<section class="practice-main-col">' +
         '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
@@ -1797,6 +2148,7 @@ function renderPracticePage() {
 
   if (task.type === "spot-error") setupPractice(topic, task, index, renderNav);
   if (task.type === "find-zones") setupFindZones(topic, task, index, renderNav);
+  if (task.type === "order") setupOrder(topic, task, index, renderNav);
 
   // Переход к другому заданию (список слева и кнопка «К следующему заданию») — без перезагрузки.
   // Обработчик вешается один раз: сам блок страницы при переключении не пересоздаётся
