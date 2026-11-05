@@ -15,7 +15,7 @@ function getCurrentUser() {
 
 /* ---------- Прогресс по урокам (хранит js/store.js: на сервере или в localStorage) ---------- */
 
-/* Порог зачёта PASS_RATE (0.7 = 70%) задан в js/data.js, рядом с placeholderQuiz */
+/* Порог зачёта PASS_RATE (0.7 = 70%) задан в js/data.js */
 
 /* Уроки — только темы с kind: "lesson". Все подсчёты прогресса, «Продолжить»,
    номера уроков и «Следующий урок» идут по этому списку. Число уроков берётся из data.js. */
@@ -85,7 +85,6 @@ function renderHeader() {
   const user = getCurrentUser();
   const page = document.body.dataset.page; // какая страница открыта (для подсветки пункта меню)
 
-  // Страницы «Консультант» и «Помощь» появятся позже
   const links = [
     { href: "index.html", text: "Главная", page: "home" },
     { href: "lessons.html", text: "Уроки", page: "lessons" },
@@ -101,7 +100,7 @@ function renderHeader() {
       ]
     },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
-    { href: "help.html", text: "Помощь", page: "help" }
+    { href: "help.html", text: "Поддержка", page: "help" }
   ];
   // Справа в шапке: «Войти» или (после входа) «Кабинет»/имя и «Выйти»
   const account = user
@@ -547,6 +546,291 @@ function renderMyStats(progress) {
   );
 }
 
+/* ---------- Кабинет: «Моё самочувствие» ---------- */
+
+const MOOD_LABELS = ["Очень плохо", "Плохо", "Нормально", "Хорошо", "Отлично"];
+const MOOD_MOUTHS = ["M12 29 Q20 20 28 29", "M13 28 Q20 24 27 28", "M13 26 H27", "M13 24 Q20 29 27 24", "M12 23 Q20 33 28 23"];
+const MOOD_NOTE_MAX = 300;
+const CHART_DAYS = 14;
+const BAD_STREAK_HINT = 3;     // столько последних отметок 1–2 подряд — предлагаем поговорить
+const SILENT_DAYS_HINT = 5;    // столько дней без отметок — напоминаем
+const INSIGHT_MIN_MARKS = 3;
+
+function moodFace(mood) {
+  return '<svg viewBox="0 0 40 40" aria-hidden="true" focusable="false">' +
+    '<circle cx="20" cy="20" r="17"/>' +
+    '<circle class="mood-eye" cx="14" cy="16" r="2"/><circle class="mood-eye" cx="26" cy="16" r="2"/>' +
+    '<path d="' + MOOD_MOUTHS[mood - 1] + '"/>' +
+  "</svg>";
+}
+
+/* «2026-11-05» → «5 ноября» */
+function dayTitle(day) {
+  return new Date(day + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+}
+
+function shiftLocalDay(day, days) {
+  const date = new Date(day + "T12:00:00");
+  date.setDate(date.getDate() + days);
+  return Store.localDay(date);
+}
+
+/* Сколько дней между двумя датами вида «2026-11-05» */
+function daysBetween(from, to) {
+  return Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000);
+}
+
+/* График за 14 дней: точка на каждый отмеченный день, линия только между соседними днями, пропуски пустые.
+   Подписи рисуются один к одному в пикселях, поэтому при смене ширины график строится заново */
+function moodChartHtml(entries, width) {
+  const today = Store.localDay(new Date());
+  const height = 190;
+  const left = 26;
+  const right = 12;
+  const top = 12;
+  const bottom = 28;
+  const step = (width - left - right) / (CHART_DAYS - 1);
+  const byDay = {};
+  entries.forEach(function (e) { byDay[e.day] = e.mood; });
+
+  function y(mood) { return top + (5 - mood) * (height - top - bottom) / 4; }
+
+  let grid = "";
+  for (let mood = 1; mood <= 5; mood++) {
+    grid += '<line class="mood-grid" x1="' + left + '" x2="' + (width - right) + '" y1="' + y(mood) + '" y2="' + y(mood) + '"/>' +
+      '<text class="mood-axis" x="' + (left - 8) + '" y="' + (y(mood) + 4) + '" text-anchor="end">' + mood + "</text>";
+  }
+
+  const labelEvery = Math.ceil(38 / step);  // подписи дат не наезжают друг на друга; сегодняшняя есть всегда
+  let lines = "";
+  let dots = "";
+  let labels = "";
+  let targets = "";
+  const spoken = [];
+  for (let i = 0; i < CHART_DAYS; i++) {
+    const day = shiftLocalDay(today, i - CHART_DAYS + 1);
+    const x = left + i * step;
+    const mood = byDay[day];
+    const next = byDay[shiftLocalDay(day, 1)];
+    if (mood && next && i < CHART_DAYS - 1) {
+      lines += '<line class="mood-line" x1="' + x + '" y1="' + y(mood) + '" x2="' + (x + step) + '" y2="' + y(next) + '"/>';
+    }
+    if (mood) {
+      dots += '<circle class="mood-dot" cx="' + x + '" cy="' + y(mood) + '" r="5"/>';
+      targets += '<rect class="mood-target" x="' + (x - step / 2) + '" y="0" width="' + step + '" height="' + height + '" data-tip="' +
+        escapeHtml(dayTitle(day) + ": " + MOOD_LABELS[mood - 1]) + '" data-x="' + x + '" data-y="' + y(mood) + '"/>';
+      spoken.push(dayTitle(day) + " — " + MOOD_LABELS[mood - 1]);
+    }
+    if ((CHART_DAYS - 1 - i) % labelEvery === 0) {
+      const parts = day.split("-");
+      labels += '<text class="mood-axis" x="' + x + '" y="' + (height - 8) + '" text-anchor="' + (i === CHART_DAYS - 1 ? "end" : "middle") + '">' +
+        Number(parts[2]) + "." + parts[1] + "</text>";
+    }
+  }
+  const summary = spoken.length ? "Настроение за 14 дней: " + spoken.join(", ") : "За 14 дней отметок нет";
+  return '<svg class="mood-chart-svg" role="img" aria-label="' + escapeHtml(summary) + '" width="' + width + '" height="' + height +
+    '" viewBox="0 0 ' + width + " " + height + '">' + grid + lines + dots + labels + targets + "</svg>" +
+    '<div class="mood-tip" hidden></div>';
+}
+
+function drawMoodChart(box, entries) {
+  const width = Math.round(box.clientWidth);
+  if (width < 100 || Number(box.dataset.width) === width && box.dataset.drawn === JSON.stringify(entries)) return;
+  box.dataset.width = width;
+  box.dataset.drawn = JSON.stringify(entries);
+  box.innerHTML = moodChartHtml(entries, width);
+}
+
+/* Всплывающая подпись над точкой графика */
+function setupMoodTip(box) {
+  function show(e) {
+    const tip = box.querySelector(".mood-tip");
+    const target = e.target.closest(".mood-target");
+    if (!tip) return;
+    tip.hidden = !target;
+    if (!target) return;
+    tip.textContent = target.dataset.tip;
+    const half = tip.offsetWidth / 2;
+    tip.style.left = Math.max(half, Math.min(box.clientWidth - half, Number(target.dataset.x))) + "px";
+    tip.style.top = Number(target.dataset.y) + "px";
+  }
+  box.addEventListener("pointermove", show);
+  box.addEventListener("pointerdown", show);  // на телефоне подпись появляется по нажатию
+  box.addEventListener("pointerleave", function () {
+    const tip = box.querySelector(".mood-tip");
+    if (tip) tip.hidden = true;
+  });
+}
+
+function myWellbeingBlock() {
+  return '<h2 class="lesson-h2">Моё самочувствие</h2><div id="my-wellbeing"><p class="muted">Загружаем…</p></div>';
+}
+
+function setupMyWellbeing() {
+  const box = document.getElementById("my-wellbeing");
+  if (!box) return;
+
+  Promise.all([Store.getMood(), Store.getWellbeing()]).then(function (data) {
+    drawMyWellbeing(box, data[0], data[1].results, data[1].shareWellbeing);
+  }).catch(function (e) {
+    box.innerHTML = '<div class="card"><p class="error" role="alert">Самочувствие не загрузилось: ' + escapeHtml(e.message) + "</p></div>";
+  });
+}
+
+function drawMyWellbeing(box, entries, results, share) {
+  const today = Store.localDay(new Date());
+  const todayEntry = entries.find(function (e) { return e.day === today; });
+  const last = results[0];
+
+  box.innerHTML =
+    '<div class="my-wellbeing-grid">' +
+      '<form class="card mood-form" id="mood-form">' +
+        '<fieldset class="mood-fieldset">' +
+          "<legend><h3>Как вы сегодня?</h3></legend>" +
+          '<div class="mood-options">' +
+            MOOD_LABELS.map(function (label, i) {
+              const mood = i + 1;
+              return '<label class="mood-option">' +
+                '<input type="radio" class="visually-hidden" name="mood" value="' + mood + '"' + (todayEntry && todayEntry.mood === mood ? " checked" : "") + ">" +
+                '<span class="mood-face">' + moodFace(mood) + "</span>" +
+                '<span class="mood-label">' + label + "</span>" +
+              "</label>";
+            }).join("") +
+          "</div>" +
+        "</fieldset>" +
+        '<label for="mood-note" class="mood-note-label">Заметка <span class="muted">(необязательно)</span></label>' +
+        '<textarea id="mood-note" rows="2" maxlength="' + MOOD_NOTE_MAX + '">' + escapeHtml(todayEntry && todayEntry.note || "") + "</textarea>" +
+        '<div class="mood-save">' +
+          '<button type="submit" class="btn btn-small btn-primary">Сохранить</button>' +
+          '<p class="mood-status" id="mood-status" role="status">' + (todayEntry ? "Сегодняшнюю отметку можно поменять" : "") + "</p>" +
+        "</div>" +
+      "</form>" +
+
+      '<div class="card mood-history">' +
+        "<h3>Настроение за 14 дней</h3>" +
+        '<div class="mood-chart" id="mood-chart"></div>' +
+        '<p class="mood-last">' +
+          (last
+            ? "<strong>" + escapeHtml(wellbeingLevelById(last.level).title) + " · " +
+              escapeHtml(new Date(last.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })) + "</strong> " +
+              '<a href="help.html#check">Пройти тест ещё раз</a>'
+            : 'Тест ещё не пройден. <a href="help.html#check">Пройти тест</a>') +
+        "</p>" +
+      "</div>" +
+    "</div>" +
+
+    '<div id="mood-hints"></div>' +
+
+    '<div class="card mood-settings">' +
+      '<label class="mood-share">' +
+        '<input type="checkbox" id="share-wellbeing"' + (share ? " checked" : "") + ">" +
+        "<span>Консультант может учитывать мои отметки настроения и результаты теста (заметки не передаются)</span>" +
+      "</label>" +
+      '<p class="error" id="share-error" role="alert"></p>' +
+      '<div class="mood-insight">' +
+        '<button type="button" class="btn btn-small btn-secondary" id="insight-btn">Комментарий консультанта</button>' +
+        '<p class="muted small" id="insight-hint"></p>' +
+        (Store.getMode() === "server" ? '<p class="muted small insight-privacy">Консультанту отправятся только оценки настроения и результат теста, без заметок</p>' : "") +
+      "</div>" +
+      '<div class="insight-card" id="insight-card" aria-live="polite" hidden></div>' +
+    "</div>";
+
+  const chart = document.getElementById("mood-chart");
+  const hints = document.getElementById("mood-hints");
+  const insightBtn = document.getElementById("insight-btn");
+  const insightHint = document.getElementById("insight-hint");
+
+  function refresh() {
+    drawMoodChart(chart, entries);
+    hints.innerHTML = moodHintsHtml(entries, last);
+    insightBtn.disabled = entries.length < INSIGHT_MIN_MARKS;
+    insightHint.textContent = entries.length < INSIGHT_MIN_MARKS ? "Станет доступен после " + INSIGHT_MIN_MARKS + " отметок настроения" : "";
+  }
+  refresh();
+  setupMoodTip(chart);
+  if (window.ResizeObserver) new ResizeObserver(function () { drawMoodChart(chart, entries); }).observe(chart);
+
+  const form = document.getElementById("mood-form");
+  const status = document.getElementById("mood-status");
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    const picked = form.querySelector('input[name="mood"]:checked');
+    if (!picked) {
+      status.textContent = "Выберите, как вы сегодня.";
+      return;
+    }
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    Store.saveMood(Number(picked.value), document.getElementById("mood-note").value).then(function (entry) {
+      const index = entries.findIndex(function (x) { return x.day === entry.day; });
+      if (index === -1) entries.push(entry); else entries[index] = entry;
+      status.textContent = "Сохранено. Сегодняшнюю отметку можно поменять";
+      refresh();
+    }).catch(function (e) {
+      status.textContent = "Не сохранилось: " + e.message;
+    }).then(function () {
+      button.disabled = false;
+    });
+  });
+
+  const shareBox = document.getElementById("share-wellbeing");
+  const shareError = document.getElementById("share-error");
+  shareBox.addEventListener("change", function () {
+    const wanted = shareBox.checked;
+    shareError.textContent = "";
+    Store.setShareWellbeing(wanted).catch(function (e) {
+      shareBox.checked = !wanted;
+      shareError.textContent = "Настройка не сохранилась: " + e.message;
+    });
+  });
+
+  const insightCard = document.getElementById("insight-card");
+  insightBtn.addEventListener("click", function () {
+    insightCard.hidden = false;
+    if (Store.getMode() !== "server") {
+      insightCard.innerHTML = "<p>Доступно при работе через сервер</p>";
+      return;
+    }
+    insightBtn.disabled = true;
+    insightCard.innerHTML = '<p class="typing">Консультант думает…</p>';
+    Store.getInsight().then(function (reply) {
+      insightCard.innerHTML = formatAnswer(reply.answer) + (reply.needsTalk
+        ? '<div class="buttons"><a href="consultant.html?mode=support" class="btn btn-small btn-primary">Поговорить</a></div>'
+        : "");
+    }).catch(function (e) {
+      insightCard.innerHTML = "<p>" + escapeHtml(e.message) + "</p>";
+    }).then(function () {
+      insightBtn.disabled = entries.length < INSIGHT_MIN_MARKS;
+    });
+  });
+}
+
+/* Подсказки по правилам. Отметки — от старых к новым, last — последний результат теста.
+   Если отметок давно нет, про «последние дни» не говорим: остаётся только напоминание */
+function moodHintsHtml(entries, last) {
+  const today = Store.localDay(new Date());
+  const lastEntry = entries[entries.length - 1];
+  const silent = !lastEntry || daysBetween(lastEntry.day, today) >= SILENT_DAYS_HINT;
+  let badStreak = 0;
+  for (let i = entries.length - 1; i >= 0 && entries[i].mood <= 2; i--) badStreak++;
+
+  let html = "";
+  if (!silent && badStreak >= BAD_STREAK_HINT) {
+    html += '<div class="card mood-hint"><p>Похоже, последние дни тяжёлые. Поговорим?</p>' +
+      '<div class="buttons">' +
+        '<a href="consultant.html?mode=support" class="btn btn-small btn-primary">Поговорить</a>' +
+        '<a href="help.html#selfcare" class="btn btn-small btn-secondary">Минутка для себя</a>' +
+      "</div></div>";
+  }
+  if (last && last.level === "high") {
+    html += '<div class="card mood-hint mood-hint-high"><p>Последний тест показал высокую нагрузку. Вы не обязаны справляться с этим в одиночку.</p>' +
+      supportPhonesHtml() +
+      '<div class="buttons"><a href="consultant.html?mode=support" class="btn btn-small btn-primary">Поговорить сейчас</a></div></div>';
+  }
+  if (silent) html += '<div class="card mood-hint"><p>Как вы сегодня? Отметьте настроение</p></div>';
+  return html;
+}
+
 function renderCabinetPage() {
   const page = document.getElementById("cabinet-page");
   if (!page) return;
@@ -575,6 +859,8 @@ function renderCabinetPage() {
     '<h2 class="lesson-h2">Моя статистика</h2>' +
     renderMyStats(progress) +
 
+    myWellbeingBlock() +
+
     '<h2 class="lesson-h2">Мои уроки</h2>' +
     renderMyLessons(progress) +
 
@@ -598,6 +884,8 @@ function renderCabinetPage() {
         "</div>" +
       "</div>" +
     "</div>";
+
+  setupMyWellbeing();
 
   document.getElementById("cabinet-logout").addEventListener("click", function () {
     Store.logout().then(function () { location.href = "index.html"; });
@@ -3272,7 +3560,7 @@ function renderMemosPage() {
   const list = document.getElementById("memos-list");
   if (!list) return;
 
-  // memos.html?section=psychology — только памятки одного раздела (так ссылается страница «Помощь»)
+  // memos.html?section=psychology — только памятки одного раздела
   const section = SECTIONS.find(function (s) {
     return s.id === new URLSearchParams(location.search).get("section");
   });
@@ -3515,94 +3803,518 @@ function renderArticlePage() {
   setupLessonVideos(page, videos);
 }
 
-/* ---------- Помощь (help.html) ---------- */
+/* ---------- Поддержка (help.html) ---------- */
 
-function renderContacts() {
-  const box = document.getElementById("contacts-list");
+/* Телефоны из js/phones.js: подсказка в кабинете */
+function supportPhonesHtml() {
+  return '<ul class="support-phones">' +
+    CRISIS_PHONES.map(function (p) {
+      return '<li><a href="tel:' + escapeHtml(p.tel) + '">' + escapeHtml(p.number) + "</a> — " + escapeHtml(p.short) + "</li>";
+    }).join("") +
+  "</ul>";
+}
+
+/* Карточка «Куда обратиться»: те же телефоны строками */
+function renderSupportContacts() {
+  const box = document.getElementById("support-phones");
   if (!box) return;
-
-  box.innerHTML = CONTACTS.map(function (c) {
-    const phone = (c.phone || "").trim();
-    const url = (c.url || "").trim();
-    const validUrl = /^https?:\/\//i.test(url); // ссылки только на сайты (http/https)
-    // Для ссылки «позвонить» оставляем только цифры и «+»
-    const tel = phone.replace(/[^\d+]/g, "");
-
-    return (
-      '<article class="card contact-card">' +
-        "<h3>" + escapeHtml(c.title) + "</h3>" +
-        (c.description ? "<p>" + escapeHtml(c.description) + "</p>" : "") +
-        (phone
-          ? '<p class="contact-phone">Телефон: <a href="tel:' + escapeHtml(tel) + '">' + escapeHtml(phone) + "</a></p>"
-          : "") +
-        (validUrl
-          ? '<a href="' + escapeHtml(url) + '" class="btn btn-secondary" target="_blank" rel="noopener">Перейти на сайт</a>'
-          : "") +
-        (!phone && !validUrl ? '<p class="muted contact-pending">Контакты уточняются</p>' : "") +
-      "</article>"
-    );
+  box.innerHTML = CRISIS_PHONES.map(function (p) {
+    return '<li><span>' + escapeHtml(p.title) + '</span><a href="tel:' + escapeHtml(p.tel) + '">' + escapeHtml(p.number) + "</a></li>";
   }).join("");
 }
 
-/* Опрос самочувствия: считает баллы и показывает результат. Ответы НЕ сохраняются. */
+/* Плашка над тестом: сохраняется ли результат */
+function renderSupportBanner() {
+  const box = document.getElementById("support-banner");
+  if (!box) return;
+  const user = getCurrentUser();
+  box.innerHTML =
+    '<span class="support-banner-icon" aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 12.5l4 4 8-9"/></svg>' +
+    "</span>" +
+    "<p>" + escapeHtml(user ? WELLBEING.noteUser : WELLBEING.noteGuest) + "</p>" +
+    (user ? '<a href="cabinet.html">Открыть кабинет</a>' : '<a href="' + loginLinkBack() + '">Войти</a>');
+}
+
+/* Уровень нагрузки по баллам теста: первый, у которого сумма не больше max. На сервере то же считает server/wellbeing.js */
+function wellbeingLevelOf(score) {
+  return WELLBEING.levels.find(function (l) { return score <= l.max; });
+}
+
+function wellbeingLevelById(id) {
+  return WELLBEING.levels.find(function (l) { return l.id === id; });
+}
+
+/* Кольцо с баллами: доля закрашена по сумме, цвет задаёт уровень (CSS) */
+function wellbeingRing(score, max) {
+  const length = 2 * Math.PI * 42;
+  return '<div class="result-ring" role="img" aria-label="' + score + " из " + max + '">' +
+    '<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">' +
+      '<circle class="result-ring-track" cx="50" cy="50" r="42"/>' +
+      (score > 0
+        ? '<circle class="result-ring-value" cx="50" cy="50" r="42" stroke-dasharray="' + (length * score / max) + " " + length + '"/>'
+        : "") +
+    "</svg>" +
+    '<div class="result-ring-text"><strong>' + score + "</strong><span>из " + max + "</span></div>" +
+  "</div>";
+}
+
+/* Тест «Проверить себя»: по одному вопросу, результат на том же месте. Вошедшим результат сохраняется */
 function setupWellbeingSurvey() {
-  const form = document.getElementById("wellbeing-form");
-  if (!form) return;
+  const box = document.getElementById("check");
+  if (!box) return;
 
-  const result = document.getElementById("wellbeing-result");
-  const error = document.getElementById("wellbeing-error");
+  const user = getCurrentUser();
+  const total = WELLBEING.questions.length;
+  const scoreMax = total * (WELLBEING.options.length - 1);
+  let answers = [];     // номер выбранного варианта по каждому вопросу: он же баллы
+  let current = 0;
+  let finished = false;
+  let score = 0;
 
-  form.querySelector(".wellbeing-questions").innerHTML = WELLBEING.questions.map(function (q, qi) {
-    return (
-      '<fieldset class="question">' +
-        "<legend>" + (qi + 1) + ". " + escapeHtml(q) + "</legend>" +
-        WELLBEING.options.map(function (option, points) {
-          return (
-            '<label class="option">' +
-              '<input type="radio" name="w' + qi + '" value="' + points + '"> ' +
-              "<span>" + escapeHtml(option) + "</span>" +
-            "</label>"
-          );
+  function focusTitle(selector) {
+    box.querySelector(selector).focus({ preventScroll: true });
+  }
+
+  function showQuestion(moveFocus) {
+    finished = false;
+    const last = current === total - 1;
+    box.innerHTML =
+      '<div class="survey-head"><h2>Проверить себя</h2><p>Вопрос ' + (current + 1) + " из " + total + "</p></div>" +
+      '<div class="survey-progress" aria-hidden="true">' +
+        WELLBEING.questions.map(function (q, i) {
+          return '<span class="' + (i < current ? "is-done" : i === current ? "is-current" : "") + '"></span>';
         }).join("") +
-      "</fieldset>"
-    );
-  }).join("");
+      "</div>" +
+      '<h3 class="survey-question" id="survey-question" tabindex="-1">' + escapeHtml(WELLBEING.questions[current]) + "</h3>" +
+      '<p class="survey-hint">Вспомните последние две недели</p>' +
+      '<div class="survey-options" role="group" aria-labelledby="survey-question">' +
+        WELLBEING.options.map(function (option, i) {
+          return '<button type="button" class="survey-option" data-option="' + i + '" aria-pressed="' + (answers[current] === i) + '">' + escapeHtml(option) + "</button>";
+        }).join("") +
+      "</div>" +
+      '<div class="survey-nav">' +
+        '<button type="button" class="btn btn-secondary survey-back"' + (current === 0 ? " disabled" : "") + ">← Назад</button>" +
+        '<button type="button" class="btn btn-primary survey-next"' + (answers[current] === undefined ? " disabled" : "") + ">" +
+          (last ? "Показать результат" : "Дальше →") +
+        "</button>" +
+      "</div>";
+    if (moveFocus) focusTitle(".survey-question");
+  }
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-
-    let total = 0;
-    let answered = 0;
-    WELLBEING.questions.forEach(function (q, qi) {
-      const checked = form.querySelector('input[name="w' + qi + '"]:checked');
-      if (checked) {
-        answered++;
-        total += Number(checked.value);
-      }
+  function choose(option) {
+    answers[current] = option;
+    box.querySelectorAll(".survey-option").forEach(function (b) {
+      b.setAttribute("aria-pressed", Number(b.dataset.option) === option);
     });
+    box.querySelector(".survey-next").disabled = false;
+  }
 
-    if (answered < WELLBEING.questions.length) {
-      error.textContent = "Ответьте, пожалуйста, на все вопросы.";
-      result.hidden = true;
-      return;
-    }
+  function save() {
+    const error = box.querySelector(".result-save-error");
     error.textContent = "";
+    Store.saveWellbeing(score).catch(function (e) {
+      error.innerHTML = "Результат не сохранился: " + escapeHtml(e.message) +
+        ' <button type="button" class="survey-retry">Сохранить ещё раз</button>';
+    });
+  }
 
-    const outcome = WELLBEING.results.find(function (r) { return total <= r.max; }) ||
-      WELLBEING.results[WELLBEING.results.length - 1];
+  function showResult() {
+    finished = true;
+    score = answers.reduce(function (sum, a) { return sum + a; }, 0);
+    const level = wellbeingLevelOf(score);
+    box.innerHTML =
+      '<div class="survey-head"><h2 id="survey-result" tabindex="-1">Ваш результат</h2><p>' +
+        escapeHtml(new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })) + "</p></div>" +
+      '<div class="result-main result-' + level.id + '">' +
+        wellbeingRing(score, scoreMax) +
+        "<div>" +
+          '<p class="result-level">' + escapeHtml(level.title) + "</p>" +
+          '<p class="result-text">' + escapeHtml(level.text) + "</p>" +
+        "</div>" +
+      "</div>" +
+      '<div class="result-list">' + renderList(level.list) + "</div>" +
+      (level.urgent
+        ? '<p class="wellbeing-urgent">' + escapeHtml(WELLBEING.urgentNote) + "</p>" +
+          '<p class="result-phones">' + CRISIS_PHONES.map(function (p) {
+            return '<a href="tel:' + escapeHtml(p.tel) + '">' + escapeHtml(p.number) + "</a>";
+          }).join('<span aria-hidden="true"> · </span>') + "</p>"
+        : "") +
+      '<p class="result-note">' + escapeHtml(WELLBEING.disclaimer) + "</p>" +
+      '<p class="error result-save-error" role="alert"></p>' +
+      '<div class="result-actions">' +
+        '<button type="button" class="btn btn-secondary survey-again">Пройти ещё раз</button>' +
+        '<div class="result-buttons">' + level.buttons.map(function (b, i) {
+          return '<a href="' + escapeHtml(b.href) + '" class="btn ' + (i === level.buttons.length - 1 ? "btn-primary" : "btn-secondary") + '">' + escapeHtml(b.text) + "</a>";
+        }).join("") + "</div>" +
+      "</div>";
+    focusTitle("#survey-result");
+    if (user) save();
+  }
 
-    result.innerHTML =
-      '<p class="wellbeing-text">' + escapeHtml(outcome.text) + "</p>" +
-      '<p class="muted">' + escapeHtml(WELLBEING.disclaimer) + "</p>" +
-      (outcome.high ? '<p class="wellbeing-urgent">' + escapeHtml(WELLBEING.urgentNote) + "</p>" : "");
-    result.hidden = false;
-    result.focus();
+  function go(index) {
+    current = index;
+    showQuestion(true);
+  }
+
+  box.addEventListener("click", function (e) {
+    const option = e.target.closest(".survey-option");
+    if (option) return choose(Number(option.dataset.option));
+    if (e.target.closest(".survey-back")) return go(current - 1);
+    if (e.target.closest(".survey-next")) return current === total - 1 ? showResult() : go(current + 1);
+    if (e.target.closest(".survey-retry")) return save();
+    if (e.target.closest(".survey-again")) {
+      answers = [];
+      go(0);
+    }
   });
 
-  // «Пройти заново» очищает ответы и прячет результат
-  form.addEventListener("reset", function () {
-    error.textContent = "";
-    result.hidden = true;
+  /* Стрелки листают, цифры выбирают ответ. Результат показывает только кнопка: случайное нажатие не должно его сохранить */
+  document.addEventListener("keydown", function (e) {
+    if (finished || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (document.querySelector("dialog[open]") || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    const place = box.getBoundingClientRect();
+    if (place.bottom < 0 || place.top > window.innerHeight) return;
+
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (current > 0) go(current - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (current < total - 1 && answers[current] !== undefined) go(current + 1);
+    } else if (/^[1-4]$/.test(e.key)) {
+      e.preventDefault();
+      choose(Number(e.key) - 1);
+    }
+  });
+
+  showQuestion(false);
+}
+
+/* ---------- Минутка для себя: практики в окне поверх страницы ---------- */
+
+/* Идёт по шагам [{ seconds, ... }]: onStep в начале шага, onTick — сколько секунд осталось, onDone в конце.
+   Возвращает функцию «стоп» */
+function runTimedSteps(steps, onStep, onTick, onDone) {
+  let index = -1;
+  let endsAt = 0;
+  let timer = null;
+
+  function tick() {
+    const left = endsAt - Date.now();
+    if (left <= 0) return next();
+    onTick(Math.ceil(left / 1000));
+    timer = setTimeout(tick, Math.min(200, left));
+  }
+  function next() {
+    index++;
+    if (index >= steps.length) return onDone();
+    endsAt = Date.now() + steps[index].seconds * 1000;
+    onStep(steps[index], index);
+    tick();
+  }
+  next();
+  return function () { clearTimeout(timer); };
+}
+
+/* Практика с кнопками «Начать»/«Стоп». Что происходит на шаге — решает сама практика: onStep и onStop.
+   Возвращает функцию, которая останавливает таймер, когда окно закрывают */
+function practiceTimer(body, steps, onStep, onTick, onStop, doneText) {
+  const startBtn = body.querySelector(".practice-start");
+  const stopBtn = body.querySelector(".practice-stop");
+  let stop = null;
+
+  function finish(text) {
+    if (stop) stop();
+    stop = null;
+    startBtn.hidden = false;
+    stopBtn.hidden = true;
+    onStop(text);
+  }
+  startBtn.addEventListener("click", function () {
+    startBtn.hidden = true;
+    stopBtn.hidden = false;
+    stopBtn.focus();
+    stop = runTimedSteps(steps, onStep, onTick, function () {
+      stop = null;
+      finish(doneText);
+      startBtn.focus();
+    });
+  });
+  stopBtn.addEventListener("click", function () {
+    finish("");
+    startBtn.focus();
+  });
+  return function () { if (stop) stop(); };
+}
+
+const PRACTICE_BUTTONS =
+  '<div class="buttons practice-buttons">' +
+    '<button type="button" class="btn btn-primary practice-start">Начать</button>' +
+    '<button type="button" class="btn btn-secondary practice-stop" hidden>Стоп</button>' +
+  "</div>";
+
+/* Каждая практика рисует себя в body и возвращает функцию остановки (или ничего) */
+const PRACTICE_RUNNERS = {
+  /* Дыхание 4–6: круг растёт на вдохе и сжимается на выдохе. Движение — только в CSS, его отключает prefers-reduced-motion */
+  breath: function (body, practice) {
+    body.insertAdjacentHTML("beforeend",
+      '<div class="breath-stage">' +
+        '<div class="breath-circle"></div>' +
+        '<div class="breath-text">' +
+          '<span class="breath-phase" aria-live="polite"></span>' +
+          '<span class="practice-seconds" aria-hidden="true"></span>' +
+        "</div>" +
+      "</div>" +
+      '<p class="selfcare-count" aria-live="polite">&nbsp;</p>' +
+      PRACTICE_BUTTONS);
+    const circle = body.querySelector(".breath-circle");
+    const phase = body.querySelector(".breath-phase");
+    const seconds = body.querySelector(".practice-seconds");
+    const count = body.querySelector(".selfcare-count");
+    const steps = [];
+    for (let i = 1; i <= practice.rounds; i++) {
+      steps.push({ seconds: 4, label: "Вдох", cls: "is-in", round: i }, { seconds: 6, label: "Выдох", cls: "is-out", round: i });
+    }
+    return practiceTimer(body, steps, function (step) {
+      circle.className = "breath-circle " + step.cls;
+      phase.textContent = step.label;
+      count.textContent = step.round + " из " + practice.rounds;
+    }, function (left) {
+      seconds.textContent = left;
+    }, function (text) {
+      circle.className = "breath-circle";
+      phase.textContent = text;
+      seconds.textContent = "";
+      count.innerHTML = "&nbsp;";
+    }, "Готово");
+  },
+
+  /* Квадратное дыхание: точка идёт вдоль сторон квадрата, текущая сторона подписана */
+  square: function (body, practice) {
+    body.insertAdjacentHTML("beforeend",
+      '<div class="square-stage">' +
+        '<span class="square-label square-label-0">Вдох</span>' +
+        '<span class="square-label square-label-1">Пауза</span>' +
+        '<span class="square-label square-label-2">Выдох</span>' +
+        '<span class="square-label square-label-3">Пауза</span>' +
+        '<div class="square-box">' +
+          '<div class="square-dot"></div>' +
+          '<div class="square-text">' +
+            '<span class="breath-phase" aria-live="polite"></span>' +
+            '<span class="practice-seconds" aria-hidden="true"></span>' +
+          "</div>" +
+        "</div>" +
+      "</div>" +
+      '<p class="selfcare-count" aria-live="polite">&nbsp;</p>' +
+      PRACTICE_BUTTONS);
+    const stage = body.querySelector(".square-stage");
+    const dot = body.querySelector(".square-dot");
+    const phase = body.querySelector(".breath-phase");
+    const seconds = body.querySelector(".practice-seconds");
+    const count = body.querySelector(".selfcare-count");
+    const steps = [];
+    for (let i = 1; i <= practice.rounds; i++) {
+      ["Вдох", "Пауза", "Выдох", "Пауза"].forEach(function (label, side) {
+        steps.push({ seconds: 4, label: label, side: side, round: i });
+      });
+    }
+    return practiceTimer(body, steps, function (step) {
+      dot.className = "square-dot square-dot-" + step.side;
+      stage.dataset.side = step.side;
+      phase.textContent = step.label;
+      count.textContent = "Круг " + step.round + " из " + practice.rounds;
+    }, function (left) {
+      seconds.textContent = left;
+    }, function (text) {
+      dot.className = "square-dot";
+      delete stage.dataset.side;
+      phase.textContent = text;
+      seconds.textContent = "";
+      count.innerHTML = "&nbsp;";
+    }, "Готово");
+  },
+
+  /* 5-4-3-2-1: шаги по одному, кнопка «Дальше» */
+  steps: function (body, practice) {
+    body.insertAdjacentHTML("beforeend",
+      '<div class="practice-panel">' +
+        '<p class="selfcare-count"></p>' +
+        '<p class="practice-step" tabindex="-1" aria-live="polite"></p>' +
+      "</div>" +
+      '<div class="buttons practice-buttons"><button type="button" class="btn btn-primary practice-next">Дальше</button></div>');
+    const count = body.querySelector(".selfcare-count");
+    const text = body.querySelector(".practice-step");
+    const next = body.querySelector(".practice-next");
+    let index = 0;
+
+    function show() {
+      if (index < practice.steps.length) {
+        count.textContent = "Шаг " + (index + 1) + " из " + practice.steps.length;
+        text.textContent = practice.steps[index];
+      } else {
+        count.textContent = "";
+        text.textContent = practice.ending;
+        next.textContent = "Начать сначала";
+      }
+    }
+    next.addEventListener("click", function () {
+      if (index >= practice.steps.length) {
+        index = 0;
+        next.textContent = "Дальше";
+      } else {
+        index++;
+      }
+      show();
+    });
+    show();
+  },
+
+  /* Сжать и отпустить: таймер по частям тела */
+  tense: function (body, practice) {
+    body.insertAdjacentHTML("beforeend",
+      '<div class="practice-panel">' +
+        '<p class="selfcare-count">&nbsp;</p>' +
+        '<p class="practice-step" aria-live="polite">Кисти, плечи, лицо, живот, стопы</p>' +
+        '<p class="practice-phase" aria-live="polite">&nbsp;</p>' +
+        '<p class="practice-seconds practice-seconds-big" aria-hidden="true">&nbsp;</p>' +
+      "</div>" +
+      PRACTICE_BUTTONS);
+    const count = body.querySelector(".selfcare-count");
+    const part = body.querySelector(".practice-step");
+    const phase = body.querySelector(".practice-phase");
+    const seconds = body.querySelector(".practice-seconds");
+    const steps = [];
+    practice.parts.forEach(function (p, i) {
+      steps.push(
+        { seconds: 5, label: "Напрягите", part: p, number: i + 1, tense: true },
+        { seconds: 10, label: "Отпустите", part: p, number: i + 1 }
+      );
+    });
+    return practiceTimer(body, steps, function (step) {
+      count.textContent = "Шаг " + step.number + " из " + practice.parts.length;
+      part.textContent = step.part;
+      phase.textContent = step.label;
+      phase.classList.toggle("is-tense", Boolean(step.tense));
+    }, function (left) {
+      seconds.textContent = left;
+    }, function (text) {
+      count.innerHTML = "&nbsp;";
+      part.textContent = text || "Кисти, плечи, лицо, живот, стопы";
+      phase.innerHTML = "&nbsp;";
+      phase.classList.remove("is-tense");
+      seconds.innerHTML = "&nbsp;";
+    }, "Готово");
+  },
+
+  /* Пауза для себя: три поля. Что написано, нигде не сохраняется */
+  pause: function (body, practice) {
+    body.insertAdjacentHTML("beforeend",
+      '<form class="practice-pause">' +
+        [1, 2, 3].map(function (n) {
+          return '<label for="pause-' + n + '" class="visually-hidden">Сегодня я, запись ' + n + "</label>" +
+            '<input type="text" id="pause-' + n + '" placeholder="Сегодня я…" autocomplete="off" maxlength="200">';
+        }).join("") +
+        '<div class="buttons practice-buttons"><button type="submit" class="btn btn-primary">Готово</button></div>' +
+        '<p class="practice-praise" role="status"></p>' +
+      "</form>");
+    const form = body.querySelector(".practice-pause");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      form.querySelector(".practice-praise").textContent = practice.praise;
+    });
+  }
+};
+
+/* Значки плиток практик */
+const PRACTICE_ICONS = {
+  breath: '<circle cx="12" cy="12" r="8"/>',
+  square: '<rect x="5" y="5" width="14" height="14" rx="1.5"/>',
+  steps: '<text x="12" y="17.5" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor" stroke="none">5</text>',
+  tense: '<path d="M7 11.5V8a1.5 1.5 0 0 1 3 0v3m0-1V6.5a1.5 1.5 0 0 1 3 0V11m0-3.5a1.5 1.5 0 0 1 3 0V11m0-2a1.5 1.5 0 0 1 3 0v5.5a6 6 0 0 1-6 6h-1.5A5.5 5.5 0 0 1 6 15v-1a2.5 2.5 0 0 1 2.5-2.5H12"/>',
+  pause: '<path d="M5 9h12v6a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M9 3.5v2.5M13 3.5v2.5"/>'
+};
+
+/* Плитки «Минутки для себя»: практики и видео. И то и другое открывается в окне поверх страницы */
+function setupSelfCare() {
+  const list = document.getElementById("practice-list");
+  if (!list) return;
+
+  const videos = lessonVideos({ videos: SUPPORT_VIDEOS });
+
+  list.innerHTML =
+    PRACTICES.map(function (p, i) {
+      return '<li><button type="button" class="support-tile" data-practice="' + i + '" aria-haspopup="dialog">' +
+        '<span class="support-tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + PRACTICE_ICONS[p.type] + "</svg></span>" +
+        '<span class="support-tile-title">' + escapeHtml(p.title) + "</span>" +
+        '<span class="support-tile-time">' + escapeHtml(p.time) + "</span>" +
+        '<span class="support-tile-start">Начать →</span>' +
+      "</button></li>";
+    }).join("") +
+    videos.map(function (v, i) {
+      return '<li class="support-tile-video-item"><button type="button" class="support-tile support-tile-video" data-video="' + i + '" aria-haspopup="dialog">' +
+        '<span class="support-video-preview" aria-hidden="true"><span class="support-video-play"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5l11 7-11 7z"/></svg></span></span>' +
+        '<span class="support-video-caption">' +
+          '<span class="support-tile-title">' + escapeHtml(v.short || v.title) + "</span>" +
+          '<span class="support-tile-time">Видео · ' + escapeHtml(v.source) + "</span>" +
+        "</span>" +
+      "</button></li>";
+    }).join("");
+
+  // Окно памятки урока, только с другим содержимым
+  const dialog = document.createElement("dialog");
+  dialog.className = "lesson-modal practice-modal";
+  dialog.setAttribute("aria-labelledby", "practice-modal-title");
+  dialog.innerHTML =
+    '<div class="lesson-modal-box">' +
+      '<div class="lesson-modal-head">' +
+        '<h2 id="practice-modal-title"></h2>' +
+        '<button type="button" class="lesson-modal-close" aria-label="Закрыть окно">✕</button>' +
+      "</div>" +
+      '<div class="lesson-modal-body"></div>' +
+    "</div>";
+  document.body.appendChild(dialog);
+
+  const body = dialog.querySelector(".lesson-modal-body");
+  let opener = null;
+  let stopPractice = null;
+  let pressedOutside = false;
+
+  function show(title, isVideo) {
+    dialog.querySelector("h2").textContent = title;
+    dialog.classList.toggle("video-modal", isVideo);
+    document.documentElement.classList.add("modal-open");
+    dialog.showModal();
+    dialog.querySelector(".lesson-modal-close").focus();
+  }
+
+  list.addEventListener("click", function (e) {
+    opener = e.target.closest(".support-tile");
+    if (!opener) return;
+    if (opener.dataset.video !== undefined) {
+      const video = videos[Number(opener.dataset.video)];
+      body.innerHTML = '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>";
+      show(video.title, true);
+      return;
+    }
+    const practice = PRACTICES[Number(opener.dataset.practice)];
+    body.innerHTML = '<p class="practice-intro">' + escapeHtml(practice.text) + "</p>";
+    stopPractice = PRACTICE_RUNNERS[practice.type](body, practice);
+    show(practice.title + " · " + practice.time, false);
+  });
+
+  // Крестик, Esc или щелчок по фону: таймер останавливается, плеер убирается вместе с содержимым окна
+  dialog.addEventListener("close", function () {
+    if (stopPractice) stopPractice();
+    stopPractice = null;
+    body.innerHTML = "";
+    document.documentElement.classList.remove("modal-open");
+    if (opener) opener.focus();
+  });
+  dialog.querySelector(".lesson-modal-close").addEventListener("click", function () { dialog.close(); });
+  dialog.addEventListener("pointerdown", function (e) { pressedOutside = e.target === dialog; });
+  dialog.addEventListener("click", function (e) {
+    if (e.target === dialog && pressedOutside) dialog.close();
   });
 }
 
@@ -3749,7 +4461,7 @@ function createConsultantChat(parts) {
   const serverMode = Store.getMode() === "server";
   const history = [];  // последние реплики для сервера: [{ role: "user"|"assistant", content }]
   let busy = false;
-  let mode = "care";
+  let mode = parts.mode || "care";
 
   function addMessage(who, html, extraClass) {
     const msg = document.createElement("div");
@@ -3892,11 +4604,15 @@ function setupConsultantPage() {
 
   const input = document.getElementById("chat-input");
   const hintsBox = document.getElementById("chat-hints");
+  // consultant.html?mode=support — сразу нужный режим. Неизвестный режим — обычный
+  const modeParam = new URLSearchParams(location.search).get("mode");
+  const startMode = CONSULTANT_MODES.find(function (m) { return m.id === modeParam; });
   const chat = createConsultantChat({
     log: log,
     form: document.getElementById("chat-form"),
     input: input,
-    send: document.getElementById("chat-send")
+    send: document.getElementById("chat-send"),
+    mode: startMode ? startMode.id : "care"
   });
   const serverMode = chat.serverMode;
 
@@ -3904,11 +4620,12 @@ function setupConsultantPage() {
     ? "Ответы готовит ИИ по материалам уроков и справочника школы."
     : "Сайт открыт без сервера: консультант отвечает упрощённо, по ключевым словам.";
 
-  // Первое сообщение консультанта
-  chat.addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+  // Первое сообщение консультанта: у выбранного режима оно своё, а гостю пока нужно только войти
+  const needsLogin = serverMode && !getCurrentUser();
+  chat.addMessage("bot", "<p>" + escapeHtml(!needsLogin && startMode && startMode.greeting || CONSULTANT.greeting) + "</p>");
 
   // Через сервер консультант работает только для вошедших
-  if (serverMode && !getCurrentUser()) {
+  if (needsLogin) {
     chat.addMessage("bot",
       "<p>Чтобы задать вопрос, войдите или зарегистрируйтесь.</p>" +
       '<div class="msg-links">' +
@@ -3924,6 +4641,7 @@ function setupConsultantPage() {
 
   // Примеры вопросов подходят только к вопросам по урокам
   chat.showModes(function (mode) { hintsBox.hidden = mode !== "care"; });
+  hintsBox.hidden = Boolean(startMode) && startMode.id !== "care";
 
   // Кнопки-подсказки отправляют свой текст как вопрос
   hintsBox.addEventListener("click", function (e) {
@@ -4125,8 +4843,10 @@ function startPage() {
   renderMemoPage();
   renderVideoPage();
   renderArticlePage();
-  renderContacts();
+  renderSupportBanner();
+  renderSupportContacts();
   setupWellbeingSurvey();
+  setupSelfCare();
   setupConsultantPage();
   setupConsultantWidget();
 }

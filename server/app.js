@@ -9,7 +9,8 @@ const cookieParser = require("cookie-parser");
 const { rateLimit } = require("express-rate-limit");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { answerQuestion } = require("./consultant");
+const { answerQuestion, wellbeingInsight } = require("./consultant");
+const { levelOf, todayFor, MOOD_DAYS, SCORE_MAX, NOTE_MAX, RESULTS_MAX } = require("./wellbeing");
 const { createYandexModel } = require("./yandex");
 
 const SITE_ROOT = path.join(__dirname, "..");
@@ -51,6 +52,30 @@ function checkCredentials(body) {
 
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/* Отметка настроения: mood — целое 1–5, note — необязательная строка до 300 символов */
+function checkMood(body) {
+  body = body || {};
+  if (!Number.isInteger(body.mood) || body.mood < 1 || body.mood > 5) {
+    throw userError(400, "Настроение — это число от 1 до 5.");
+  }
+  if (body.note !== undefined && body.note !== null && typeof body.note !== "string") {
+    throw userError(400, "Неверный формат заметки.");
+  }
+  // Нулевой символ PostgreSQL в тексте не принимает
+  const note = (body.note || "").replace(/\u0000/g, "").trim();
+  if (note.length > NOTE_MAX) throw userError(400, "Заметка слишком длинная: не больше " + NOTE_MAX + " символов.");
+  return { mood: body.mood, note: note || null };
+}
+
+/* Смещение часового пояса браузера (Date.getTimezoneOffset, минуты): по нему считается «сегодня» человека.
+   Нет смещения — сегодня по часам сервера */
+function checkTzOffset(value) {
+  if (value === undefined || value === "") return undefined;
+  const offset = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isInteger(offset) || offset < -840 || offset > 720) throw userError(400, "Неверный часовой пояс.");
+  return offset;
 }
 
 /*
@@ -210,8 +235,50 @@ function createApp(options) {
     if (message.length > QUESTION_MAX) {
       throw userError(400, "Вопрос слишком длинный: не больше " + QUESTION_MAX + " символов. Сократите его, пожалуйста.");
     }
-    const reply = await answerQuestion(message, body.history, callModel, { mode: body.mode, userId: req.user.id });
+    const reply = await answerQuestion(message, body.history, callModel, { mode: body.mode, userId: req.user.id, db: db });
     res.json(reply);
+  });
+
+  /* Комментарий консультанта к отметкам: лимит общий с вопросами консультанту */
+  api.post("/consultant/insight", requireAuth, consultantLimiter, async function (req, res) {
+    const reply = await wellbeingInsight(req.user.id, db, callModel);
+    if (!reply) throw userError(400, "Для комментария нужно хотя бы 3 отметки настроения.");
+    res.json(reply);
+  });
+
+  /* ---------- Самочувствие ухаживающего ---------- */
+  api.get("/mood", requireAuth, async function (req, res) {
+    const today = todayFor(checkTzOffset(req.query.tzOffset));
+    res.json({ today: today, entries: await db.getMood(req.user.id, today, MOOD_DAYS) });
+  });
+
+  api.put("/mood", requireAuth, async function (req, res) {
+    const data = checkMood(req.body);
+    const today = todayFor(checkTzOffset(req.body.tzOffset));
+    res.json({ entry: await db.saveMood(req.user.id, today, data.mood, data.note) });
+  });
+
+  api.get("/wellbeing", requireAuth, async function (req, res) {
+    res.json({
+      results: await db.getWellbeingResults(req.user.id, RESULTS_MAX),
+      shareWellbeing: await db.getShareWellbeing(req.user.id)
+    });
+  });
+
+  /* Уровень всегда считает сервер: что прислали в запросе, не важно */
+  api.post("/wellbeing", requireAuth, async function (req, res) {
+    const score = (req.body || {}).score;
+    if (!Number.isInteger(score) || score < 0 || score > SCORE_MAX) {
+      throw userError(400, "Баллы — это целое число от 0 до " + SCORE_MAX + ".");
+    }
+    res.status(201).json({ result: await db.addWellbeingResult(req.user.id, score, levelOf(score)) });
+  });
+
+  api.put("/settings/share-wellbeing", requireAuth, async function (req, res) {
+    const enabled = (req.body || {}).enabled;
+    if (typeof enabled !== "boolean") throw userError(400, "Неверный формат настройки.");
+    await db.setShareWellbeing(req.user.id, enabled);
+    res.json({ shareWellbeing: enabled });
   });
 
   api.use(function (req, res, next) {

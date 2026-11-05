@@ -17,6 +17,25 @@ const SCHEMA = `
     data       JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   );
+
+  CREATE TABLE IF NOT EXISTS mood_entries (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day     DATE NOT NULL,
+    mood    SMALLINT NOT NULL CHECK (mood BETWEEN 1 AND 5),
+    note    TEXT CHECK (char_length(note) <= 300),
+    PRIMARY KEY (user_id, day)
+  );
+
+  CREATE TABLE IF NOT EXISTS wellbeing_results (
+    id         SERIAL PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    score      SMALLINT NOT NULL CHECK (score BETWEEN 0 AND 21),
+    level      TEXT NOT NULL CHECK (level IN ('low', 'mid', 'high'))
+  );
+  CREATE INDEX IF NOT EXISTS wellbeing_results_user ON wellbeing_results (user_id, created_at DESC);
+
+  ALTER TABLE users ADD COLUMN IF NOT EXISTS share_wellbeing BOOLEAN NOT NULL DEFAULT false;
 `;
 
 function createDb(connectionString) {
@@ -69,6 +88,55 @@ function createDb(connectionString) {
         [userId, JSON.stringify(data)]
       );
       return result.rows[0].updated_at;
+    },
+
+    /* Отметки настроения за days дней до today включительно, от старых к новым.
+       day::text — чтобы дата пришла строкой «2026-11-05»: объект Date сдвинул бы её на часовой пояс */
+    getMood: async function (userId, today, days) {
+      const result = await pool.query(
+        `SELECT day::text AS day, mood, note FROM mood_entries
+         WHERE user_id = $1 AND day > $2::date - $3::int ORDER BY day`,
+        [userId, today, days]
+      );
+      return result.rows;
+    },
+
+    /* Одна отметка на день: повторное сохранение заменяет её целиком */
+    saveMood: async function (userId, day, mood, note) {
+      const result = await pool.query(
+        `INSERT INTO mood_entries (user_id, day, mood, note) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id, day) DO UPDATE SET mood = EXCLUDED.mood, note = EXCLUDED.note
+         RETURNING day::text AS day, mood, note`,
+        [userId, day, mood, note]
+      );
+      return result.rows[0];
+    },
+
+    /* Результаты теста, сначала новые */
+    getWellbeingResults: async function (userId, limit) {
+      const result = await pool.query(
+        `SELECT score, level, created_at FROM wellbeing_results
+         WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2`,
+        [userId, limit]
+      );
+      return result.rows;
+    },
+
+    addWellbeingResult: async function (userId, score, level) {
+      const result = await pool.query(
+        "INSERT INTO wellbeing_results (user_id, score, level) VALUES ($1, $2, $3) RETURNING score, level, created_at",
+        [userId, score, level]
+      );
+      return result.rows[0];
+    },
+
+    getShareWellbeing: async function (userId) {
+      const result = await pool.query("SELECT share_wellbeing FROM users WHERE id = $1", [userId]);
+      return Boolean(result.rows[0] && result.rows[0].share_wellbeing);
+    },
+
+    setShareWellbeing: async function (userId, enabled) {
+      await pool.query("UPDATE users SET share_wellbeing = $2 WHERE id = $1", [userId, enabled]);
     },
 
     close: function () {

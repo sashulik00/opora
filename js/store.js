@@ -12,6 +12,9 @@
 
   Прогресс — один объект, как раньше в localStorage:
     { burns: { best, total, passed, completed }, practiceDone: { burns: { "spot-error-1": true } }, ... }
+
+  Самочувствие (отметки настроения, результаты теста, согласие): на сервере — через API,
+  без сервера — в localStorage. Все такие функции возвращают Promise.
 */
 const Store = (function () {
   const USERS_KEY = "opora_users";       // режим local: список «зарегистрированных» в этом браузере
@@ -76,7 +79,12 @@ const Store = (function () {
   }
 
   function localLoad() {
-    const email = localStorage.getItem(CURRENT_KEY);
+    let email = null;
+    try {
+      email = localStorage.getItem(CURRENT_KEY);
+    } catch (e) {
+      // браузер закрыл доступ к хранилищу — просто никто не вошёл
+    }
     user = localUsers().find(function (u) { return u.email === email; }) || null;
     progress = user ? readJson(localProgressKey(user.email), {}) : {};
   }
@@ -126,6 +134,32 @@ const Store = (function () {
     if (document.visibilityState === "hidden") flush(true);
   });
 
+  /* ---------- Самочувствие ---------- */
+
+  /* Дата вида «2026-11-05» по часам этого компьютера */
+  function localDay(date) {
+    const pad = function (n) { return String(n).padStart(2, "0"); };
+    return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+  }
+
+  function wellbeingKey(name) {
+    return "opora_" + name + "_" + user.email;
+  }
+
+  function writeLocal(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return Promise.resolve();
+    } catch (e) {
+      return Promise.reject(new Error("Браузер не дал сохранить данные."));
+    }
+  }
+
+  /* Как на сервере: уровень по баллам. Границы — в WELLBEING (js/data.js) */
+  function localLevel(score) {
+    return WELLBEING.levels.find(function (l) { return score <= l.max; }).id;
+  }
+
   /* ---------- Запуск: какой режим и кто вошёл ---------- */
 
   const ready = (location.protocol === "http:" || location.protocol === "https:")
@@ -158,6 +192,56 @@ const Store = (function () {
     ready: ready,
 
     getMode: function () { return mode; },
+
+    localDay: localDay,
+
+    /* Отметки настроения за 30 дней, от старых к новым: [{ day, mood, note }] */
+    getMood: function () {
+      if (mode === "server") {
+        return api("GET", "/mood?tzOffset=" + new Date().getTimezoneOffset()).then(function (data) { return data.entries; });
+      }
+      const from = new Date();
+      from.setDate(from.getDate() - 29);
+      const start = localDay(from);
+      return Promise.resolve(readJson(wellbeingKey("mood"), []).filter(function (e) { return e.day >= start; }));
+    },
+
+    /* Отметка за сегодня: одна на день, повторное сохранение заменяет её. Возвращает сохранённую отметку */
+    saveMood: function (mood, note) {
+      if (mode === "server") {
+        return api("PUT", "/mood", { mood: mood, note: note, tzOffset: new Date().getTimezoneOffset() }).then(function (data) { return data.entry; });
+      }
+      const entry = { day: localDay(new Date()), mood: mood, note: String(note || "").trim().slice(0, 300) || null };
+      const entries = readJson(wellbeingKey("mood"), []).filter(function (e) { return e.day !== entry.day; });
+      entries.push(entry);
+      return writeLocal(wellbeingKey("mood"), entries.slice(-60)).then(function () { return entry; });
+    },
+
+    /* Последние результаты теста (сначала новые) и согласие: { results: [{ score, level, created_at }], shareWellbeing } */
+    getWellbeing: function () {
+      if (mode === "server") return api("GET", "/wellbeing");
+      return Promise.resolve({
+        results: readJson(wellbeingKey("wellbeing"), []).slice(0, 10),
+        shareWellbeing: readJson(wellbeingKey("share_wellbeing"), false) === true
+      });
+    },
+
+    saveWellbeing: function (score) {
+      if (mode === "server") return api("POST", "/wellbeing", { score: score });
+      const results = readJson(wellbeingKey("wellbeing"), []);
+      results.unshift({ score: score, level: localLevel(score), created_at: new Date().toISOString() });
+      return writeLocal(wellbeingKey("wellbeing"), results.slice(0, 10));
+    },
+
+    setShareWellbeing: function (enabled) {
+      if (mode === "server") return api("PUT", "/settings/share-wellbeing", { enabled: enabled });
+      return writeLocal(wellbeingKey("share_wellbeing"), enabled);
+    },
+
+    /* Комментарий консультанта к отметкам: только через сервер */
+    getInsight: function () {
+      return api("POST", "/consultant/insight");
+    },
 
     /* { email, name } или null. name есть только у старых «входов» без сервера */
     getUser: function () { return user ? copy(user) : null; },

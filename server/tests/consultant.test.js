@@ -343,7 +343,7 @@ describe("срочный формат и режимы", function () {
     expect(last).not.toMatch(/Тема: Ожоги|Тема: Раны и швы/);
   });
 
-  test("getWellbeingSummary пока возвращает null; сводка, если появится, добавится к инструкции", async function () {
+  test("getWellbeingSummary без базы возвращает null; сводка добавляется к инструкции", async function () {
     expect(await getWellbeingSummary(1)).toBeNull();
     expect(supportInstructions(null)).toBe(INSTRUCTIONS.support);
     expect(supportInstructions("Плохо спит третью неделю")).toMatch(/поддерживающий собеседник[\s\S]*Плохо спит третью неделю/);
