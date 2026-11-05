@@ -923,18 +923,6 @@ html.modal-open {
   scroll-margin-top: 110px; /* чтобы при переходе по якорю заголовок не прятался под шапкой */
 }
 
-.video-box {
-  aspect-ratio: 16 / 9;
-  max-width: 100%;
-  border-radius: var(--radius);
-  overflow: hidden;
-  background: #000;
-}
-.video-box iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
 .video-placeholder {
   aspect-ratio: 16 / 9;
   max-width: 100%;
@@ -1083,43 +1071,76 @@ html.modal-open {
   color: var(--muted);
   font-size: 1rem;
 }
+/* Строки в две колонки: название, действие серым, круглая кнопка со стрелкой */
 .rights-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 40px;
 }
-/* .card.rights-item — чтобы общий отступ карточек (в том числе телефонный) не перебивал аккордеон */
-.card.rights-item { padding: 0; overflow: hidden; }
-.rights-heading { margin: 0; font-size: 1.2rem; }
-.rights-toggle {
+.rights-list .empty-result { grid-column: 1 / -1; }
+.rights-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   width: 100%;
-  min-height: 64px;
-  padding: 18px 24px;
+  padding: 18px 0;
   background: none;
   border: 0;
+  border-bottom: 1px solid var(--border);
   color: var(--text);
   font: inherit;
-  font-weight: bold;
   text-align: left;
   cursor: pointer;
 }
-.rights-toggle:hover { color: var(--accent); }
-.rights-arrow {
+.rights-row-text { min-width: 0; }
+/* Название не длиннее двух строк, дальше многоточие */
+.rights-row-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 1.3rem;
+  font-weight: bold;
+  line-height: 1.25;
+}
+.rights-row-action {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.rights-row-arrow {
   flex-shrink: 0;
-  font-size: 1.4rem;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
   color: var(--accent);
-  transition: transform 0.2s;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
 }
-.rights-item.is-open .rights-arrow { transform: rotate(180deg); }
-.rights-item.is-open { border-color: var(--accent); }
-.rights-panel {
-  padding: 4px 24px 24px;
-  border-top: 1px solid var(--border);
+.rights-row-arrow svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
+.rights-row:hover .rights-row-title { color: var(--accent); }
+.rights-row:hover .rights-row-arrow { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (max-width: 600px) {
+  .rights-list { grid-template-columns: minmax(0, 1fr); }
+  .rights-row-title { font-size: 1.2rem; }
+}
+
+/* Подробности в окне */
+.page-modal .lesson-modal-head h2 { line-height: 1.25; }
+.page-modal .rights-block:first-child { margin-top: 0; }
 .rights-block { margin-top: 18px; }
 .rights-block h3 {
   font-size: 1.05rem;
@@ -1182,33 +1203,33 @@ html.modal-open {
 }
 .empty-result p { margin: 0; }
 
-.article-actions { margin-top: 32px; }
-
-/* Статья: абзацы чуть крупнее и с отступами */
-.article-text p { margin-bottom: 1.1em; }
-
-/* «Ещё по теме» внизу страниц памятки, видео и статьи */
-.more-on-topic {
-  margin-top: 40px;
-  padding: 20px 24px;
-}
-.more-on-topic h2 {
-  font-size: 1.15rem;
-  margin-bottom: 10px;
-}
-.more-on-topic ul {
+/* Статья: только текст и овальные кнопки под заголовком */
+#article-page { max-width: 860px; }
+.article-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 24px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  gap: 10px;
+  margin: 4px 0 24px;
 }
-.more-on-topic a {
-  display: inline-block;
-  padding: 8px 0;
-  font-weight: bold;
+.article-buttons .btn {
+  min-height: 44px;
+  padding: 9px 24px;
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1.3;
 }
+.article-text p { margin-bottom: 1.1em; }
+.article-text p:last-child { margin-bottom: 0; }
+.article-text h2 { margin: 1.4em 0 0.5em; font-size: 1.4rem; line-height: 1.25; }
+.article-text h2:first-child { margin-top: 0; }
+
+/* Раздел «Видео» */
+.videos-group { margin-top: 32px; }
+.videos-group h2 { margin-bottom: 16px; }
+.videos-group .tile { scroll-margin-top: 110px; }
+.videos-group .tile.is-target { border: 2px solid var(--accent); }
+.videos-group .tile-body { padding: 16px 18px 18px; }
+.videos-group .tile-section { display: none; }
 
 .filters-label {
   font-weight: bold;
@@ -1216,7 +1237,7 @@ html.modal-open {
   margin: 0 0 8px;
 }
 
-/* ===== Общая карточка (тайл): справочник, памятки, видео, статьи ===== */
+/* ===== Общая карточка (тайл): справочник, видео ===== */
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1259,6 +1280,8 @@ html.modal-open {
   height: 100%;
   object-fit: cover;
 }
+/* На обложке с ▶ название раздела не показываем: значок лёг бы поверх него */
+.tile-video .tile-cover-label { display: none; }
 .tile-play {
   position: absolute;
   top: 50%;
@@ -1695,7 +1718,10 @@ html.modal-open {
 }
 
 /* Окно практики и видео */
-.video-modal { width: min(1000px, calc(100vw - 32px)); }
+/* На телефоне окно на весь экран, как и остальные */
+@media (min-width: 601px) {
+  .video-modal { width: min(1000px, calc(100vw - 32px)); }
+}
 
 @media (max-width: 1000px) {
   .support-top { grid-template-columns: minmax(0, 1fr); }
@@ -2250,135 +2276,6 @@ html.modal-open {
   font-size: 0.95rem;
 }
 
-/* ===== Памятки: «кладка» карточек разной высоты (memos.html) =====
-   Колонки: 3 на компьютере, 2 на планшете, 1 на телефоне (см. медиазапросы ниже) */
-.memo-masonry {
-  columns: 3;
-  column-gap: 24px;
-  padding-top: 4px;           /* место для тени и подъёма верхних карточек */
-}
-.memo-masonry .empty-result { column-span: all; }
-
-.memo-card {
-  position: relative;
-  break-inside: avoid;        /* карточка не разрывается между колонками */
-  margin-bottom: 24px;        /* зазор по вертикали = зазору между колонками */
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  overflow: hidden;           /* скругляет и верх картинки */
-  box-shadow: 0 2px 8px rgba(107, 74, 53, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-.memo-card:hover,
-.memo-card:focus-within {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 10px 26px rgba(107, 74, 53, 0.16);
-}
-@media (prefers-reduced-motion: reduce) {
-  .memo-card:hover,
-  .memo-card:focus-within { transform: none; }
-}
-
-/* Картинка (поле cover) или заглушка. Пропорции идут по кругу: */
-.memo-card-media {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  text-align: center;
-  /* заглушка: терракотовый градиент */
-  background: linear-gradient(135deg, #b4472f 0%, #8f4a32 55%, #6b4a35 100%);
-}
-.memo-card-media.is-green {
-  /* у каждой второй карточки — зелёный градиент */
-  background: linear-gradient(135deg, #4f7a4a 0%, #3e6a3c 55%, #2f5530 100%);
-}
-.memo-card--a .memo-card-media { aspect-ratio: 4 / 3; }   /* широкая */
-.memo-card--b .memo-card-media { aspect-ratio: 3 / 4; }   /* высокая */
-.memo-card--c .memo-card-media { aspect-ratio: 1 / 1; }   /* квадрат */
-.memo-card--d .memo-card-media { aspect-ratio: 16 / 10; } /* широкая */
-.memo-card-media img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;          /* заполняет блок без искажений */
-}
-.memo-card-placeholder {
-  color: #fff;
-  font-weight: bold;
-  font-size: 1.15rem;
-}
-
-.memo-card-body { padding: 18px 22px 22px; }
-.memo-card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.memo-card-section {
-  color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.memo-card-lesson {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
-  color: #1b5e20;
-  font-size: 0.85rem;
-  font-weight: bold;
-}
-.memo-card-title {
-  margin: 0 0 8px;
-  font-size: 1.35rem;
-  line-height: 1.25;
-}
-.memo-card-link {
-  color: var(--accent-dark);
-  text-decoration: none;
-}
-/* Ссылка растянута на всю карточку — нажать можно в любом месте */
-.memo-card-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 20px;
-}
-.memo-card-link:focus-visible { outline: none; }
-.memo-card-link:focus-visible::after { outline: 3px solid var(--accent); outline-offset: 2px; }
-.memo-card-text {
-  margin: 0 0 12px;
-  color: var(--muted);
-  font-size: 1rem;
-  /* одна-две строки описания */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.memo-card-more {
-  color: var(--accent);
-  font-weight: bold;
-  font-size: 1rem;
-}
-.memo-card:hover .memo-card-more { text-decoration: underline; }
-
-@media (max-width: 960px) {
-  .memo-masonry { columns: 2; }
-}
-@media (max-width: 600px) {
-  .memo-masonry { columns: 1; }
-}
-
 /* ===== Статьи: каталог карточек (articles.html) ===== */
 .catalog-title {
   margin: 0 0 16px;
@@ -2573,8 +2470,6 @@ html.modal-open {
 }
 
 @media (max-width: 480px) {
-  .rights-toggle { padding: 16px 18px; }
-  .rights-panel { padding: 4px 18px 20px; }
   .test-percent { font-size: 2.6rem; }
   body { font-size: 18px; }
   .hero { padding: calc(var(--header-h) + 24px) 0 var(--hero-text-bottom); }

@@ -59,3 +59,32 @@ test("ответы консультанта без сервера: 2–3 пре�
     expect(a.text).not.toMatch(/\d+\s*(мг|мл|таблет|капс|раз[а]? в день)|антибиотик|антисептик|снотворн|обезболивающ|таблетк/i);
   });
 });
+
+test("статьи уроков: 2–4 раздела, 400–700 слов, не повторяют текст урока, без лекарств и доз", function () {
+  const lessons = TOPICS.filter(function (t) { return t.kind === "lesson"; });
+  expect(lessons).toHaveLength(10);
+  lessons.forEach(function (t) {
+    expect(t.article.length).toBeGreaterThanOrEqual(2);
+    expect(t.article.length).toBeLessThanOrEqual(4);
+    const paragraphs = t.article.reduce(function (all, part) {
+      expect(part.heading.length).toBeGreaterThan(0);
+      expect(part.text.length).toBeGreaterThan(0);
+      return all.concat(part.text);
+    }, []);
+    const text = t.article.map(function (part) { return part.heading; }).concat(paragraphs).join(" ");
+    const words = text.split(/\s+/).filter(function (w) { return /[а-яё0-9]/i.test(w); }).length;
+    expect(words).toBeGreaterThanOrEqual(400);
+    expect(words).toBeLessThanOrEqual(700);
+    paragraphs.forEach(function (p) { expect(t.details).not.toContain(p); });
+    expect(text).not.toMatch(/\d+\s*(мг|мл|таблет|капс|раз[а]? в день)|антибиотик|антисептик|снотворн|обезболивающ|таблетк|ПТСР/i);
+    // Номера телефонов — только в js/phones.js
+    expect(text).not.toMatch(/8-800/);
+  });
+});
+
+test("у тем справочника статья прежняя: поля article нет", function () {
+  TOPICS.filter(function (t) { return t.kind !== "lesson"; }).forEach(function (t) {
+    expect(t.article).toBeUndefined();
+    expect(t.details.length).toBeGreaterThan(0);
+  });
+});

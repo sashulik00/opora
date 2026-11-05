@@ -92,7 +92,6 @@ function renderHeader() {
       href: "reference.html", text: "Справочник", page: "reference",
       children: [
         { href: "reference.html", text: "Поиск", page: "reference" },
-        { href: "memos.html", text: "Памятки", page: "memos" },
         { href: "videos.html", text: "Видео", page: "videos" },
         { href: "articles.html", text: "Статьи", page: "articles" },
         { href: "faq.html", text: "Частые вопросы", page: "faq" },
@@ -922,21 +921,6 @@ function getEmbedUrl(url) {
   return null;
 }
 
-function renderVideo(topic) {
-  const url = (topic.video || "").trim();
-  const embed = url ? getEmbedUrl(url) : null;
-  if (embed) {
-    return (
-      '<div class="video-box">' +
-        '<iframe src="' + embed + '" title="Видео: ' + escapeHtml(topic.title) + '" ' +
-        'allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen ' +
-        'referrerpolicy="strict-origin-when-cross-origin"></iframe>' +
-      "</div>"
-    );
-  }
-  return '<div class="video-placeholder">Видео скоро появится</div>';
-}
-
 /* Есть ли в списке хотя бы один непустой пункт */
 function hasItems(list) {
   return Array.isArray(list) && list.some(function (item) { return item; });
@@ -1062,7 +1046,7 @@ function lessonVideoOrg(video) {
   return video.org ? "Видео: " + video.org : "";
 }
 
-function renderLessonVideos(videos, label) {
+function renderLessonVideos(videos) {
   if (!videos.length) return "";
   const list = videos.length < 2 ? "" :
     '<ul class="lesson-video-list">' +
@@ -1072,7 +1056,7 @@ function renderLessonVideos(videos, label) {
       }).join("") +
     "</ul>";
   return (
-    '<section class="lesson-video" aria-label="' + (label || "Видео урока") + '">' +
+    '<section class="lesson-video" aria-label="Видео урока">' +
       '<div class="lesson-video-screen">' + lessonVideoScreen(videos[0]) + "</div>" +
       '<p class="lesson-video-org">' + escapeHtml(lessonVideoOrg(videos[0])) + "</p>" +
       list +
@@ -1305,7 +1289,7 @@ function renderNotALesson(topic) {
       "<h1>" + escapeHtml(topic.title) + "</h1>" +
       "<p>Эта тема есть только в справочнике: урока и теста по ней нет.</p>" +
       '<div class="buttons">' +
-        '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-primary">Памятка</a>' +
+        '<a href="' + memoLink(topic) + '" class="btn btn-primary">Памятка</a>' +
         '<a href="' + topicLink("article.html", topic) + '" class="btn btn-secondary">Статья</a>' +
       "</div>" +
     "</div>"
@@ -3401,7 +3385,7 @@ function sectionOf(topic) {
 }
 
 function hasVideo(topic) {
-  return Boolean((topic.video || "").trim());
+  return lessonVideos(topic).length > 0;
 }
 
 /* Есть ли у темы памятка СПРАВОЧНИКА (поле memo; памятка урока — lessonMemo) */
@@ -3411,7 +3395,7 @@ function hasMemo(topic) {
 }
 
 function hasArticle(topic) {
-  return hasItems(topic.details);
+  return hasItems(topic.article) || hasItems(topic.details);
 }
 
 /* Приводит текст к виду для поиска: маленькие буквы, «ё» → «е», лишние пробелы убраны */
@@ -3420,11 +3404,12 @@ function normalizeText(text) {
 }
 
 /* Текст темы для поиска в справочнике: название, описание, памятка справочника (memo),
-   статья (details) и частые вопросы (faq). Памятка и тест урока сюда не входят. */
+   статья (article, details) и частые вопросы (faq). Памятка и тест урока сюда не входят. */
 function topicSearchText(topic) {
   const memo = topic.memo || {};
+  const article = (topic.article || []).map(function (part) { return part.heading + " " + part.text.join(" "); });
   const parts = [topic.title, topic.description, topic.intro || ""]
-    .concat(memo.doList || [], memo.dontList || [], memo.urgentList || [], topic.details || [])
+    .concat(memo.doList || [], memo.dontList || [], memo.urgentList || [], topic.details || [], article)
     .concat((topic.faq || []).map(function (f) { return f.q + " " + f.a; }));
   return normalizeText(parts.join(" "));
 }
@@ -3443,12 +3428,12 @@ function renderCover(topic, section) {
   );
 }
 
-/* ОДНА общая карточка для справочника, памяток, видео и статей.
-   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием) */
+/* ОДНА общая карточка для справочника и видео.
+   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием), attrs (доп. атрибуты ссылки) */
 function renderTile(topic, options) {
   const section = sectionOf(topic);
   return (
-    '<a class="tile" href="' + options.href + '">' +
+    '<a class="tile' + (options.play ? " tile-video" : "") + '" href="' + options.href + '"' + (options.attrs || "") + ">" +
       '<div class="tile-media">' +
         renderCover(topic, section) +
         (options.play ? '<span class="tile-play" aria-label="Есть видео">▶</span>' : "") +
@@ -3465,6 +3450,58 @@ function renderTile(topic, options) {
 
 function topicLink(page, topic) {
   return page + "?id=" + encodeURIComponent(topic.id);
+}
+
+/* Статья темы с сразу открытой памяткой */
+function memoLink(topic) {
+  return topicLink("article.html", topic) + "&memo=1";
+}
+
+/* Раздел видео, сразу на этой теме */
+function videoLink(topic) {
+  return "videos.html?topic=" + encodeURIComponent(topic.id);
+}
+
+/* Окно поверх страницы: как памятка в уроке (крестик, Esc, щелчок по фону, страница под окном не прокручивается).
+   Содержимое убирается при закрытии: плеер не продолжает играть. Возвращает функцию open(title, html, opener) */
+function createPageModal(extraClass) {
+  const dialog = document.createElement("dialog");
+  dialog.className = "lesson-modal page-modal" + (extraClass ? " " + extraClass : "");
+  dialog.setAttribute("aria-labelledby", "page-modal-title");
+  dialog.innerHTML =
+    '<div class="lesson-modal-box">' +
+      '<div class="lesson-modal-head">' +
+        '<h2 id="page-modal-title"></h2>' +
+        '<button type="button" class="lesson-modal-close" aria-label="Закрыть окно">✕</button>' +
+      "</div>" +
+      '<div class="lesson-modal-body"></div>' +
+    "</div>";
+  document.body.appendChild(dialog);
+
+  const body = dialog.querySelector(".lesson-modal-body");
+  let opener = null;
+  let pressedOutside = false;
+
+  dialog.addEventListener("close", function () {
+    body.innerHTML = "";
+    document.documentElement.classList.remove("modal-open");
+    if (opener) opener.focus();
+  });
+  dialog.querySelector(".lesson-modal-close").addEventListener("click", function () { dialog.close(); });
+  dialog.addEventListener("pointerdown", function (e) { pressedOutside = e.target === dialog; });
+  dialog.addEventListener("click", function (e) {
+    if (e.target === dialog && pressedOutside) dialog.close();
+  });
+
+  return function open(title, html, from) {
+    opener = from;
+    dialog.querySelector("h2").textContent = title;
+    body.innerHTML = html;
+    body.scrollTop = 0;
+    document.documentElement.classList.add("modal-open");
+    dialog.showModal();
+    dialog.querySelector(".lesson-modal-close").focus();
+  };
 }
 
 /* Группа кнопок-фильтров. items: [{id, title}], onChange(id) вызывается при выборе */
@@ -3489,11 +3526,11 @@ function setupFilterButtons(box, items, onChange) {
 
 const SECTION_FILTERS = [{ id: "all", title: "Все" }].concat(SECTIONS);
 
-/* Типы материалов справочника: есть ли такой материал у темы и на какую страницу он ведёт */
+/* Типы материалов справочника: есть ли такой материал у темы и куда он ведёт */
 const MATERIAL_TYPES = [
-  { id: "memos", title: "Памятки", badge: "Памятка", page: "memo.html", fits: hasMemo },
-  { id: "videos", title: "Видео", badge: "Видео", page: "video.html", fits: hasVideo },
-  { id: "articles", title: "Статьи", badge: "Статья", page: "article.html", fits: hasArticle }
+  { id: "memos", title: "Памятки", badge: "Памятка", link: memoLink, fits: hasMemo },
+  { id: "videos", title: "Видео", badge: "Видео", link: videoLink, fits: hasVideo },
+  { id: "articles", title: "Статьи", badge: "Статья", link: function (t) { return topicLink("article.html", t); }, fits: hasArticle }
 ];
 
 const EMPTY_RESULT =
@@ -3538,7 +3575,7 @@ function setupReferencePage() {
       types.forEach(function (type) {
         if (!type.fits(topic)) return;
         cards.push(renderTile(topic, {
-          href: topicLink(type.page, topic),
+          href: type.link(topic),
           badge: type.badge,
           play: type.id === "videos",
           text: topic.description
@@ -3554,72 +3591,54 @@ function setupReferencePage() {
   showResults();
 }
 
-/* ---------- Справочник: списки Памятки, Видео, Статьи ---------- */
+/* ---------- Справочник: разделы Видео и Статьи ---------- */
 
-function renderMemosPage() {
-  const list = document.getElementById("memos-list");
-  if (!list) return;
+/* Раздел видео: ролики из поля videos тем, по разделам. Темы без роликов не показываются.
+   videos.html?topic=ID прокручивает к теме и отмечает её; если ролик у темы один, он сразу открывается в окне */
+function setupVideosPage() {
+  const box = document.getElementById("videos-list");
+  if (!box) return;
 
-  // memos.html?section=psychology — только памятки одного раздела
-  const section = SECTIONS.find(function (s) {
-    return s.id === new URLSearchParams(location.search).get("section");
-  });
-  if (section) {
-    list.insertAdjacentHTML("beforebegin",
-      '<p class="hint">Раздел: <strong>' + escapeHtml(section.title) + "</strong>. " +
-      '<a href="memos.html">Показать все памятки</a></p>');
+  const items = [];
+  const groups = SECTIONS.map(function (section) {
+    const tiles = TOPICS.filter(function (t) { return t.section === section.id && hasVideo(t); }).map(function (topic) {
+      const videos = lessonVideos(topic);
+      return videos.map(function (video, i) {
+        items.push({ topic: topic, video: video });
+        return renderTile(topic, {
+          href: videoLink(topic),
+          play: true,
+          text: videos.length > 1 ? "Ролик " + (i + 1) + " из " + videos.length : "",
+          attrs: ' data-video="' + (items.length - 1) + '" data-topic="' + escapeHtml(topic.id) + '" aria-haspopup="dialog"'
+        });
+      }).join("");
+    }).join("");
+    return tiles
+      ? '<section class="videos-group"><h2>' + escapeHtml(section.title) + '</h2><div class="tile-grid">' + tiles + "</div></section>"
+      : "";
+  }).join("");
+  box.innerHTML = groups || EMPTY_RESULT;
+
+  const openModal = createPageModal("video-modal");
+
+  function showVideo(tile) {
+    const video = items[Number(tile.dataset.video)].video;
+    openModal(video.title, '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>", tile);
   }
 
-  const topics = TOPICS.filter(function (t) {
-    return hasMemo(t) && (!section || t.section === section.id);
+  box.addEventListener("click", function (e) {
+    const tile = e.target.closest(".tile");
+    if (!tile) return;
+    e.preventDefault();
+    showVideo(tile);
   });
-  list.innerHTML = topics.length ? topics.map(renderMemoCard).join("") : EMPTY_RESULT;
-}
 
-/* Карточка памятки для «кладки» на memos.html.
-   Пропорции картинки идут по кругу: 4:3, 3:4, 1:1, 16:10 (классы memo-card--a…d в style.css).
-   Если у темы нет cover (или файл не нашёлся) — цветная плашка с названием раздела. */
-const MEMO_CARD_SHAPES = ["a", "b", "c", "d"];
-
-function renderMemoCard(topic, index) {
-  const section = sectionOf(topic);
-  const shape = MEMO_CARD_SHAPES[index % MEMO_CARD_SHAPES.length];
-  const cover = (topic.cover || "").trim();
-  const href = topicLink("memo.html", topic);
-
-  return (
-    '<article class="memo-card memo-card--' + shape + '">' +
-      '<div class="memo-card-media' + (index % 2 ? " is-green" : "") + '">' +
-        '<span class="memo-card-placeholder" aria-hidden="true">' + escapeHtml(section.title) + "</span>" +
-        (cover
-          ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
-          : "") +
-      "</div>" +
-      '<div class="memo-card-body">' +
-        '<div class="memo-card-tags">' +
-          '<span class="memo-card-section">' + escapeHtml(section.title) + "</span>" +
-          (isLesson(topic) ? '<span class="memo-card-lesson">Есть урок</span>' : "") +
-        "</div>" +
-        // Вся карточка кликабельна: ссылка в заголовке растянута на карточку (см. .memo-card-link::after)
-        '<h2 class="memo-card-title"><a class="memo-card-link" href="' + href + '">' + escapeHtml(topic.title) + "</a></h2>" +
-        '<p class="memo-card-text">' + escapeHtml(topic.description) + "</p>" +
-        '<span class="memo-card-more" aria-hidden="true">Открыть памятку →</span>' +
-      "</div>" +
-    "</article>"
-  );
-}
-
-function renderVideosPage() {
-  const list = document.getElementById("videos-list");
-  if (!list) return;
-  list.innerHTML = TOPICS.map(function (t) {
-    const ready = hasVideo(t);
-    return renderTile(t, {
-      href: topicLink("video.html", t),
-      play: ready,
-      badge: ready ? "" : "Скоро"
-    });
-  }).join("");
+  const topicId = new URLSearchParams(location.search).get("topic");
+  const tiles = Array.from(box.querySelectorAll(".tile")).filter(function (t) { return t.dataset.topic === topicId; });
+  if (!tiles.length) return;
+  tiles.forEach(function (t) { t.classList.add("is-target"); });
+  tiles[0].scrollIntoView({ block: "start" });
+  if (tiles.length === 1) showVideo(tiles[0]);
 }
 
 function renderArticlesPage() {
@@ -3693,7 +3712,7 @@ function setupFaqPage() {
   show("all");
 }
 
-/* ---------- Справочник: страницы одного материала (memo / video / article) ---------- */
+/* ---------- Справочник: статья (article.html) ---------- */
 
 /* Находит тему по ?id= в адресе. Если не нашли — показывает сообщение и возвращает null */
 function topicFromAddress(page, listHref, listTitle) {
@@ -3717,30 +3736,7 @@ function renderMaterialHead(topic, listHref, listTitle) {
       '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
     "</nav>" +
     '<p class="lesson-num">' + escapeHtml(sectionOf(topic).title) + "</p>" +
-    "<h1>" + escapeHtml(topic.title) + "</h1>"
-  );
-}
-
-/* «Ещё по теме»: ссылки на другие материалы темы, кроме текущей страницы */
-function renderMoreOnTopic(topic, current) {
-  const links = [
-    { page: "memo.html", title: "Памятка" },
-    { page: "video.html", title: "Видео" },
-    { page: "article.html", title: "Статья" },
-    { page: "lesson.html", title: "Урок" }
-  ].filter(function (l) {
-    // У тем справочника (kind: "reference") урока нет — ссылку «Урок» не показываем
-    if (l.page === "lesson.html" && !isLesson(topic)) return false;
-    return l.page !== current;
-  });
-
-  return (
-    '<aside class="card more-on-topic" aria-label="Ещё по теме">' +
-      "<h2>Ещё по теме</h2>" +
-      "<ul>" + links.map(function (l) {
-        return '<li><a href="' + topicLink(l.page, topic) + '">' + l.title + "</a></li>";
-      }).join("") + "</ul>" +
-    "</aside>"
+    "<h1>" + escapeHtml((topic.articleTitle || "").trim() || topic.title) + "</h1>"
   );
 }
 
@@ -3748,59 +3744,56 @@ function renderSoon(text) {
   return '<div class="video-placeholder">' + escapeHtml(text) + "</div>";
 }
 
-/* memo.html — только памятка справочника */
-function renderMemoPage() {
-  const page = document.getElementById("memo-page");
-  if (!page) return;
-  const topic = topicFromAddress(page, "memos.html", "К списку памяток");
-  if (!topic) return;
-
-  document.title = topic.title + " — Памятка — Опора";
-  page.innerHTML =
-    renderMaterialHead(topic, "memos.html", "Памятки") +
-    renderIntro(topic) +   // вводный абзац сверху
-    (renderMemo(topic.memo, sectionOf(topic), false) || renderSoon("Памятка скоро появится")) +
-    renderMoreOnTopic(topic, "memo.html");
+/* Новый текст статьи (поле article): разделы с подзаголовками */
+function renderArticleSections(topic) {
+  return (
+    '<article class="card article-text">' +
+      topic.article.map(function (part) {
+        return "<h2>" + escapeHtml(part.heading) + "</h2>" +
+          part.text.map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("");
+      }).join("") +
+    "</article>"
+  );
 }
 
-/* video.html — только видеоплеер */
-function renderVideoPage() {
-  const page = document.getElementById("video-page");
-  if (!page) return;
-  const topic = topicFromAddress(page, "videos.html", "К списку видео");
-  if (!topic) return;
-
-  document.title = topic.title + " — Видео — Опора";
-  page.innerHTML =
-    renderMaterialHead(topic, "videos.html", "Видео") +
-    renderVideo(topic) +
-    '<div class="buttons article-actions">' +
-      '<a href="videos.html" class="btn btn-secondary">К списку видео</a>' +
-    "</div>" +
-    renderMoreOnTopic(topic, "video.html");
+/* Статья справочной темы: вводный абзац, абзацы details и источники */
+function renderReferenceArticle(topic) {
+  return (
+    renderIntro(topic) +
+    (hasItems(topic.details)
+      ? '<div class="card details article-text">' +
+          topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
+        "</div>"
+      : renderSoon("Статья скоро появится")) +
+    renderSources(topic)
+  );
 }
 
-/* article.html — статья (details), видео (videos, если есть) и источники */
+/* article.html — только текст статьи и кнопки: Памятка (окно), Видео по теме, Урок по теме.
+   article.html?id=ID&memo=1 открывает памятку сразу */
 function renderArticlePage() {
   const page = document.getElementById("article-page");
   if (!page) return;
   const topic = topicFromAddress(page, "articles.html", "К списку статей");
   if (!topic) return;
 
-  const videos = Array.isArray(topic.videos) ? lessonVideos(topic) : [];
+  const memoBlocks = renderMemo(topic.memo, sectionOf(topic), false);
   document.title = topic.title + " — Статья — Опора";
   page.innerHTML =
     renderMaterialHead(topic, "articles.html", "Статьи") +
-    renderIntro(topic) +   // вводный абзац сверху
-    renderLessonVideos(videos, "Видео") +
-    (hasArticle(topic)
-      ? '<div class="card details article-text">' +
-          topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
-        "</div>"
-      : renderSoon("Статья скоро появится")) +
-    renderSources(topic) +
-    renderMoreOnTopic(topic, "article.html");
-  setupLessonVideos(page, videos);
+    '<div class="article-buttons">' +
+      (memoBlocks ? '<button type="button" class="btn btn-primary" id="article-memo-open" aria-haspopup="dialog">Памятка</button>' : "") +
+      (hasVideo(topic) ? '<a href="' + videoLink(topic) + '" class="btn btn-secondary">Видео по теме</a>' : "") +
+      (isLesson(topic) ? '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-secondary">Урок по теме</a>' : "") +
+    "</div>" +
+    (hasItems(topic.article) ? renderArticleSections(topic) : renderReferenceArticle(topic));
+
+  if (!memoBlocks) return;
+  const openModal = createPageModal();
+  const memoButton = document.getElementById("article-memo-open");
+  function showMemo() { openModal("Памятка", memoBlocks, memoButton); }
+  memoButton.addEventListener("click", showMemo);
+  if (new URLSearchParams(location.search).get("memo") === "1") showMemo();
 }
 
 /* ---------- Поддержка (help.html) ---------- */
@@ -4480,7 +4473,7 @@ function createConsultantChat(parts) {
     if (!isLesson(topic)) {
       return (
         '<div class="msg-links">' +
-          '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-small btn-primary">Памятка</a>' +
+          '<a href="' + memoLink(topic) + '" class="btn btn-small btn-primary">Памятка</a>' +
           '<a href="' + topicLink("article.html", topic) + '" class="btn btn-small btn-secondary">Статья</a>' +
           (topic.section === "legal"
             ? '<a href="rights.html" class="btn btn-small btn-secondary">Права и документы</a>'
@@ -4491,7 +4484,7 @@ function createConsultantChat(parts) {
     return (
       '<div class="msg-links">' +
         '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-small btn-primary">Открыть урок</a>' +
-        '<a href="' + topicLink("memo.html", topic) + '" class="btn btn-small btn-secondary">Памятка</a>' +
+        '<a href="' + memoLink(topic) + '" class="btn btn-small btn-secondary">Памятка</a>' +
         '<a href="' + topicLink("article.html", topic) + '" class="btn btn-small btn-secondary">Статья</a>' +
       "</div>"
     );
@@ -4740,10 +4733,10 @@ function rightsSearchText(item) {
     .join(" "));
 }
 
-function renderRightsCard(item) {
+/* Подробности элемента: блоки для окна поверх страницы */
+function rightsDetailsHtml(item) {
   const source = item.source || {};
   const validUrl = /^https?:\/\//i.test(source.url || "");
-  const panelId = "rights-panel-" + item.id;
 
   function block(title, content) {
     return content ? '<div class="rights-block"><h3>' + title + "</h3>" + content + "</div>" : "";
@@ -4751,27 +4744,32 @@ function renderRightsCard(item) {
   function para(text) { return text ? "<p>" + escapeHtml(text) + "</p>" : ""; }
 
   return (
-    '<article class="card rights-item" data-id="' + escapeHtml(item.id) + '">' +
-      '<h2 class="rights-heading">' +
-        '<button type="button" class="rights-toggle" aria-expanded="false" aria-controls="' + panelId + '">' +
-          "<span>" + escapeHtml(item.title) + "</span>" +
-          '<span class="rights-arrow" aria-hidden="true">▾</span>' +
-        "</button>" +
-      "</h2>" +
-      '<div class="rights-panel" id="' + panelId + '" hidden>' +
-        block("Что это", para(item.what)) +
-        block("Куда обратиться", para(item.where)) +
-        block("Какие документы нужны", hasItems(item.documents) ? renderList(item.documents) : "") +
-        block("Что положено", para(item.entitled)) +
-        block("Что делать по шагам", hasItems(item.steps) ? renderList(item.steps, "ol") : "") +
-        block("Где проверить",
-          // Название источника: ссылкой, если адрес есть, иначе текстом
-          (source.title || validUrl
-            ? "<p>" + sourceHtml(source) + "</p>"
-            : '<p class="muted">Источник уточняется</p>') +
-          '<p class="muted">Проверено: ' + escapeHtml(item.checked || "дата уточняется") + "</p>") +
-      "</div>" +
-    "</article>"
+    block("Что это", para(item.what)) +
+    block("Куда обратиться", para(item.where)) +
+    block("Какие документы нужны", hasItems(item.documents) ? renderList(item.documents) : "") +
+    block("Что положено", para(item.entitled)) +
+    block("Что делать по шагам", hasItems(item.steps) ? renderList(item.steps, "ol") : "") +
+    block("Где проверить",
+      // Название источника: ссылкой, если адрес есть, иначе текстом
+      (source.title || validUrl
+        ? "<p>" + sourceHtml(source) + "</p>"
+        : '<p class="muted">Источник уточняется</p>') +
+      '<p class="muted">Проверено: ' + escapeHtml(item.checked || "дата уточняется") + "</p>")
+  );
+}
+
+/* Строка элемента: название, действие серым, круглая кнопка со стрелкой. Кликабельна вся строка */
+function renderRightsRow(item) {
+  return (
+    '<button type="button" class="rights-row" data-id="' + escapeHtml(item.id) + '" aria-haspopup="dialog">' +
+      '<span class="rights-row-text">' +
+        '<span class="rights-row-title">' + escapeHtml(item.title) + "</span>" +
+        '<span class="rights-row-action">Подробнее</span>' +
+      "</span>" +
+      '<span class="rights-row-arrow" aria-hidden="true">' +
+        '<svg viewBox="0 0 24 24" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg>' +
+      "</span>" +
+    "</button>"
   );
 }
 
@@ -4780,16 +4778,7 @@ function setupRightsPage() {
   if (!list) return;
 
   const input = document.getElementById("rights-search");
-
-  // Открыть одну карточку (остальные закрываются) или закрыть её
-  function toggle(card, open) {
-    list.querySelectorAll(".rights-item").forEach(function (c) {
-      const isThis = c === card && open;
-      c.classList.toggle("is-open", isThis);
-      c.querySelector(".rights-toggle").setAttribute("aria-expanded", isThis);
-      c.querySelector(".rights-panel").hidden = !isThis;
-    });
-  }
+  const openModal = createPageModal();
 
   function show() {
     const words = normalizeText(input.value).split(" ").filter(Boolean);
@@ -4799,17 +4788,17 @@ function setupRightsPage() {
     });
 
     list.innerHTML = found.length
-      ? found.map(renderRightsCard).join("")
+      ? found.map(renderRightsRow).join("")
       : '<div class="card empty-result"><p><strong>Ничего не найдено.</strong> ' +
         "Попробуйте другое слово, например «инвалидность», «протез» или «выплаты», " +
         'или <a href="consultant.html">спросите консультанта</a>.</p></div>';
   }
 
   list.addEventListener("click", function (e) {
-    const button = e.target.closest(".rights-toggle");
-    if (!button) return;
-    const card = button.closest(".rights-item");
-    toggle(card, !card.classList.contains("is-open"));
+    const row = e.target.closest(".rights-row");
+    if (!row) return;
+    const item = RIGHTS.find(function (r) { return r.id === row.dataset.id; });
+    openModal(item.title, rightsDetailsHtml(item), row);
   });
 
   input.addEventListener("input", show);
@@ -4836,12 +4825,9 @@ function startPage() {
   renderTestPage();
   setupRightsPage();
   setupReferencePage();
-  renderMemosPage();
-  renderVideosPage();
+  setupVideosPage();
   renderArticlesPage();
   setupFaqPage();
-  renderMemoPage();
-  renderVideoPage();
   renderArticlePage();
   renderSupportBanner();
   renderSupportContacts();
