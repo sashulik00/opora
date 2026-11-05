@@ -20,7 +20,14 @@ const SCHEMA = `
 `;
 
 function createDb(connectionString) {
-  const pool = new Pool({ connectionString: connectionString, max: 10 });
+  // connectionTimeoutMillis: база не отвечает — запрос получит ошибку через 5 секунд, а не будет висеть
+  const pool = new Pool({ connectionString: connectionString, max: 10, connectionTimeoutMillis: 5000 });
+
+  // Связь оборвалась (например, база перезапустилась). Пул сам выбросит эту связь и откроет новую при следующем запросе.
+  // Без этого обработчика такая ошибка роняет весь сервер
+  pool.on("error", function (err) {
+    console.error("[База] связь оборвалась, переподключимся при следующем запросе:", err.message);
+  });
 
   return {
     pool: pool,

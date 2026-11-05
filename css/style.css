@@ -1537,6 +1537,48 @@ html.modal-open {
   cursor: pointer;
 }
 .chat-hint:hover { border-color: var(--accent); }
+/* Режимы над чатом */
+.chat-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chat-mode {
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 10px 16px;
+  min-height: 46px;
+  background: var(--card);
+  color: var(--text);
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chat-mode:hover { border-color: var(--accent); }
+.chat-mode[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: bold;
+}
+/* Кризисный ответ: спокойный блок и крупные кнопки звонка */
+.msg-crisis {
+  max-width: 100%;
+  width: 100%;
+  background: #fdecea;
+  border-color: #c62828;
+}
+.crisis-phones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.msg-crisis .alarm-phone {
+  margin-top: 0;
+  background: #c62828;
+  color: #fff;
+}
 .chat-form {
   display: flex;
   gap: 10px;
@@ -1643,7 +1685,10 @@ html.modal-open {
   padding: 12px 14px;
 }
 .chat-widget .msg { max-width: 92%; padding: 10px 14px; }
-.chat-widget .msg-alarm { max-width: 100%; }
+.chat-widget .msg-alarm,
+.chat-widget .msg-crisis { max-width: 100%; }
+.chat-widget .chat-modes { flex: none; gap: 6px; padding: 8px 12px 0; }
+.chat-widget .chat-mode { padding: 6px 12px; min-height: 40px; font-size: 0.85rem; line-height: 1.2; }
 .chat-widget .alarm-text { font-size: 1.1rem; }
 .chat-widget .alarm-phone { padding: 10px 16px; min-height: 0; font-size: 1.15rem; }
 .chat-widget .msg-alarm .alarm-phone + .alarm-phone { margin-left: 0; }

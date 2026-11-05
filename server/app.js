@@ -127,16 +127,18 @@ function createApp(options) {
     res.cookie(COOKIE_NAME, token, Object.assign({ maxAge: TOKEN_DAYS * 24 * 60 * 60 * 1000 }, cookieOptions));
   }
 
-  /* Кто вошёл: пользователь из токена или null */
+  /* Кто вошёл: пользователь из токена или null.
+     Ошибка базы — не повод считать человека вышедшим: она уходит дальше и становится ответом 500, cookie входа остаётся */
   async function currentUser(req) {
     const token = req.cookies[COOKIE_NAME];
     if (!token) return null;
+    let payload;
     try {
-      const payload = jwt.verify(token, jwtSecret, { algorithms: ["HS256"] });
-      return await db.findUserById(Number(payload.sub));
+      payload = jwt.verify(token, jwtSecret, { algorithms: ["HS256"] });
     } catch (e) {
       return null;  // токен испорчен или просрочен
     }
+    return db.findUserById(Number(payload.sub));
   }
 
   async function requireAuth(req, res, next) {
@@ -208,7 +210,7 @@ function createApp(options) {
     if (message.length > QUESTION_MAX) {
       throw userError(400, "Вопрос слишком длинный: не больше " + QUESTION_MAX + " символов. Сократите его, пожалуйста.");
     }
-    const reply = await answerQuestion(message, body.history, callModel);
+    const reply = await answerQuestion(message, body.history, callModel, { mode: body.mode, userId: req.user.id });
     res.json(reply);
   });
 

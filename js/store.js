@@ -133,7 +133,13 @@ const Store = (function () {
         if (!("user" in data)) throw new Error("Это не наш сервер");
         mode = "server";
         if (data.user) return afterServerLoad(data.user);
-      }).catch(function () {
+      }).catch(function (e) {
+        // Сервер есть, но сейчас не может ответить (например, перезапускается база): вход без пароля тут не нужен
+        if (e.status >= 500) {
+          mode = "server";
+          loadFailed = true;
+          return;
+        }
         if (mode !== "server") {  // сервера нет (например, Live Server) — работаем как раньше
           mode = "local";
           localLoad();

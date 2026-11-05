@@ -3668,16 +3668,16 @@ function findConsultantAnswer(question) {
      там ИИ Яндекса отвечает по материалам школы.
    • Сайт открыт файлом без сервера — упрощённые ответы по ключевым словам из data.js (как раньше).
    Возвращает Promise с объектом:
-     { type: "alarm" | "answer" | "nothing" | "unavailable", answer, sources } — ответ сервера,
+     { type: "crisis" | "alarm" | "answer" | "unavailable", mode, answer, sources, phones } — ответ сервера,
      { type: "error", text } — ошибка (не вошли, слишком длинно, нет связи…),
      или старый вид от findConsultantAnswer — без сервера. */
-function getConsultantReply(question, history) {
+function getConsultantReply(question, history, mode) {
   if (Store.getMode() === "server") {
     return fetch("/api/consultant", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: question, history: history })
+      body: JSON.stringify({ message: question, history: history, mode: mode })
     }).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (data) {
         if (!res.ok) return { type: "error", text: data.error || "Консультант сейчас недоступен. Попробуйте чуть позже." };
@@ -3704,14 +3704,40 @@ function formatAnswer(text) {
     .join("");
 }
 
+/* Адрес темы из ответа сервера: только страница урока или статьи */
+function sourceUrl(source) {
+  return /^(lesson|article)\.html\?id=[\w-]+$/.test(source.url || "") ? source.url : "lesson.html?id=" + encodeURIComponent(source.topicId);
+}
+
 /* «Источники: урок «Ожоги», статья «Выплаты и льготы»» */
 function sourcesHtml(sources) {
   if (!sources || !sources.length) return "";
   return '<p class="msg-sources">Источники: ' + sources.map(function (s) {
-    const url = /^(lesson|article)\.html\?id=[\w-]+$/.test(s.url || "") ? s.url : "lesson.html?id=" + encodeURIComponent(s.topicId);
-    return (s.kind === "article" ? "статья" : "урок") + ' <a href="' + url + '">«' + escapeHtml(s.title) + "»</a>";
+    return (s.kind === "article" ? "статья" : "урок") + ' <a href="' + sourceUrl(s) + '">«' + escapeHtml(s.title) + "»</a>";
   }).join(", ") + "</p>";
 }
+
+/* Кнопки под ответом: предложенные темы. Тем нет — «Все уроки» (но не в разговоре о самочувствии) */
+function topicLinksHtml(reply) {
+  const sources = reply.sources || [];
+  if (!sources.length && reply.mode === "support") return "";
+  return '<div class="msg-links">' +
+    (sources.length
+      ? sources.map(function (s) {
+          return '<a href="' + sourceUrl(s) + '" class="btn btn-small btn-secondary">' + escapeHtml(s.title) + "</a>";
+        }).join("")
+      : '<a href="lessons.html" class="btn btn-small btn-secondary">Все уроки</a>') +
+  "</div>";
+}
+
+/* Режимы консультанта: кнопки над чатом. Выбранный режим уходит на сервер полем mode и помнится до перезагрузки */
+const CONSULTANT_MODES = [
+  { id: "urgent", label: "Срочный вопрос по уходу",
+    greeting: "Опишите, что происходит. Отвечу коротко: что делать сейчас и когда звонить врачу." },
+  { id: "support", label: "Мне тяжело, хочу поговорить",
+    greeting: "Можно просто рассказать, как вы. Я выслушаю. Я не психолог, но помогу найти, куда обратиться, если нужно." },
+  { id: "care", label: "Вопрос по урокам", greeting: "" }  // пусто — обычное приветствие CONSULTANT.greeting
+];
 
 /* Чат консультанта — один и тот же и на странице consultant.html, и в окне на главной:
    сообщения, запрос к серверу (или ответы по ключевым словам без него), тревожные ответы, источники.
@@ -3723,6 +3749,7 @@ function createConsultantChat(parts) {
   const serverMode = Store.getMode() === "server";
   const history = [];  // последние реплики для сервера: [{ role: "user"|"assistant", content }]
   let busy = false;
+  let mode = "care";
 
   function addMessage(who, html, extraClass) {
     const msg = document.createElement("div");
@@ -3760,6 +3787,13 @@ function createConsultantChat(parts) {
 
   function replyHtml(reply) {
     // Ответы сервера (ИИ)
+    if (serverMode && reply.type === "crisis") {
+      return formatAnswer(reply.answer) + '<div class="crisis-phones">' +
+        (reply.phones || []).map(function (p) {
+          return '<a href="tel:' + escapeHtml(p.tel) + '" class="alarm-phone">' + escapeHtml(p.number) + "</a>";
+        }).join("") +
+      "</div>";
+    }
     if (serverMode && reply.type === "alarm") {
       return (
         formatAnswer(reply.answer).replace("<p>", '<p class="alarm-text">') +
@@ -3769,12 +3803,7 @@ function createConsultantChat(parts) {
       );
     }
     if (reply.type === "error") return "<p>" + escapeHtml(reply.text) + "</p>";
-    if (serverMode) {
-      return formatAnswer(reply.answer) + sourcesHtml(reply.sources) +
-        (reply.type === "nothing" || (reply.type === "unavailable" && !(reply.sources || []).length)
-          ? '<div class="msg-links"><a href="lessons.html" class="btn btn-small btn-secondary">Все уроки</a></div>'
-          : "");
-    }
+    if (serverMode) return formatAnswer(reply.answer) + topicLinksHtml(reply);
 
     // Без сервера — как раньше
     if (reply.type === "alarm") {
@@ -3812,9 +3841,9 @@ function createConsultantChat(parts) {
 
     const typing = addMessage("bot", '<p class="typing">Консультант думает…</p>', "msg-typing");
 
-    getConsultantReply(question, history.slice(-6)).then(function (reply) {
+    getConsultantReply(question, history.slice(-6), mode).then(function (reply) {
       typing.remove();
-      addMessage("bot", replyHtml(reply), reply.type === "alarm" ? "msg-alarm" : "");
+      addMessage("bot", replyHtml(reply), reply.type === "alarm" ? "msg-alarm" : reply.type === "crisis" ? "msg-crisis" : "");
       if (serverMode && reply.type !== "error") {
         history.push({ role: "user", content: question }, { role: "assistant", content: reply.answer || "" });
         history.splice(0, Math.max(0, history.length - 6));
@@ -3830,7 +3859,31 @@ function createConsultantChat(parts) {
     input.focus();
   });
 
-  return { addMessage: addMessage, ask: ask, setBusy: setBusy, replyHtml: replyHtml, serverMode: serverMode };
+  /* Кнопки режимов над чатом. Они нужны только там, где отвечает сервер и человек вошёл.
+     Смена режима начинает разговор заново: прошлые реплики на сервер не уходят, иначе модель подхватит прежний тон */
+  function showModes(onChange) {
+    if (!serverMode || !getCurrentUser()) return;
+    const bar = document.createElement("div");
+    bar.className = "chat-modes";
+    bar.setAttribute("role", "group");
+    bar.setAttribute("aria-label", "О чём хотите спросить");
+    bar.innerHTML = CONSULTANT_MODES.map(function (m) {
+      return '<button type="button" class="chat-mode" data-mode="' + m.id + '" aria-pressed="' + (m.id === mode) + '">' + escapeHtml(m.label) + "</button>";
+    }).join("");
+    chat.parentNode.insertBefore(bar, chat);
+    bar.addEventListener("click", function (e) {
+      const button = e.target.closest(".chat-mode");
+      if (!button || button.dataset.mode === mode) return;
+      mode = button.dataset.mode;
+      history.length = 0;
+      bar.querySelectorAll(".chat-mode").forEach(function (b) { b.setAttribute("aria-pressed", b === button); });
+      const chosen = CONSULTANT_MODES.find(function (m) { return m.id === mode; });
+      addMessage("bot", "<p>" + escapeHtml(chosen.greeting || CONSULTANT.greeting) + "</p>");
+      if (onChange) onChange(mode);
+    });
+  }
+
+  return { addMessage: addMessage, ask: ask, setBusy: setBusy, replyHtml: replyHtml, showModes: showModes, serverMode: serverMode };
 }
 
 function setupConsultantPage() {
@@ -3868,6 +3921,9 @@ function setupConsultantPage() {
     hintsBox.hidden = true;
     return;
   }
+
+  // Примеры вопросов подходят только к вопросам по урокам
+  chat.showModes(function (mode) { hintsBox.hidden = mode !== "care"; });
 
   // Кнопки-подсказки отправляют свой текст как вопрос
   hintsBox.addEventListener("click", function (e) {
@@ -3935,6 +3991,7 @@ function setupConsultantWidget() {
       '<div class="msg-links"><a href="' + loginLinkBack() + '" class="btn btn-small btn-primary">Войти</a></div>');
   } else {
     chat.addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+    chat.showModes();
   }
 
   function setOpen(open) {

@@ -6,13 +6,21 @@
   работает как раньше. Если data.js изменили, сервер перечитает его при следующем вопросе.
 
   Поиск: слова вопроса и тем приводятся к «основе» (отрезаются русские окончания),
-  у каждой темы считается вес совпадений. Внешних библиотек нет.
+  у каждой темы считается вес совпадений. Опечатки прощаются (расстояние Левенштейна),
+  разговорные слова понимаются по словарю server/synonyms.js. Внешних библиотек нет.
 */
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const SYNONYMS = require("./synonyms");
 
 const DATA_FILE = path.join(__dirname, "..", "js", "data.js");
+
+const SYNONYM_WEIGHT = 20;    // слово вопроса из словаря темы весит больше, чем любое другое слово
+const WORD_MAX = 10;          // одно слово вопроса приносит теме не больше этого, сколько бы раз оно ни встречалось в её тексте
+const FUZZY_FACTOR = 0.6;     // слово с опечаткой весит меньше точного
+const FUZZY_MIN_WEIGHT = 2;   // опечатки ищем только среди важных слов темы: случайных совпадений в длинном тексте не нужно
+const MIN_SCORE = 4;          // тема слабее этого — считаем, что не нашлась (одно слово где-то в тексте — ещё не тема)
 
 /* Служебные слова, по которым искать бессмысленно */
 const STOP_WORDS = new Set((
@@ -21,7 +29,11 @@ const STOP_WORDS = new Set((
   "мой моя мое мои наш наша свой своя есть был была были быть будет если когда где куда чем чтобы " +
   "можно нужно надо ли ещё еще уже очень только тоже также какой какая какие каких делать сделать " +
   "что-то кто здравствуйте привет добрый день вечер пожалуйста спасибо подскажите скажите помогите вопрос " +
-  "сколько стоит стоить много мало всегда никогда сейчас потом тогда себя себе"
+  "сколько стоит стоить много мало всегда никогда сейчас потом тогда себя себе " +
+  // Слова, которые есть почти в каждой теме или ничего не говорят о теме
+  "него неё ней нельзя после перед почему зачем хочу могу может нужен нужна дела дело " +
+  "расскажи расскажите рассказать напиши напишите посоветуй посоветуйте приготовить приготовьте " +
+  "уход ухода уходу уходе ухаживать ухаживаю ухаживает"
 ).split(" "));
 
 /* Окончания — от длинных к коротким. Отрезается первое подходящее, если основа остаётся не короче 3 букв */
@@ -50,6 +62,77 @@ function stems(text) {
   return (normalize(text).match(/[а-яa-z0-9]+/g) || [])
     .filter(function (w) { return w.length >= 3 && !STOP_WORDS.has(w); })
     .map(stem);
+}
+
+/* Сколько опечаток прощаем слову: от 5 букв — одну, от 9 — две */
+function allowedErrors(word) {
+  if (word.length >= 9) return 2;
+  return word.length >= 5 ? 1 : 0;
+}
+
+/* Расстояние Левенштейна, но не больше max: дальше считать незачем, вернётся max + 1 */
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let previous = [];
+  for (let j = 0; j <= b.length; j++) previous[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (current[j] < best) best = current[j];
+    }
+    if (best > max) return max + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/* Похожи ли основы с учётом опечаток. Первая буква должна совпасть: в ней почти не ошибаются,
+   зато так «дочь» не станет «ночью». Совсем короткие основы не сравниваем */
+function isTypoOf(word, queryStem, indexStem) {
+  const max = allowedErrors(word.length <= indexStem.length + 1 ? word : word.slice(0, indexStem.length + 1));
+  if (!max || queryStem.length < 4 || indexStem.length < 4 || queryStem[0] !== indexStem[0]) return false;
+  return editDistance(queryStem, indexStem, max) <= max;
+}
+
+/* Основа слова без отбрасывания служебных: нужна для фраз словаря («не сплю», «нет сил») */
+function wordsOf(text) {
+  return (normalize(text).match(/[а-яa-z0-9]+/g) || []).map(function (w) {
+    return { word: w, stem: stem(w) };
+  });
+}
+
+/* Словарь: тема → список фраз, каждая фраза — список основ */
+const SYNONYM_PHRASES = Object.keys(SYNONYMS).map(function (id) {
+  return { id: id, phrases: SYNONYMS[id].map(wordsOf) };
+});
+
+/* Где фраза словаря стоит в вопросе: все слова подряд, с учётом окончаний и опечаток. Нет — -1 */
+function findPhrase(words, phrase) {
+  for (let i = 0; i + phrase.length <= words.length; i++) {
+    const fits = phrase.every(function (p, j) {
+      const w = words[i + j];
+      return stemsMatch(w.stem, p.stem) || isTypoOf(w.word, w.stem, p.stem);
+    });
+    if (fits) return i;
+  }
+  return -1;
+}
+
+/* Темы, чьи фразы из словаря есть в вопросе. Возвращает { id темы: основы слов вопроса, которые эти фразы покрыли } */
+function synonymHits(question) {
+  const words = wordsOf(question);
+  const hits = {};
+  SYNONYM_PHRASES.forEach(function (entry) {
+    entry.phrases.forEach(function (phrase) {
+      const at = findPhrase(words, phrase);
+      if (at === -1) return;
+      hits[entry.id] = hits[entry.id] || new Set();
+      phrase.forEach(function (p, j) { hits[entry.id].add(words[at + j].stem); });
+    });
+  });
+  return hits;
 }
 
 /* Совпадают ли основы: равны или одна начинается с другой (не короче 5 букв) — «перевяз»/«перевязк» */
@@ -82,7 +165,15 @@ function topicMaterial(topic, section) {
   return lines.join("\n\n");
 }
 
-/* Индекс темы: основа слова → вес. Название весит больше всего, потом ключевые слова, описание, остальной текст */
+/* Все пункты памяток темы: урока и справочника */
+function memoText(topic) {
+  return [topic.lessonMemo, topic.memo].map(function (memo) {
+    memo = memo || {};
+    return [].concat(memo.doList || [], memo.dontList || [], memo.urgentList || []).filter(Boolean).join(" ");
+  }).join(" ");
+}
+
+/* Индекс темы: основа слова → вес. Название весит больше всего, потом ключевые слова, памятка, вступление, остальной текст */
 function buildIndex(topic, keywords) {
   const weights = new Map();
   function addStems(list, weight, cap) {
@@ -99,6 +190,7 @@ function buildIndex(topic, keywords) {
   addText(topic.articleTitle, 3, 1);
   // Ключевые слова консультанта в data.js — уже основы («ожог», «кипят»), их не обрезаем
   addStems((keywords || []).map(normalize).filter(function (k) { return k.length >= 3; }), 5, 1);
+  addText(memoText(topic), 3, 2);
   addText(topic.description + " " + (topic.intro || ""), 2, 2);
   addText(topicMaterial(topic), 1, 3);
   return weights;
@@ -122,6 +214,7 @@ function load() {
       id: topic.id,
       title: topic.title,
       kind: topic.kind,
+      section: topic.section,
       material: topicMaterial(topic, section),
       index: buildIndex(topic, keywordsByTopic[topic.id])
     };
@@ -144,24 +237,42 @@ function sourceOf(topic) {
 /* 2–3 самые подходящие темы. Темы, которые сильно слабее лучшей, отбрасываются */
 function search(question, limit) {
   limit = limit || 3;
-  const query = Array.from(new Set(stems(question)));
-  if (!query.length) return [];
+  const words = (normalize(question).match(/[а-яa-z0-9]+/g) || [])
+    .filter(function (w) { return w.length >= 3 && !STOP_WORDS.has(w); });
+  const seen = new Set();
+  const query = words
+    .map(function (w) { return { word: w, stem: stem(w) }; })
+    .filter(function (q) {
+      if (seen.has(q.stem)) return false;
+      seen.add(q.stem);
+      return true;
+    });
+  const synonyms = synonymHits(question);
+  if (!query.length && !Object.keys(synonyms).length) return [];
 
   const scored = load().topics.map(function (topic) {
-    let score = 0;
+    const covered = synonyms[topic.id];
+    let score = covered ? SYNONYM_WEIGHT * covered.size : 0;
     query.forEach(function (q) {
+      if (covered && covered.has(q.stem)) return;
       let best = 0;
       topic.index.forEach(function (weight, s) {
-        if (weight > best && stemsMatch(q, s)) best = weight;
+        if (weight > best && stemsMatch(q.stem, s)) best = weight;
       });
-      score += best;
+      // Точного совпадения нет — ищем опечатку среди важных слов темы
+      if (!best) {
+        topic.index.forEach(function (weight, s) {
+          if (weight >= FUZZY_MIN_WEIGHT && weight * FUZZY_FACTOR > best && isTypoOf(q.word, q.stem, s)) best = weight * FUZZY_FACTOR;
+        });
+      }
+      score += Math.min(best, WORD_MAX);
     });
     return { topic: topic, score: score };
-  }).filter(function (r) { return r.score > 0; });
+  }).filter(function (r) { return r.score >= MIN_SCORE; });
 
   scored.sort(function (a, b) { return b.score - a.score; });
   const top = scored.length ? scored[0].score : 0;
-  return scored.filter(function (r) { return r.score >= top * 0.3; }).slice(0, limit).map(function (r) { return r.topic; });
+  return scored.filter(function (r) { return r.score >= top * 0.6; }).slice(0, limit).map(function (r) { return r.topic; });
 }
 
 /* Фразы «до приезда скорой…» из материалов сайта (для тревожного ответа). Сейчас таких фраз в data.js нет */
@@ -180,4 +291,4 @@ function allTopics() {
   return load().topics;
 }
 
-module.exports = { search, sourceOf, firstAidHints, allTopics, stems, stem };
+module.exports = { search, sourceOf, firstAidHints, allTopics, stems, stem, editDistance };
