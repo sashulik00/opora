@@ -4,8 +4,8 @@
   Порядок на каждый вопрос:
   1) кризисные фразы → сразу телефоны помощи, модель НЕ вызывается (все режимы);
   2) тревожные слова → сразу «звоните 103 или 112», модель НЕ вызывается (все режимы);
-  3) поиск 2–3 подходящих тем с учётом опечаток и синонимов (server/knowledge.js, server/synonyms.js);
-  4) вопрос + тексты найденных тем + список всех тем → модель Яндекса, с инструкцией выбранного режима;
+  3) поиск 2–3 подходящих тем с учётом опечаток и синонимов (server/knowledge.js, server/synonyms.js) и терминов словаря;
+  4) вопрос + определения терминов + тексты найденных тем + список всех тем → модель Яндекса, с инструкцией выбранного режима;
   5) модель не ответила → «консультант сейчас недоступен» и список найденных уроков.
   Текст вопроса в лог сервера не пишется.
 */
@@ -128,6 +128,13 @@ const REFUSAL_ANSWERS = {
   care: "На этот вопрос я сейчас ответить не смогу. Спросите, пожалуйста, у лечащего врача или посмотрите материалы школы."
 };
 
+/* Человек спрашивает определение термина или телефон: сначала словарь */
+const ASKS_DEFINITION = /что такое|что значит|что означает|что это|это что|расшифр|телефон/;
+const REFERENCE_LABEL = "Ответ из справочника школы";
+const FUND_PHONE = CRISIS_PHONES.find(function (p) { return p.tel === "117"; });
+const ASK_FUND = "Этот вопрос лучше уточнить в Социальном фонде или у социального координатора фонда «Защитники Отечества». " +
+  "Телефон фонда: " + FUND_PHONE.number + ".";
+
 const UNAVAILABLE = "Консультант сейчас недоступен. Попробуйте чуть позже, а пока посмотрите уроки по вашему вопросу:";
 const UNAVAILABLE_NO_TOPICS = "Консультант сейчас недоступен. Попробуйте чуть позже или откройте список уроков.";
 
@@ -170,11 +177,11 @@ function topicsList() {
   return knowledge.allTopics().map(function (t) { return "— " + t.title; }).join("\n");
 }
 
-/* Последнее сообщение модели: список тем, материалы (если нашлись) и сам вопрос */
-function buildMessage(message, topics) {
-  const materials = topics.length
-    ? topics.map(function (t, i) { return "[Материал " + (i + 1) + "]\n" + t.material; }).join("\n\n---\n\n")
-    : "Подходящих материалов не нашлось.";
+/* Последнее сообщение модели: список тем, материалы (если нашлись: сначала словарь, потом темы) и сам вопрос */
+function buildMessage(message, topics, glossary) {
+  const blocks = (glossary.length ? ["[Словарь сокращений]\n" + glossary.join("\n")] : [])
+    .concat(topics.map(function (t, i) { return "[Материал " + (i + 1) + "]\n" + t.material; }));
+  const materials = blocks.length ? blocks.join("\n\n---\n\n") : "Подходящих материалов не нашлось.";
   const fit = topics.length ? "ПОДХОДЯЩИЕ ТЕМЫ:\n" + topics.map(function (t) { return "— " + t.title; }).join("\n") + "\n\n---\n\n" : "";
   return "СПИСОК ТЕМ САЙТА:\n" + topicsList() + "\n\n---\n\n" + fit + "МАТЕРИАЛЫ ШКОЛЫ:\n\n" + materials + "\n\n---\n\nВОПРОС: " + message;
 }
@@ -199,6 +206,31 @@ function topicButtons(answer, topics, mode) {
   const both = named.filter(function (n) { return topics.some(function (t) { return t.id === n.id; }); });
   if (both.length) return both;
   return topics.length && mode !== "support" ? topics : named;
+}
+
+/*
+  Что ответить вместо отказа модели. Срочный вопрос и разговор о самочувствии — готовые фразы: справочник тут не ответ.
+  Иначе — лучшее совпадение из частых вопросов и словаря с кнопкой на статью.
+  Совпадения нет: медицинскую тему отправляем к врачу, остальное — в Социальный фонд и к координатору фонда
+*/
+function refusalReply(message, mode, urgent, topics, glossary) {
+  const buttons = topics.slice(0, TOPIC_BUTTONS_MAX).map(knowledge.sourceOf);
+  if (mode !== "care" || urgent) {
+    return { type: "answer", mode: mode, answer: REFUSAL_ANSWERS[urgent ? "urgent" : mode], sources: buttons };
+  }
+  const definition = glossary.length && ASKS_DEFINITION.test(message.toLowerCase());
+  const found = definition ? { text: glossary.join("\n"), topicId: null } : knowledge.searchReference(message, topics);
+  if (found) {
+    const topicId = found.topicId || (topics[0] && topics[0].id);
+    return {
+      type: "answer",
+      mode: mode,
+      answer: REFERENCE_LABEL + "\n\n" + found.text,
+      sources: topicId ? [knowledge.articleSourceOf(topicId)] : [{ title: "Словарь сокращений", kind: "article", url: "rights.html" }]
+    };
+  }
+  const legal = !topics.length || topics[0].section === "legal";
+  return { type: "answer", mode: mode, answer: legal ? ASK_FUND : REFUSAL_ANSWERS.care, sources: buttons };
 }
 
 /*
@@ -232,17 +264,19 @@ async function answerQuestion(message, history, callModel, options) {
   // В разговоре о самочувствии медицинские материалы ни к чему
   const topics = mode === "support" ? found.filter(function (t) { return t.section === "psychology"; }) : found;
   const sources = topics.map(knowledge.sourceOf);
-  const input = history.concat({ role: "user", content: buildMessage(message, topics) });
+  const glossary = mode === "support" ? [] : knowledge.searchGlossary(message);
+  const input = history.concat({ role: "user", content: buildMessage(message, topics, glossary) });
 
   let instructions = INSTRUCTIONS[mode];
   if (mode === "support") instructions = supportInstructions(await summaryOrNothing(options.userId, options.db));
-  if (mode === "care" && URGENT_WORDS.test(message.toLowerCase().replace(/ё/g, "е"))) instructions = INSTRUCTIONS.urgent;
+  const urgent = mode === "care" && URGENT_WORDS.test(message.toLowerCase().replace(/ё/g, "е"));
+  if (urgent) instructions = INSTRUCTIONS.urgent;
 
   try {
     const answer = await callModel(instructions, input);
     if (MODEL_REFUSAL.test(answer.toLowerCase().replace(/ё/g, "е"))) {
       console.error("[Консультант] модель отказалась отвечать");
-      return { type: "answer", mode: mode, answer: REFUSAL_ANSWERS[mode], sources: sources.slice(0, TOPIC_BUTTONS_MAX) };
+      return refusalReply(message, mode, urgent, topics, glossary);
     }
     return { type: "answer", mode: mode, answer: answer, sources: topicButtons(answer, topics, mode).slice(0, TOPIC_BUTTONS_MAX).map(knowledge.sourceOf) };
   } catch (e) {

@@ -2,7 +2,7 @@
   Знания консультанта — тексты тем из js/data.js.
 
   Как сервер читает data.js: файл выполняется как есть в отдельной «песочнице» (модуль vm),
-  и оттуда забираются TOPICS, SECTIONS и CONSULTANT. Сам data.js не меняется — сайт в браузере
+  и оттуда забираются TOPICS, SECTIONS, CONSULTANT и GLOSSARY. Сам data.js не меняется — сайт в браузере
   работает как раньше. Если data.js изменили, сервер перечитает его при следующем вопросе.
 
   Поиск: слова вопроса и тем приводятся к «основе» (отрезаются русские окончания),
@@ -13,6 +13,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 const SYNONYMS = require("./synonyms");
+const { CRISIS_PHONES } = require("../js/phones");
 
 const DATA_FILE = path.join(__dirname, "..", "js", "data.js");
 
@@ -26,7 +27,7 @@ const MIN_SCORE = 4;          // тема слабее этого — счита
 const STOP_WORDS = new Set((
   "и в во не на с со по за из к ко у о об от до для при без над под про а но да или ли же бы то " +
   "что как так это этот эта эти тот та те он она оно они мы вы я ты его ее их мне меня нам нас вам вас " +
-  "мой моя мое мои наш наша свой своя есть был была были быть будет если когда где куда чем чтобы " +
+  "мой моя мое мои наш наша свой своя свое свою свои своих своим своими своей своего своему своем есть был была были быть будет если когда где куда чем чтобы " +
   "можно нужно надо ли ещё еще уже очень только тоже также какой какая какие каких делать сделать " +
   "что-то кто здравствуйте привет добрый день вечер пожалуйста спасибо подскажите скажите помогите вопрос " +
   "сколько стоит стоить много мало всегда никогда сейчас потом тогда себя себе " +
@@ -143,7 +144,7 @@ function stemsMatch(a, b) {
   return short.length >= 5 && long.startsWith(short);
 }
 
-/* Весь текст темы для модели: описание, подробности, памятки, частые вопросы (без теста) */
+/* Весь текст темы для модели: описание, подробности, статья, памятки, частые вопросы (без теста) */
 function topicMaterial(topic, section) {
   const lines = ["Тема: " + topic.title + (section ? " (" + section.title + ")" : "")];
   function add(label, value) {
@@ -159,6 +160,7 @@ function topicMaterial(topic, section) {
   add("Кратко", topic.description);
   add("Введение", topic.intro);
   add("Подробно", (topic.details || []).join("\n"));
+  add("Статья", (topic.article || []).map(function (part) { return part.heading + "\n" + part.text.join("\n"); }).join("\n\n"));
   addMemo("Памятка урока", topic.lessonMemo);
   addMemo("Памятка справочника", topic.memo);
   add("Частые вопросы", (topic.faq || []).filter(function (f) { return f && f.q; }).map(function (f) { return f.q + " " + f.a; }));
@@ -204,7 +206,7 @@ function load() {
   if (cache && cache.mtime === mtime) return cache;
 
   const code = fs.readFileSync(DATA_FILE, "utf8");
-  const data = vm.runInNewContext(code + "\n;({ TOPICS: TOPICS, SECTIONS: SECTIONS, CONSULTANT: CONSULTANT })", {}, { filename: "data.js" });
+  const data = vm.runInNewContext(code + "\n;({ TOPICS: TOPICS, SECTIONS: SECTIONS, CONSULTANT: CONSULTANT, GLOSSARY: GLOSSARY })", {}, { filename: "data.js" });
   const keywordsByTopic = {};
   ((data.CONSULTANT && data.CONSULTANT.answers) || []).forEach(function (a) { keywordsByTopic[a.topicId] = a.keywords; });
 
@@ -219,8 +221,93 @@ function load() {
       index: buildIndex(topic, keywordsByTopic[topic.id])
     };
   });
-  cache = { mtime: mtime, topics: topics };
+  const glossary = data.GLOSSARY.map(function (item) {
+    const phone = CRISIS_PHONES.find(function (p) { return p.tel === item.phone; });
+    const names = [item.term].concat(item.keywords || []);
+    return {
+      text: item.term + " — " + item.text + (phone ? " Телефон: " + phone.number : ""),
+      phrases: names.map(wordsOf),
+      questionStems: stems(names.join(" ")),
+      answerStems: stems(item.text)
+    };
+  });
+  const faq = [];
+  topics.forEach(function (topic, i) {
+    (data.TOPICS[i].faq || []).filter(function (f) { return f && f.q; }).forEach(function (f) {
+      faq.push({
+        text: "«" + f.q + "»\n" + f.a,
+        topicId: topic.id,
+        keywords: (f.keywords || []).map(wordsOf),
+        questionStems: stems(f.q),
+        answerStems: stems(f.a)
+      });
+    });
+  });
+  cache = { mtime: mtime, topics: topics, glossary: glossary, faq: faq };
   return cache;
+}
+
+/* Есть ли термин в вопросе. Короткое сокращение — только точным словом: основа «СВО» совпала бы с «свой», «свои» */
+function hasTerm(words, phrase) {
+  if (phrase.length === 1 && phrase[0].word.length <= 3) {
+    return words.some(function (w) { return w.word === phrase[0].word; });
+  }
+  return findPhrase(words, phrase) !== -1;
+}
+
+/* Определения из словаря для терминов, названных в вопросе: строки «Термин — пояснение» */
+function searchGlossary(question) {
+  const words = wordsOf(question);
+  return load().glossary
+    .filter(function (item) { return item.phrases.some(function (phrase) { return hasTerm(words, phrase); }); })
+    .map(function (item) { return item.text; });
+}
+
+/* Слова о том, кто спрашивает и что хочет сделать, а не о чём вопрос: «как получить жильё участнику СВО» — вопрос о жилье */
+const NOT_SUBJECT = stems("участник сво ветеран боец бойца раненый ранение получить оформить обратиться положены нужны");
+
+/*
+  Лучшее совпадение среди частых вопросов и словаря: ответ сайта, если модель отказалась.
+  Слово вопроса приносит 2 балла, если оно есть в самом частом вопросе или в названии термина, и 1 — если только в ответе.
+  Ключевая фраза частого вопроса (keywords) приносит 2 балла, даже если её слова выше не считаются.
+  Частый вопрос подходит, если совпало слово его вопроса или ключевая фраза и при этом он из найденной темы либо набрал не меньше половины баллов.
+  Термин словаря — так же, но ещё он должен быть назван в вопросе целиком: иначе «операция» найдёт «СВО».
+  При равенстве выше запись, где совпало больше слов вопроса (и те, что не считаются выше), с более редким словом, из темы выше в поиске.
+  Возвращает { text, topicId } или null
+*/
+function searchReference(question, foundTopics) {
+  const words = wordsOf(question);
+  const allStems = Array.from(new Set(stems(question)));
+  const query = allStems.filter(function (s) {
+    return !NOT_SUBJECT.some(function (x) { return stemsMatch(s, x); });
+  });
+  const data = load();
+  const entries = data.faq.concat(data.glossary);
+  function has(list, s) { return list.some(function (x) { return stemsMatch(s, x); }); }
+  function rarity(s) {
+    return 1 / Math.max(1, entries.filter(function (e) { return has(e.questionStems, s) || has(e.answerStems, s); }).length);
+  }
+  let best = null;
+  entries.forEach(function (entry) {
+    if (entry.phrases && !entry.phrases.some(function (phrase) { return hasTerm(words, phrase); })) return;
+    const inQuestion = query.filter(function (s) { return has(entry.questionStems, s); });
+    const byKeyword = (entry.keywords || []).some(function (phrase) { return hasTerm(words, phrase); }) ? 2 : 0;
+    if (!inQuestion.length && !byKeyword) return;
+    const inAnswer = query.filter(function (s) { return !has(entry.questionStems, s) && has(entry.answerStems, s); });
+    const score = inQuestion.length * 2 + inAnswer.length + byKeyword;
+    const rank = foundTopics.findIndex(function (t) { return t.id === entry.topicId; });
+    if (rank === -1 && score < query.length) return;
+    const fullMatch = allStems.filter(function (s) { return has(entry.questionStems, s); }).length;
+    const value = score + fullMatch * 0.3 + inQuestion.reduce(function (sum, s) { return sum + rarity(s); }, 0) + (rank === -1 ? 0 : (foundTopics.length - rank) * 0.1);
+    if (!best || value > best.value) best = { value: value, text: entry.text, topicId: entry.topicId || null };
+  });
+  return best && { text: best.text, topicId: best.topicId };
+}
+
+/* Ссылка на статью темы, в том числе темы-урока */
+function articleSourceOf(topicId) {
+  const topic = load().topics.find(function (t) { return t.id === topicId; });
+  return { topicId: topic.id, title: topic.title, kind: "article", url: "article.html?id=" + encodeURIComponent(topic.id) };
 }
 
 /* Ссылка на тему: урок — на страницу урока, тема справочника — на статью */
@@ -259,12 +346,10 @@ function search(question, limit) {
       topic.index.forEach(function (weight, s) {
         if (weight > best && stemsMatch(q.stem, s)) best = weight;
       });
-      // Точного совпадения нет — ищем опечатку среди важных слов темы
-      if (!best) {
-        topic.index.forEach(function (weight, s) {
-          if (weight >= FUZZY_MIN_WEIGHT && weight * FUZZY_FACTOR > best && isTypoOf(q.word, q.stem, s)) best = weight * FUZZY_FACTOR;
-        });
-      }
+      // Опечатка в важном слове темы может весить больше точного совпадения где-то в длинном тексте
+      topic.index.forEach(function (weight, s) {
+        if (weight >= FUZZY_MIN_WEIGHT && weight * FUZZY_FACTOR > best && isTypoOf(q.word, q.stem, s)) best = weight * FUZZY_FACTOR;
+      });
       score += Math.min(best, WORD_MAX);
     });
     return { topic: topic, score: score };
@@ -291,4 +376,4 @@ function allTopics() {
   return load().topics;
 }
 
-module.exports = { search, sourceOf, firstAidHints, allTopics, stems, stem, editDistance };
+module.exports = { search, searchGlossary, searchReference, articleSourceOf, sourceOf, firstAidHints, allTopics, stems, stem, editDistance };

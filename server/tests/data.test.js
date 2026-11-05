@@ -10,8 +10,8 @@ const vm = require("vm");
 const context = {};
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "..", "js", "data.js"), "utf8") +
-  ";this.TOPICS = TOPICS; this.SECTIONS = SECTIONS; this.CONSULTANT = CONSULTANT; this.WELLBEING = WELLBEING;", context);
-const { TOPICS, SECTIONS, CONSULTANT, WELLBEING } = context;
+  ";this.TOPICS = TOPICS; this.SECTIONS = SECTIONS; this.CONSULTANT = CONSULTANT; this.WELLBEING = WELLBEING; this.GLOSSARY = GLOSSARY;", context);
+const { TOPICS, SECTIONS, CONSULTANT, WELLBEING, GLOSSARY } = context;
 
 test("в описаниях разделов и ответах консультанта нет заглушек", function () {
   SECTIONS.forEach(function (s) {
@@ -88,3 +88,31 @@ test("у тем справочника статья прежняя: поля art
     expect(t.details.length).toBeGreaterThan(0);
   });
 });
+
+test("словарь: 10 терминов, номер телефона только из js/phones.js", function () {
+  const { CRISIS_PHONES } = require("../../js/phones");
+  expect(GLOSSARY).toHaveLength(10);
+  GLOSSARY.forEach(function (item) {
+    expect(item.term.length).toBeGreaterThan(0);
+    expect(item.text.length).toBeGreaterThan(0);
+    if (item.phone) expect(CRISIS_PHONES.map(function (p) { return p.tel; })).toContain(item.phone);
+  });
+  expect(GLOSSARY.filter(function (item) { return item.phone; }).map(function (item) { return item.term; })).toEqual(["Фонд «Защитники Отечества»"]);
+  expect(JSON.stringify(GLOSSARY)).not.toMatch(/8-800|затем 1/);
+});
+
+test("новые ответы и источник на месте", function () {
+  const topic = function (id) { return TOPICS.find(function (t) { return t.id === id; }); };
+  const questions = function (id) { return topic(id).faq.map(function (f) { return f.q; }); };
+  expect(questions("disability")).toContain("Что такое «военная травма» и почему важна формулировка?");
+  expect(questions("prosthetics")).toContain("Нужно ли участнику СВО писать заявление на средства реабилитации?");
+  expect(questions("prosthetics")).toContain("Где можно потратить сертификат?");
+  expect(questions("payments")).toEqual(expect.arrayContaining(["Какие выплаты положены при ранении?", "Какие льготы положены участникам СВО?"]));
+  expect(questions("documents")).toContain("Как получить удостоверение ветерана боевых действий?");
+  const paymentsSources = topic("payments").sources.map(function (s) { return s.url; });
+  expect(paymentsSources).toContain("https://legalacts.ru/doc/ukaz-prezidenta-rf-ot-05032022-n-98-o-dopolnitelnykh/");
+  expect(paymentsSources.join(" ")).not.toContain("harant");
+  expect(topic("prosthetics").sources.map(function (s) { return s.url; })).toContain(
+    "https://xn--90aivcdt6dxbc.xn--p1ai/articles/news/poryadok-vydachi-sredstv-reabilitatsii-dlya-uchastnikov-svo-uproshchen/");
+});
+

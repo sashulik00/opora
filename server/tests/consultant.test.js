@@ -163,7 +163,7 @@ describe("отказ модели человеку не показывается
   test.each([
     ["support", "уже месяц так, никто не помогает", /Слышу вас/],
     ["urgent", "повязка промокла кровью", /позвоните лечащему врачу или в 103/],
-    ["care", "Как обрабатывать ожог?", /Спросите, пожалуйста, у лечащего врача/]
+    ["care", "Как обрабатывать ожог?", /Ответ из справочника школы/]
   ])("режим %s", async function (mode, message, expected) {
     const log = jest.spyOn(console, "error").mockImplementation(function () {});
     const { agent } = await setup(okModel(REFUSAL));
@@ -293,6 +293,142 @@ describe("поиск тем: опечатки и синонимы", function () 
     expect(knowledge.editDistance("абвгд", "еёжзи", 1)).toBe(2);
     expect(found("сын")).toContain("children");
     expect(found("сан")).not.toContain("children");  // в слове из 3 букв опечатку не прощаем
+  });
+});
+
+describe("словарь и статьи в поиске", function () {
+  const knowledge = require("../knowledge");
+  const { answerQuestion } = require("../consultant");
+  const terms = function (text) { return knowledge.searchGlossary(text).map(function (t) { return t.split(" — ")[0]; }); };
+
+  test.each([
+    ["что такое ИПРА", "ИПРА"],
+    ["ипра это что", "ИПРА"],
+    ["Что значит МСЭ?", "МСЭ"],
+    ["расшифруйте ВВК", "ВВК"],
+    ["где потратить сертификат", "Электронный сертификат"],
+    ["какие средства реабилитации положены", "ТСР"],
+    ["телефон фонда Защитники Отечества", "Фонд «Защитники Отечества»"],
+    ["что такое СВО", "СВО"]
+  ])("«%s» находит термин %s", function (text, term) {
+    expect(terms(text)).toContain(term);
+  });
+
+  test("обычные слова терминами не считаются", function () {
+    ["свой протез", "мои свои дела", "как уговорить сына", "болит рана"].forEach(function (text) {
+      expect(terms(text)).toEqual([]);
+    });
+  });
+
+  test("у фонда номер из js/phones.js", function () {
+    expect(knowledge.searchGlossary("Защитники Отечества")[0]).toMatch(/Телефон: 117, затем 1$/);
+  });
+
+  test("определение идёт в материалы модели, даже если темы не нашлись", async function () {
+    let seen = "";
+    const result = await answerQuestion("что такое СВО", [], async function (instructions, input) {
+      seen = input[input.length - 1].content;
+      return "Специальная военная операция.";
+    });
+    expect(result.type).toBe("answer");
+    expect(seen).toContain("СВО — специальная военная операция.");
+    expect(seen).not.toContain("Подходящих материалов не нашлось");
+  });
+
+  describe("модель отказалась", function () {
+    const refuse = async function () { return "Я не могу обсуждать эту тему."; };
+    const ask = function (text, options) { return answerQuestion(text, [], refuse, options); };
+
+    test("вопрос об определении или телефоне — словарь, с подписью", async function () {
+      const definition = await ask("что такое СВО");
+      expect(definition.answer).toBe("Ответ из справочника школы\n\nСВО — специальная военная операция.");
+      const phone = await ask("телефон фонда Защитники Отечества");
+      expect(phone.answer).toMatch(/Телефон: 117, затем 1$/);
+    });
+
+    test.each([
+      ["нужно ли участнику СВО писать заявление на средства реабилитации", "Нужно ли участнику СВО писать заявление", "prosthetics"],
+      ["нужно ли ветерану писать заявление на средства реабилитации", "Нужно ли участнику СВО писать заявление", "prosthetics"],
+      ["какие выплаты положены при ранении", "Какие выплаты положены при ранении?", "payments"],
+      ["какие льготы положены участникам СВО", "Какие льготы положены участникам СВО?", "payments"],
+      ["какие льготы положены участникам боевых действий", "Какие льготы положены участникам СВО?", "payments"],
+      ["как получить удостоверение ветерана", "Как получить удостоверение ветерана боевых действий?", "documents"],
+      ["куда обращаться за выплатами", "Куда обращаться за выплатами?", "payments"],
+      ["какие компенсации за ранение", "Какие выплаты положены при ранении?", "payments"],
+      ["сколько платят за ранение", "Какие выплаты положены при ранении?", "payments"],
+      ["сколько дают за ранение", "Какие выплаты положены при ранении?", "payments"]
+    ])("«%s» — частый вопрос и кнопка на статью", async function (text, faq, topicId) {
+      const reply = await ask(text);
+      expect(reply.answer).toMatch(/^Ответ из справочника школы\n\n«/);
+      expect(reply.answer).toContain(faq);
+      expect(reply.sources).toEqual([expect.objectContaining({ topicId: topicId, url: "article.html?id=" + topicId })]);
+      expect(reply.answer).not.toMatch(/врач/);
+    });
+
+    test("тема-урок: кнопка всё равно на статью", async function () {
+      const reply = await ask("Можно ли вскрывать пузыри на ожоге?");
+      expect(reply.sources[0].url).toBe("article.html?id=burns");
+    });
+
+    test("правовой вопрос без подходящего ответа — Социальный фонд и телефон фонда, без врача", async function () {
+      const reply = await ask("как оформить пенсию");
+      expect(reply.answer).toBe("Этот вопрос лучше уточнить в Социальном фонде или у социального координатора фонда «Защитники Отечества». Телефон фонда: 117, затем 1.");
+    });
+
+    test.each([
+      ["куда обратиться участнику СВО"],
+      ["как получить жильё участнику СВО"],
+      ["как оформить пенсию ветерану"]
+    ])("«%s» — слова об участнике и о получении ответ не подбирают", async function (text) {
+      expect((await ask(text)).answer).toMatch(/^Этот вопрос лучше уточнить в Социальном фонде/);
+    });
+
+    test("слово из названия термина не находит термин: «операция» — не СВО", async function () {
+      const reply = await ask("чем кормить после операции");
+      expect(reply.answer).not.toContain("специальная военная операция");
+      expect(reply.answer).toMatch(/лечащего врача/);
+    });
+
+    test("при равенстве побеждает более редкое слово", async function () {
+      expect((await ask("что делать если отказали в выплате")).answer).toContain("Что делать при отказе?");
+    });
+
+    test("термин без темы: кнопка на словарь", async function () {
+      const reply = await ask("что такое СВО");
+      expect(reply.sources[0].url).toMatch(/^(rights\.html|article\.html\?id=\w+)$/);
+    });
+
+    test("срочный вопрос справочником не отвечаем", async function () {
+      expect((await ask("из раны идёт кровь")).answer).toMatch(/позвоните лечащему врачу или в 103/);
+      expect((await ask("из раны идёт кровь", { mode: "urgent" })).answer).toMatch(/позвоните лечащему врачу или в 103/);
+    });
+
+    test("в режиме «поговорить» справочником не отвечаем", async function () {
+      expect((await ask("что такое ИПРА", { mode: "support" })).answer).toMatch(/Слышу вас/);
+    });
+  });
+
+  test("«СВО» не тянет темы со словом «свою»", function () {
+    expect(knowledge.search("что такое СВО").map(function (t) { return t.id; })).not.toContain("aggression");
+  });
+
+  test("в режиме «поговорить» словарь модели не передаётся", async function () {
+    let seen = "";
+    await answerQuestion("что такое ИПРА", [], async function (instructions, input) {
+      seen = input[input.length - 1].content;
+      return "Слышу вас.";
+    }, { mode: "support" });
+    expect(seen).not.toContain("[Словарь сокращений]");
+  });
+
+  test("редкое слово из статьи не мешает опечатке найти важное слово темы", function () {
+    expect(knowledge.search("скользкий пол в ванной").map(function (t) { return t.id; })).toContain("mobility");
+  });
+
+  test("текст статьи попадает в материал темы и в поиск", function () {
+    const bedsores = knowledge.allTopics().find(function (t) { return t.id === "bedsores"; });
+    expect(bedsores.material).toContain("надувные круги и бублики");
+    expect(bedsores.index.has(knowledge.stem("бублики"))).toBe(true);
   });
 });
 

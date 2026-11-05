@@ -3676,6 +3676,18 @@ function renderArticleCard(topic, index) {
 
 /* ---------- Справочник: Частые вопросы (faq.html) ---------- */
 
+/* Вопросы аккордеоном: свёрнуты, раскрываются по нажатию */
+function renderFaqItems(faq) {
+  return faq.filter(function (f) { return f && f.q; }).map(function (f) {
+    return (
+      '<details class="faq-item">' +
+        "<summary>" + escapeHtml(f.q) + "</summary>" +
+        '<div class="faq-answer"><p>' + escapeHtml(f.a || "") + "</p></div>" +
+      "</details>"
+    );
+  }).join("");
+}
+
 function setupFaqPage() {
   const list = document.getElementById("faq-list");
   if (!list) return;
@@ -3695,14 +3707,7 @@ function setupFaqPage() {
         '<section class="faq-topic">' +
           '<p class="tile-section">' + escapeHtml(sectionOf(t).title) + "</p>" +
           "<h2>" + escapeHtml(t.title) + "</h2>" +
-          t.faq.filter(function (f) { return f && f.q; }).map(function (f) {
-            return (
-              '<details class="faq-item">' +
-                "<summary>" + escapeHtml(f.q) + "</summary>" +
-                '<div class="faq-answer"><p>' + escapeHtml(f.a || "") + "</p></div>" +
-              "</details>"
-            );
-          }).join("") +
+          renderFaqItems(t.faq) +
         "</section>"
       );
     }).join("");
@@ -3756,7 +3761,14 @@ function renderArticleSections(topic) {
   );
 }
 
-/* Статья справочной темы: вводный абзац, абзацы details и источники */
+/* Частые вопросы темы под текстом статьи */
+function renderArticleFaq(topic) {
+  return hasItems(topic.faq)
+    ? '<section class="article-faq"><h2>Частые вопросы</h2>' + renderFaqItems(topic.faq) + "</section>"
+    : "";
+}
+
+/* Статья справочной темы: вводный абзац, абзацы details, частые вопросы и источники */
 function renderReferenceArticle(topic) {
   return (
     renderIntro(topic) +
@@ -3765,11 +3777,12 @@ function renderReferenceArticle(topic) {
           topic.details.filter(Boolean).map(function (p) { return "<p>" + escapeHtml(p) + "</p>"; }).join("") +
         "</div>"
       : renderSoon("Статья скоро появится")) +
+    renderArticleFaq(topic) +
     renderSources(topic)
   );
 }
 
-/* article.html — только текст статьи и кнопки: Памятка (окно), Видео по теме, Урок по теме.
+/* article.html — текст статьи, частые вопросы и кнопки: Памятка (окно), Видео по теме, Урок по теме.
    article.html?id=ID&memo=1 открывает памятку сразу */
 function renderArticlePage() {
   const page = document.getElementById("article-page");
@@ -3786,7 +3799,7 @@ function renderArticlePage() {
       (hasVideo(topic) ? '<a href="' + videoLink(topic) + '" class="btn btn-secondary">Видео по теме</a>' : "") +
       (isLesson(topic) ? '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-secondary">Урок по теме</a>' : "") +
     "</div>" +
-    (hasItems(topic.article) ? renderArticleSections(topic) : renderReferenceArticle(topic));
+    (hasItems(topic.article) ? renderArticleSections(topic) + renderArticleFaq(topic) : renderReferenceArticle(topic));
 
   if (!memoBlocks) return;
   const openModal = createPageModal();
@@ -4399,6 +4412,12 @@ function getConsultantReply(question, history, mode) {
 }
 
 /* Текст ответа ИИ → абзацы (пустая строка — новый абзац, перенос строки — <br>) */
+/* Номер фонда в готовом ответе — ссылкой tel:, как на странице «Поддержка» */
+function linkFundPhone(html) {
+  const phone = CRISIS_PHONES.find(function (p) { return p.tel === "117"; });
+  return html.split(escapeHtml(phone.number)).join('<a href="tel:' + escapeHtml(phone.tel) + '">' + escapeHtml(phone.number) + "</a>");
+}
+
 function formatAnswer(text) {
   return String(text || "")
     .replace(/\*\*/g, "")                       // жирный из Markdown просто убираем
@@ -4411,7 +4430,7 @@ function formatAnswer(text) {
 
 /* Адрес темы из ответа сервера: только страница урока или статьи */
 function sourceUrl(source) {
-  return /^(lesson|article)\.html\?id=[\w-]+$/.test(source.url || "") ? source.url : "lesson.html?id=" + encodeURIComponent(source.topicId);
+  return /^((lesson|article)\.html\?id=[\w-]+|rights\.html)$/.test(source.url || "") ? source.url : "lesson.html?id=" + encodeURIComponent(source.topicId);
 }
 
 /* «Источники: урок «Ожоги», статья «Выплаты и льготы»» */
@@ -4508,7 +4527,7 @@ function createConsultantChat(parts) {
       );
     }
     if (reply.type === "error") return "<p>" + escapeHtml(reply.text) + "</p>";
-    if (serverMode) return formatAnswer(reply.answer) + topicLinksHtml(reply);
+    if (serverMode) return linkFundPhone(formatAnswer(reply.answer)) + topicLinksHtml(reply);
 
     // Без сервера — как раньше
     if (reply.type === "alarm") {
@@ -4805,6 +4824,23 @@ function setupRightsPage() {
   show();
 }
 
+/* Словарь сокращений под сеткой. Номер телефона берётся из js/phones.js */
+function renderGlossary() {
+  const list = document.getElementById("glossary-list");
+  if (!list) return;
+  list.innerHTML = GLOSSARY.map(function (item) {
+    const phone = CRISIS_PHONES.find(function (p) { return p.tel === item.phone; });
+    return (
+      "<div>" +
+        "<dt>" + escapeHtml(item.term) + "</dt>" +
+        "<dd>" + escapeHtml(item.text) +
+          (phone ? ' Телефон: <a href="tel:' + escapeHtml(phone.tel) + '">' + escapeHtml(phone.number) + "</a>" : "") +
+        "</dd>" +
+      "</div>"
+    );
+  }).join("");
+}
+
 /* ---------- Запуск ---------- */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -4824,6 +4860,7 @@ function startPage() {
   renderPracticePage();
   renderTestPage();
   setupRightsPage();
+  renderGlossary();
   setupReferencePage();
   setupVideosPage();
   renderArticlesPage();

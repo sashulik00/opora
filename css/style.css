@@ -1138,6 +1138,23 @@ html.modal-open {
   .rights-row-title { font-size: 1.2rem; }
 }
 
+/* Словарь сокращений */
+.glossary { margin-top: 36px; }
+.glossary h2 { margin-bottom: 14px; font-size: 1.4rem; }
+.glossary-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 40px;
+  margin: 0;
+}
+.glossary-list dt { font-size: 0.95rem; font-weight: bold; line-height: 1.3; }
+.glossary-list dd { margin: 2px 0 0; font-size: 0.85rem; line-height: 1.35; }
+.glossary-list a { white-space: nowrap; }
+@media (max-width: 600px) {
+  .glossary-list { grid-template-columns: minmax(0, 1fr); }
+  .glossary-list dd { font-size: 0.95rem; }
+}
+
 /* Подробности в окне */
 .page-modal .lesson-modal-head h2 { line-height: 1.25; }
 .page-modal .rights-block:first-child { margin-top: 0; }
@@ -1222,6 +1239,9 @@ html.modal-open {
 .article-text p:last-child { margin-bottom: 0; }
 .article-text h2 { margin: 1.4em 0 0.5em; font-size: 1.4rem; line-height: 1.25; }
 .article-text h2:first-child { margin-top: 0; }
+
+.article-faq { margin-top: 28px; }
+.article-faq h2 { margin-bottom: 12px; font-size: 1.4rem; }
 
 /* Раздел «Видео» */
 .videos-group { margin-top: 32px; }

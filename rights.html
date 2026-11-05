@@ -24,6 +24,12 @@
 
         <!-- Карточки-ситуации строятся из js/main.js по массиву RIGHTS в js/data.js -->
         <div id="rights-list" class="rights-list"></div>
+
+        <!-- Словарь из GLOSSARY в js/data.js, телефон из js/phones.js -->
+        <section class="glossary" aria-labelledby="glossary-title">
+          <h2 id="glossary-title">Словарь сокращений</h2>
+          <dl class="glossary-list" id="glossary-list"></dl>
+        </section>
       </div>
     </section>
   </main>
@@ -31,6 +37,7 @@
   <footer id="site-footer" class="site-footer"></footer>
 
   <script src="js/data.js"></script>
+  <script src="js/phones.js"></script>
   <!-- Вход и прогресс: сервер или память браузера (до main.js) -->
   <script src="js/store.js"></script>
   <script src="js/main.js"></script>
