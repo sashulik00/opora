@@ -351,12 +351,68 @@ function setupLoginPage() {
 
 /* ---------- Страница «Уроки» ---------- */
 
+/* --- Прогресс урока: все цифры на сайте (главная, список уроков, кабинет) считаются здесь --- */
+const STATUS_NEW = "Не начат";
+const STATUS_ACTIVE = "В процессе";
+const STATUS_TEST_PASSED = "Тест сдан";
+const STATUS_PASSED = "Пройден";
+
+/* Тест сдан: есть отметка о зачёте или лучший результат не ниже порога */
+function isTestPassed(record) {
+  return Boolean(record && (record.passed || record.best / record.total >= PASS_RATE));
+}
+
+/* Прогресс темы. steps — задания практики и тест, done — сколько из них сделано.
+   «Пройден» — сделано всё; «Тест сдан» — тест сдан, но практика ещё не вся;
+   «В процессе» — выполнено задание или тест пройден, но не сдан.
+   passed — сдан ли тест: по нему считается зачёт урока (счётчик «Пройдено N из 10», «Продолжить обучение») */
+function lessonProgress(topic, progress) {
+  const record = progress[topic.id];
+  const tasks = practiceTasks(topic).length;
+  const tasksDone = countTasksDone(topic, progress);
+  const passed = isTestPassed(record);
+  let status = tasksDone || record ? STATUS_ACTIVE : STATUS_NEW;
+  if (passed) status = tasksDone === tasks ? STATUS_PASSED : STATUS_TEST_PASSED;
+  return {
+    steps: tasks + 1,
+    done: tasksDone + (passed ? 1 : 0),
+    status: status,
+    tasks: tasks,
+    tasksDone: tasksDone,
+    passed: passed
+  };
+}
+
+/* Первый по порядку урок, который ещё не пройден; все пройдены — null.
+   Сюда ведут «Продолжить обучение» на главной и «Продолжить» в кабинете */
+function firstUnfinishedLesson(progress) {
+  return LESSONS.find(function (t) { return !lessonProgress(t, progress).passed; }) || null;
+}
+
 /* Сколько уроков пройдено по сохранённому прогрессу.
    Считаются только уроки: старые записи по темам справочника остаются в памяти, но не учитываются */
 function countPassed(progress) {
   return LESSONS.filter(function (t) {
-    return progress[t.id] && progress[t.id].passed;
+    return lessonProgress(t, progress).passed;
   }).length;
+}
+
+/* Кнопка на главной: вошёл и есть прогресс — «Продолжить обучение», всё пройдено — «К урокам», иначе — «Начать обучение» */
+function renderHomeStartButton() {
+  const button = document.getElementById("home-start");
+  if (!button) return;
+  const progress = getProgress();
+  const started = Boolean(getCurrentUser()) && LESSONS.some(function (t) {
+    return lessonProgress(t, progress).status !== STATUS_NEW;
+  });
+  const next = firstUnfinishedLesson(progress);
+  if (started && !next) {
+    button.textContent = "К урокам";
+    button.href = "lessons.html";
+    return;
+  }
+  button.textContent = started ? "Продолжить обучение" : "Начать обучение";
+  button.href = "lesson.html?id=" + encodeURIComponent((started ? next : LESSONS[0]).id);
 }
 
 /* Полоса прогресса «Пройдено N из M» — общая для «Уроков» и кабинета.
@@ -394,8 +450,26 @@ function renderLessonsPage() {
   page.innerHTML = html;
 }
 
-/* Список всех уроков по разделам: номер, название, описание, статус и лучший результат.
-   Разделы без уроков (сейчас «Социально-правовая помощь») не показываются */
+/* Карточка урока: номер, название, описание, полоска прогресса и строка «В процессе · 3 из 6», «Тест сдан ✓ · 2 из 6» */
+function renderLessonCard(topic, progress) {
+  const state = lessonProgress(topic, progress);
+  const text = state.status === STATUS_NEW ? state.status
+    : state.status + (state.passed ? " ✓" : "") + " · " + state.done + " из " + state.steps;
+  return (
+    '<a class="card lesson-card' + (state.passed ? " is-passed" : "") + '" href="lesson.html?id=' + encodeURIComponent(topic.id) + '">' +
+      '<span class="lesson-num">Урок ' + (LESSONS.indexOf(topic) + 1) + "</span>" +
+      "<h3>" + escapeHtml(topic.title) + "</h3>" +
+      "<p>" + escapeHtml(topic.description) + "</p>" +
+      '<div class="lesson-bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + state.steps +
+        '" aria-valuenow="' + state.done + '" aria-label="Прогресс урока">' +
+        '<div class="lesson-bar-fill" style="width:' + Math.round(state.done / state.steps * 100) + '%"></div>' +
+      "</div>" +
+      '<div class="lesson-bar-text' + (state.passed ? " is-passed" : "") + '">' + text + "</div>" +
+    "</a>"
+  );
+}
+
+/* Список всех уроков по разделам. Разделы без уроков (сейчас «Социально-правовая помощь») не показываются */
 function renderLessonCards(progress) {
   let html = "";
   SECTIONS.forEach(function (section) {
@@ -404,21 +478,8 @@ function renderLessonCards(progress) {
     html += '<h2 class="lessons-section-title" id="' + section.id + '">' + escapeHtml(section.title) + "</h2>";
     html += '<div class="lessons-grid">';
 
-    LESSONS.forEach(function (topic, index) {
-      if (topic.section !== section.id) return;
-      const record = progress[topic.id];
-      const passed = record && record.passed;
-
-      html +=
-        '<a class="card lesson-card' + (passed ? " is-passed" : "") + '" href="lesson.html?id=' + encodeURIComponent(topic.id) + '">' +
-          '<span class="lesson-num">Урок ' + (index + 1) + "</span>" +
-          "<h3>" + escapeHtml(topic.title) + "</h3>" +
-          "<p>" + escapeHtml(topic.description) + "</p>" +
-          '<div class="lesson-meta">' +
-            '<span class="status' + (passed ? " status-done" : "") + '">' + (passed ? "Пройден ✓" : "Не начат") + "</span>" +
-            (record ? '<span class="muted">Лучший результат: ' + record.best + "/" + record.total + "</span>" : "") +
-          "</div>" +
-        "</a>";
+    LESSONS.forEach(function (topic) {
+      if (topic.section === section.id) html += renderLessonCard(topic, progress);
     });
 
     html += "</div>";
@@ -427,6 +488,64 @@ function renderLessonCards(progress) {
 }
 
 /* ---------- Личный кабинет ---------- */
+
+/* «Мои уроки»: только начатые — сначала «В процессе», затем «Тест сдан», потом «Пройден» */
+function renderMyLessons(progress) {
+  function withStatus(status) {
+    return LESSONS.filter(function (t) { return lessonProgress(t, progress).status === status; });
+  }
+  const list = withStatus(STATUS_ACTIVE).concat(withStatus(STATUS_TEST_PASSED), withStatus(STATUS_PASSED));
+  if (!list.length) {
+    return (
+      '<div class="card my-lessons-empty">' +
+        "<p>Вы ещё не начали ни одного урока</p>" +
+        '<a href="lessons.html" class="btn btn-primary">К урокам</a>' +
+      "</div>"
+    );
+  }
+  return '<div class="lessons-grid">' +
+    list.map(function (t) { return renderLessonCard(t, progress); }).join("") +
+  "</div>";
+}
+
+/* «Моя статистика»: четыре карточки, всё считается из прогресса.
+   Средний результат — по тестам уроков, которые хоть раз проходили */
+function renderMyStats(progress) {
+  const states = LESSONS.map(function (t) { return lessonProgress(t, progress); });
+  const passed = states.filter(function (s) { return s.passed; }).length;
+  const tasks = states.reduce(function (sum, s) { return sum + s.tasks; }, 0);
+  const tasksDone = states.reduce(function (sum, s) { return sum + s.tasksDone; }, 0);
+  const scores = LESSONS.map(function (t) { return progress[t.id]; })
+    .filter(function (r) { return r && r.total > 0; })
+    .map(function (r) { return r.best / r.total; });
+  const average = scores.length
+    ? Math.round(scores.reduce(function (sum, x) { return sum + x; }, 0) / scores.length * 100) + "%"
+    : "—";
+  const next = firstUnfinishedLesson(progress);
+
+  function card(label, value, more) {
+    return '<div class="card stat-card">' +
+      '<p class="stat-label">' + label + "</p>" +
+      '<p class="stat-value">' + value + "</p>" +
+      (more || "") +
+    "</div>";
+  }
+  return (
+    '<div class="stats-grid">' +
+      card("Уроков пройдено", passed + " из " + LESSONS.length) +
+      card("Средний результат тестов", average,
+        scores.length ? '<p class="stat-note">по ' + scores.length + " " + plural(scores.length, "тесту", "тестам", "тестам") + "</p>" : "") +
+      card("Заданий практики", tasksDone + " из " + tasks) +
+      '<div class="card stat-card">' +
+        '<p class="stat-label">Продолжить</p>' +
+        (next
+          ? '<p class="stat-lesson">' + escapeHtml(next.title) + "</p>" +
+            '<a href="lesson.html?id=' + encodeURIComponent(next.id) + '" class="btn btn-small btn-primary">Продолжить</a>'
+          : '<p class="stat-lesson">Все уроки пройдены ✓</p>') +
+      "</div>" +
+    "</div>"
+  );
+}
 
 function renderCabinetPage() {
   const page = document.getElementById("cabinet-page");
@@ -448,22 +567,16 @@ function renderCabinetPage() {
   }
 
   const progress = getProgress();
-  const next = LESSONS.find(function (t) { return !(progress[t.id] && progress[t.id].passed); });
 
   page.innerHTML =
     "<h1>Здравствуйте" + (user.name ? ", " + escapeHtml(user.name) : "") + "!</h1>" +
     renderProgressBar(progress, " уроков") +
 
-    '<div class="cabinet-next">' +
-      (next
-        ? '<a href="lesson.html?id=' + encodeURIComponent(next.id) + '" class="btn btn-primary">Продолжить</a>' +
-          '<p class="muted">Следующий урок: ' + escapeHtml(next.title) + "</p>"
-        : '<p class="success">Вы прошли все уроки</p>' +
-          '<a href="lessons.html" class="btn btn-primary">К списку уроков</a>') +
-    "</div>" +
+    '<h2 class="lesson-h2">Моя статистика</h2>' +
+    renderMyStats(progress) +
 
     '<h2 class="lesson-h2">Мои уроки</h2>' +
-    renderLessonCards(progress) +
+    renderMyLessons(progress) +
 
     '<h2 class="lesson-h2">Мои данные</h2>' +
     '<div class="card cabinet-data">' +
@@ -777,7 +890,7 @@ function renderLessonTestCard(topic, record, user) {
   const count = (topic.quiz || []).length;
   if (!count) return "";
   const hasResult = Boolean(record && record.total);
-  const passed = hasResult && (record.passed || record.best / record.total >= PASS_RATE);
+  const passed = hasResult && isTestPassed(record);
   return lessonSideCard(LESSON_ICONS.test, "Тест",
     '<p class="lesson-side-note">' + count + " " + plural(count, "вопрос", "вопроса", "вопросов") +
       " · зачёт от " + Math.round(PASS_RATE * 100) + "%</p>" +
@@ -940,14 +1053,14 @@ function practiceTasks(topic) {
 
 /* Выполнено ли задание: progress.practiceDone[ID темы][ID задания] = true.
    Старая запись practiceDone[ID темы] = true (до разделения на задания) — это выполненное первое задание */
-function isTaskDone(topic, task) {
-  const record = (getProgress().practiceDone || {})[topic.id];
+function isTaskDone(topic, task, progress) {
+  const record = ((progress || getProgress()).practiceDone || {})[topic.id];
   if (record === true) return practiceTasks(topic).indexOf(task) === 0;
   return Boolean(record && record[task.id]);
 }
 
-function countTasksDone(topic) {
-  return practiceTasks(topic).filter(function (t) { return isTaskDone(topic, t); }).length;
+function countTasksDone(topic, progress) {
+  return practiceTasks(topic).filter(function (t) { return isTaskDone(topic, t, progress); }).length;
 }
 
 function saveTaskDone(topic, task) {
@@ -3600,21 +3713,16 @@ function sourcesHtml(sources) {
   }).join(", ") + "</p>";
 }
 
-function setupConsultantPage() {
-  const chat = document.getElementById("chat-log");
-  if (!chat) return;
-
-  const form = document.getElementById("chat-form");
-  const input = document.getElementById("chat-input");
-  const sendBtn = document.getElementById("chat-send");
-  const hintsBox = document.getElementById("chat-hints");
+/* Чат консультанта — один и тот же и на странице consultant.html, и в окне на главной:
+   сообщения, запрос к серверу (или ответы по ключевым словам без него), тревожные ответы, источники.
+   parts — { log, form, input, send } */
+function createConsultantChat(parts) {
+  const chat = parts.log;
+  const input = parts.input;
+  const sendBtn = parts.send;
   const serverMode = Store.getMode() === "server";
   const history = [];  // последние реплики для сервера: [{ role: "user"|"assistant", content }]
   let busy = false;
-
-  document.getElementById("chat-mode").textContent = serverMode
-    ? "Ответы готовит ИИ по материалам уроков и справочника школы."
-    : "Сайт открыт без сервера: консультант отвечает упрощённо, по ключевым словам.";
 
   function addMessage(who, html, extraClass) {
     const msg = document.createElement("div");
@@ -3715,55 +3823,137 @@ function setupConsultantPage() {
     });
   }
 
+  // Отправка кнопкой и клавишей Enter (Enter в поле формы отправляет её сам)
+  parts.form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    ask(input.value);
+    input.focus();
+  });
+
+  return { addMessage: addMessage, ask: ask, setBusy: setBusy, replyHtml: replyHtml, serverMode: serverMode };
+}
+
+function setupConsultantPage() {
+  const log = document.getElementById("chat-log");
+  if (!log) return;
+
+  const input = document.getElementById("chat-input");
+  const hintsBox = document.getElementById("chat-hints");
+  const chat = createConsultantChat({
+    log: log,
+    form: document.getElementById("chat-form"),
+    input: input,
+    send: document.getElementById("chat-send")
+  });
+  const serverMode = chat.serverMode;
+
+  document.getElementById("chat-mode").textContent = serverMode
+    ? "Ответы готовит ИИ по материалам уроков и справочника школы."
+    : "Сайт открыт без сервера: консультант отвечает упрощённо, по ключевым словам.";
+
   // Первое сообщение консультанта
-  addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+  chat.addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
 
   // Через сервер консультант работает только для вошедших
   if (serverMode && !getCurrentUser()) {
-    addMessage("bot",
+    chat.addMessage("bot",
       "<p>Чтобы задать вопрос, войдите или зарегистрируйтесь.</p>" +
       '<div class="msg-links">' +
         '<a href="' + loginLinkBack() + '" class="btn btn-small btn-primary">Войти</a>' +
         '<a href="login.html?tab=register&amp;back=' + encodeURIComponent(location.pathname.split("/").pop() + location.search) +
           '" class="btn btn-small btn-secondary">Зарегистрироваться</a>' +
       "</div>");
-    setBusy(true);
+    chat.setBusy(true);
     input.disabled = true;
     hintsBox.hidden = true;
     return;
   }
 
-  // Отправка кнопкой и клавишей Enter (Enter в поле формы отправляет её сам)
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    ask(input.value);
-    input.focus();
-  });
-
   // Кнопки-подсказки отправляют свой текст как вопрос
   hintsBox.addEventListener("click", function (e) {
     const hint = e.target.closest(".chat-hint");
-    if (hint) ask(hint.textContent);
+    if (hint) chat.ask(hint.textContent);
   });
 
   // consultant.html?topic=burns — сразу спросить про тему и показать ответ именно по ней
   const topicId = new URLSearchParams(location.search).get("topic");
   const topic = TOPICS.find(function (t) { return t.id === topicId; });
   if (topic && serverMode) {
-    ask("Расскажите коротко главное по теме «" + topic.title + "»");
+    chat.ask("Расскажите коротко главное по теме «" + topic.title + "»");
   } else if (topic) {
     const answer = CONSULTANT.answers.find(function (a) { return a.topicId === topic.id; });
-    setBusy(true);
-    addMessage("user", "<p>" + escapeHtml("Расскажите про тему: " + topic.title) + "</p>");
-    const typing = addMessage("bot", '<p class="typing">Консультант думает…</p>', "msg-typing");
+    chat.setBusy(true);
+    chat.addMessage("user", "<p>" + escapeHtml("Расскажите про тему: " + topic.title) + "</p>");
+    const typing = chat.addMessage("bot", '<p class="typing">Консультант думает…</p>', "msg-typing");
     setTimeout(function () {
       typing.remove();
-      addMessage("bot", replyHtml(answer
+      chat.addMessage("bot", chat.replyHtml(answer
         ? { type: "answer", text: answer.text, topicId: topic.id }
         : { type: "answer", text: topic.description, topicId: topic.id }));
-      setBusy(false);
+      chat.setBusy(false);
     }, 700);
   }
+}
+
+/* Виджет консультанта на главной: круглая кнопка в углу и окно чата. Без входа окно предлагает войти */
+function setupConsultantWidget() {
+  if (document.body.dataset.page !== "home") return;
+
+  const box = document.createElement("div");
+  box.innerHTML =
+    '<button type="button" class="btn btn-primary chat-fab" aria-label="Открыть консультанта" aria-haspopup="dialog" aria-expanded="false" aria-controls="chat-widget">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17h0A1.5 1.5 0 0 1 4 15.5z"/><path d="M8 9h8M8 12.5h5"/></svg>' +
+    "</button>" +
+    '<section class="chat-widget" id="chat-widget" role="dialog" aria-labelledby="chat-widget-title" hidden>' +
+      '<div class="chat-widget-head">' +
+        '<h2 id="chat-widget-title">Консультант</h2>' +
+        '<button type="button" class="chat-widget-close" aria-label="Закрыть консультанта">×</button>' +
+      "</div>" +
+      '<p class="chat-widget-note">Отвечает по материалам школы, может ошибаться и не заменяет врача. ' +
+        'При опасности звоните <a href="tel:103">103</a> или <a href="tel:112">112</a></p>' +
+      '<div class="chat-log" role="log" aria-live="polite" aria-label="Переписка с консультантом"></div>' +
+      '<form class="chat-form">' +
+        '<label for="chat-widget-input" class="visually-hidden">Ваш вопрос</label>' +
+        '<input type="text" id="chat-widget-input" placeholder="Напишите вопрос…" autocomplete="off" maxlength="500">' +
+        '<button type="submit" class="btn btn-small btn-primary">Отправить</button>' +
+      "</form>" +
+    "</section>";
+  while (box.firstChild) document.body.appendChild(box.firstChild);
+
+  const fab = document.querySelector(".chat-fab");
+  const widget = document.getElementById("chat-widget");
+  const form = widget.querySelector(".chat-form");
+  const input = widget.querySelector("input");
+  const log = widget.querySelector(".chat-log");
+
+  const chat = createConsultantChat({ log: log, form: form, input: input, send: form.querySelector("button") });
+  const guest = !getCurrentUser();
+  if (guest) {
+    form.hidden = true;
+    chat.addMessage("bot",
+      "<p>Чтобы задать вопрос, войдите в аккаунт</p>" +
+      '<div class="msg-links"><a href="' + loginLinkBack() + '" class="btn btn-small btn-primary">Войти</a></div>');
+  } else {
+    chat.addMessage("bot", "<p>" + escapeHtml(CONSULTANT.greeting) + "</p>");
+  }
+
+  function setOpen(open) {
+    widget.hidden = !open;
+    fab.hidden = open;
+    fab.setAttribute("aria-expanded", open);
+    if (open) {
+      log.scrollTop = log.scrollHeight;
+      (guest ? log.querySelector("a") : input).focus();
+    } else {
+      fab.focus();
+    }
+  }
+
+  fab.addEventListener("click", function () { setOpen(true); });
+  widget.querySelector(".chat-widget-close").addEventListener("click", function () { setOpen(false); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !widget.hidden) setOpen(false);
+  });
 }
 
 /* ---------- Права и документы (rights.html) ---------- */
@@ -3862,6 +4052,7 @@ function startPage() {
   renderFileWarning();
   renderFooter();
   renderSections();
+  renderHomeStartButton();
   setupLoginPage();
   renderLessonsPage();
   renderCabinetPage();
@@ -3880,4 +4071,5 @@ function startPage() {
   renderContacts();
   setupWellbeingSurvey();
   setupConsultantPage();
+  setupConsultantWidget();
 }

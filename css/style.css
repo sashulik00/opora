@@ -613,25 +613,24 @@ input:focus { border-color: var(--accent); outline: none; }
   font-size: 0.95rem;
   margin-bottom: 6px;
 }
-.lesson-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
+/* Полоска прогресса в карточке урока и строка под ней */
+.lesson-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #eadfce;
+  overflow: hidden;
+}
+.lesson-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: #2e7d32;
+}
+.lesson-bar-text {
+  margin-top: 6px;
+  color: var(--muted);
   font-size: 0.95rem;
 }
-.status {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-}
-.status-done {
-  background: #e8f5e9;
-  border-color: #a5d6a7;
-  color: #1b5e20;
-  font-weight: bold;
-}
+.lesson-bar-text.is-passed { color: #1b5e20; font-weight: bold; }
 
 /* ===== Страница урока: слева видео и статья, справа три карточки ===== */
 .lesson-block { padding: 22px 0 40px; }
@@ -1339,14 +1338,30 @@ html.modal-open {
 
 /* ===== Личный кабинет ===== */
 .cabinet-guest { max-width: 640px; }
-.cabinet-next {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 20px;
-  margin: 8px 0 8px;
+/* Кабинет: «Моя статистика» — четыре карточки в ряд, на телефоне 2×2 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
 }
-.cabinet-next p { margin: 0; }
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 18px;
+}
+.stat-card p { margin: 0; }
+.stat-label { font-size: 0.95rem; color: var(--muted); }
+.stat-value { font-size: 1.6rem; font-weight: bold; line-height: 1.2; }
+.stat-note { font-size: 0.85rem; line-height: 1.3; color: var(--muted); }
+.stat-lesson { font-size: 1.05rem; font-weight: bold; line-height: 1.25; }
+.stat-card .btn { margin-top: auto; }
+@media (max-width: 700px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-card { padding: 12px 14px; }
+}
+.my-lessons-empty p { margin: 0 0 14px; }
 .cabinet-data { max-width: 640px; }
 .cabinet-data p { margin-bottom: 0.6em; }
 .cabinet-data .btn { margin-top: 12px; }
@@ -1543,6 +1558,117 @@ html.modal-open {
   font-size: 1rem;
 }
 .chat-note a { font-weight: bold; }
+/* Виджет консультанта на главной: круглая кнопка в углу и окно чата */
+.chat-fab {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px rgba(31, 42, 68, 0.3);
+}
+.chat-fab svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.chat-widget {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  height: 520px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 40px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(31, 42, 68, 0.3);
+  font-size: 1rem;
+  line-height: 1.4;
+  overflow: hidden;
+}
+.chat-widget-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.chat-widget-head h2 { margin: 0; font-size: 1.2rem; }
+.chat-widget-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.chat-widget-close:hover { background: #f6ece6; color: var(--accent-dark); }
+.chat-widget-note {
+  flex: none;
+  margin: 0;
+  padding: 8px 16px;
+  background: #fff6e8;
+  border-bottom: 1px solid #e8cfa4;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+.chat-widget-note a { font-weight: bold; }
+.chat-widget .chat-log {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  padding: 12px 14px;
+}
+.chat-widget .msg { max-width: 92%; padding: 10px 14px; }
+.chat-widget .msg-alarm { max-width: 100%; }
+.chat-widget .alarm-text { font-size: 1.1rem; }
+.chat-widget .alarm-phone { padding: 10px 16px; min-height: 0; font-size: 1.15rem; }
+.chat-widget .msg-alarm .alarm-phone + .alarm-phone { margin-left: 0; }
+.chat-widget .chat-form {
+  flex: none;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+.chat-widget .chat-form input { font-size: 1rem; }
+@media (max-width: 600px) {
+  .chat-widget {
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    height: auto;
+    max-width: none;
+    max-height: none;
+  }
+}
+/* На телефоне кнопка в углу не закрывает строку с номером 112 в подвале */
+@media (max-width: 700px) {
+  body[data-page="home"] .site-footer { padding-bottom: 96px; }
+}
 /* «Источники: урок …» под ответом консультанта */
 .msg-sources {
   margin-top: 12px !important;
