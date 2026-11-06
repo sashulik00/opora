@@ -3468,12 +3468,6 @@ function hasVideo(topic) {
   return lessonVideos(topic).length > 0;
 }
 
-/* Есть ли у темы памятка СПРАВОЧНИКА (поле memo; памятка урока — lessonMemo) */
-function hasMemo(topic) {
-  const memo = topic.memo || {};
-  return hasItems(memo.doList) || hasItems(memo.dontList) || hasItems(memo.urgentList);
-}
-
 function hasArticle(topic) {
   return hasItems(topic.article) || hasItems(topic.details);
 }
@@ -3494,16 +3488,27 @@ function topicSearchText(topic) {
   return normalizeText(parts.join(" "));
 }
 
-/* Обложка карточки: картинка из папки images или цветная заглушка с названием раздела.
-   Если картинку не удалось загрузить (например, ошибка в имени файла), остаётся заглушка. */
-function renderCover(topic, section) {
+/* Адрес картинки на карточке темы: картинка статьи (image) или обложка (cover), иначе пусто */
+function topicCardImage(topic) {
   const cover = (topic.cover || "").trim();
+  return (topic.image || "").trim() || (cover ? "images/" + cover : "");
+}
+
+/* Картинка в блоке box не загрузилась (например, ошибка в имени файла) — убираем её, остаётся то, что под ней.
+   Отдельной функцией, потому что инлайновые onerror запрещены политикой сервера */
+function dropBrokenImages(box) {
+  box.addEventListener("error", function (e) {
+    if (e.target.tagName === "IMG") e.target.remove();
+  }, true);
+}
+
+/* Обложка карточки в поиске: картинка темы или цветная заглушка с названием раздела */
+function renderCover(topic, section) {
+  const src = topicCardImage(topic);
   return (
     '<div class="tile-cover" style="background:' + escapeHtml(section.color || "#5b6478") + '">' +
       '<span class="tile-cover-label">' + escapeHtml(section.title) + "</span>" +
-      (cover
-        ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
-        : "") +
+      (src ? '<img src="' + escapeHtml(encodeURI(src)) + '" alt="" loading="lazy">' : "") +
     "</div>"
   );
 }
@@ -3605,9 +3610,9 @@ function setupFilterButtons(box, items, onChange) {
 
 const SECTION_FILTERS = [{ id: "all", title: "Все" }].concat(SECTIONS);
 
-/* Типы материалов справочника: есть ли такой материал у темы и куда он ведёт */
+/* Типы материалов в поиске справочника: есть ли такой материал у темы и куда он ведёт.
+   Памятки отдельных карточек не имеют: они открываются из статьи и из урока */
 const MATERIAL_TYPES = [
-  { id: "memos", title: "Памятки", badge: "Памятка", link: memoLink, fits: hasMemo },
   { id: "videos", title: "Видео", fits: hasVideo },
   { id: "articles", title: "Статьи", badge: "Статья", link: function (t) { return topicLink("article.html", t); }, fits: hasArticle }
 ];
@@ -3646,7 +3651,7 @@ function setupReferencePage() {
     const words = normalizeText(input.value).split(" ").filter(Boolean);
     const types = MATERIAL_TYPES.filter(function (t) { return currentType === "all" || t.id === currentType; });
 
-    // Одна карточка на каждый материал темы: памятка, статья, каждый ролик
+    // Одна карточка на каждый материал темы: статья, каждый ролик
     const cards = [];
     videos.length = 0;
     TOPICS.forEach(function (topic) {
@@ -3739,10 +3744,8 @@ function setupVideoCards(box, videos) {
     showVideo(card);
   });
 
-  // Картинка thumb не нашлась — остаётся градиент со значком
-  box.addEventListener("error", function (e) {
-    if (e.target.tagName === "IMG") e.target.remove();
-  }, true);
+  // Под картинкой остаётся градиент со значком у ролика, цветная заглушка у статьи
+  dropBrokenImages(box);
 
   return showVideo;
 }
@@ -3835,23 +3838,22 @@ function renderArticlesPage() {
   if (!list) return;
   const topics = TOPICS.filter(hasArticle);
   list.innerHTML = topics.length ? topics.map(renderArticleCard).join("") : EMPTY_RESULT;
+  dropBrokenImages(list);
 }
 
-/* Карточка статьи на articles.html: картинка 4:3, заголовок статьи (articleTitle,
+/* Карточка статьи на articles.html: картинка 16:9, заголовок статьи (articleTitle,
    если пусто — название темы) и кнопка «Читать статью». Вся карточка — одна ссылка.
-   Без cover — плашка с названием раздела, терракотовая и зелёная по очереди. */
+   Без картинки — плашка с названием раздела, терракотовая и зелёная по очереди. */
 function renderArticleCard(topic, index) {
   const section = sectionOf(topic);
-  const cover = (topic.cover || "").trim();
+  const src = topicCardImage(topic);
   const title = (topic.articleTitle || "").trim() || topic.title;
 
   return (
     '<article class="article-card">' +
       '<div class="article-card-media' + (index % 2 ? " is-green" : "") + '">' +
         '<span class="article-card-placeholder" aria-hidden="true">' + escapeHtml(section.title) + "</span>" +
-        (cover
-          ? '<img src="images/' + escapeHtml(encodeURI(cover)) + '" alt="" loading="lazy" onerror="this.remove()">'
-          : "") +
+        (src ? '<img src="' + escapeHtml(encodeURI(src)) + '" alt="" loading="lazy">' : "") +
       "</div>" +
       '<div class="article-card-body">' +
         // Ссылка в заголовке растянута на всю карточку (см. .article-card-link::after)
@@ -3971,7 +3973,16 @@ function renderReferenceArticle(topic) {
   );
 }
 
-/* article.html — текст статьи, частые вопросы и кнопки: Памятка (окно), Видео по теме, Урок по теме.
+/* Широкая картинка над текстом статьи (поле image; imagePosition — какую её часть оставить в кадре) */
+function renderArticleImage(topic) {
+  const image = (topic.image || "").trim();
+  if (!image) return "";
+  const position = (topic.imagePosition || "").trim();
+  return '<img class="article-image" src="' + escapeHtml(encodeURI(image)) + '" alt="" width="800" height="450"' +
+    (position ? ' style="object-position:' + escapeHtml(position) + '"' : "") + ">";
+}
+
+/* article.html — картинка, текст статьи, частые вопросы и кнопки: Памятка (окно), Видео по теме, Урок по теме.
    article.html?id=ID&memo=1 открывает памятку сразу */
 function renderArticlePage() {
   const page = document.getElementById("article-page");
@@ -3988,7 +3999,11 @@ function renderArticlePage() {
       (hasVideo(topic) ? '<a href="' + videoLink(topic) + '" class="btn btn-secondary">Видео по теме</a>' : "") +
       (isLesson(topic) ? '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-secondary">Урок по теме</a>' : "") +
     "</div>" +
+    renderArticleImage(topic) +
     (hasItems(topic.article) ? renderArticleSections(topic) + renderArticleFaq(topic) : renderReferenceArticle(topic));
+
+  // Файла нет — статья выглядит как без картинки
+  dropBrokenImages(page);
 
   if (!memoBlocks) return;
   const openModal = createPageModal();

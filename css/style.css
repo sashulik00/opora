@@ -1220,7 +1220,7 @@ html.modal-open {
 }
 .empty-result p { margin: 0; }
 
-/* Статья: только текст и овальные кнопки под заголовком */
+/* Статья: овальные кнопки под заголовком, картинка и текст */
 #article-page { max-width: 860px; }
 .article-buttons {
   display: flex;
@@ -1234,6 +1234,15 @@ html.modal-open {
   border-radius: 999px;
   font-size: 1rem;
   line-height: 1.3;
+}
+.article-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  margin-bottom: 24px;
 }
 .article-text p { margin-bottom: 1.1em; }
 .article-text p:last-child { margin-bottom: 0; }
@@ -2467,10 +2476,10 @@ html.modal-open {
   .article-card:focus-within { transform: none; }
 }
 
-/* Картинка 4:3 (поле cover) или плашка-заглушка */
+/* Картинка 16:9 (поле image, те же пропорции, что у файла) или плашка-заглушка */
 .article-card-media {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 9;
   display: flex;
   align-items: center;
   justify-content: center;
