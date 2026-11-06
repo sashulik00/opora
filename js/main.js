@@ -1043,7 +1043,24 @@ function lessonVideoScreen(video) {
 }
 
 function lessonVideoOrg(video) {
-  return video.org ? "Видео: " + video.org : "";
+  const platform = videoPlatform(video);
+  return video.org ? "Видео: " + video.org + (platform ? ", " + platform : "") : platform;
+}
+
+/* Площадка ролика — по адресу плеера */
+function videoPlatform(video) {
+  const url = video.embedUrl || video.pageUrl || "";
+  if (/rutube\./.test(url)) return "Rutube";
+  if (/dzen\./.test(url)) return "Дзен";
+  if (/\bvk(video)?\./.test(url)) return "VK Видео";
+  if (/youtu\.?be/.test(url)) return "YouTube";
+  return "";
+}
+
+/* Содержимое окна с роликом: плеер и подпись источника */
+function videoModalHtml(video) {
+  return '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>" +
+    '<p class="lesson-video-org">' + escapeHtml(lessonVideoOrg(video)) + "</p>";
 }
 
 function renderLessonVideos(videos) {
@@ -3491,15 +3508,14 @@ function renderCover(topic, section) {
   );
 }
 
-/* ОДНА общая карточка для справочника и видео.
-   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием) */
+/* Общая карточка материала в поиске справочника (у видео своя карточка — renderVideoCard).
+   options: href, badge (надпись поверх обложки), text (текст под названием) */
 function renderTile(topic, options) {
   const section = sectionOf(topic);
   return (
-    '<a class="tile' + (options.play ? " tile-video" : "") + '" href="' + options.href + '">' +
+    '<a class="tile" href="' + options.href + '">' +
       '<div class="tile-media">' +
         renderCover(topic, section) +
-        (options.play ? '<span class="tile-play" aria-label="Есть видео">▶</span>' : "") +
         (options.badge ? '<span class="tile-badge">' + escapeHtml(options.badge) + "</span>" : "") +
       "</div>" +
       '<div class="tile-body">' +
@@ -3592,7 +3608,7 @@ const SECTION_FILTERS = [{ id: "all", title: "Все" }].concat(SECTIONS);
 /* Типы материалов справочника: есть ли такой материал у темы и куда он ведёт */
 const MATERIAL_TYPES = [
   { id: "memos", title: "Памятки", badge: "Памятка", link: memoLink, fits: hasMemo },
-  { id: "videos", title: "Видео", badge: "Видео", link: videoLink, fits: hasVideo },
+  { id: "videos", title: "Видео", fits: hasVideo },
   { id: "articles", title: "Статьи", badge: "Статья", link: function (t) { return topicLink("article.html", t); }, fits: hasArticle }
 ];
 
@@ -3613,6 +3629,8 @@ function setupReferencePage() {
   const counter = document.getElementById("results-count");
   let currentSection = "all";
   let currentType = "all";
+  const videos = [];   // ролики показанных карточек: номер в списке — data-video у карточки
+  setupVideoCards(list, videos);
 
   setupFilterButtons(document.getElementById("type-filters"), [{ id: "all", title: "Все" }].concat(MATERIAL_TYPES), function (id) {
     currentType = id;
@@ -3628,8 +3646,9 @@ function setupReferencePage() {
     const words = normalizeText(input.value).split(" ").filter(Boolean);
     const types = MATERIAL_TYPES.filter(function (t) { return currentType === "all" || t.id === currentType; });
 
-    // Одна карточка на каждый материал темы: памятка, видео, статья
+    // Одна карточка на каждый материал темы: памятка, статья, каждый ролик
     const cards = [];
+    videos.length = 0;
     TOPICS.forEach(function (topic) {
       if (currentSection !== "all" && topic.section !== currentSection) return;
       const text = topicSearchText(topic);
@@ -3637,10 +3656,16 @@ function setupReferencePage() {
 
       types.forEach(function (type) {
         if (!type.fits(topic)) return;
+        if (type.id === "videos") {
+          lessonVideos(topic).forEach(function (video) {
+            videos.push(video);
+            cards.push(renderVideoCard(topic, video, videos.length - 1));
+          });
+          return;
+        }
         cards.push(renderTile(topic, {
           href: type.link(topic),
           badge: type.badge,
-          play: type.id === "videos",
           text: topic.description
         }));
       });
@@ -3678,24 +3703,48 @@ const VIDEO_ICONS = {
 /* Новая тема без своего значка: значок раздела */
 const VIDEO_SECTION_ICONS = { medical: "wounds", psychology: "stress", legal: "documents" };
 
-/* Карточка ролика: превью (картинка thumb или градиент раздела со значком темы), название ролика и название темы */
+/* Карточка ролика на странице «Видео» и в поиске справочника: превью (картинка thumb или градиент раздела со значком темы),
+   название ролика, ниже тема и автор. index — номер ролика в списке, который получает setupVideoCards */
 function renderVideoCard(topic, video, index) {
   const thumb = (video.thumb || "").trim();
   return (
-    '<li class="video-card-item">' +
-      '<a class="video-card" href="' + videoLink(topic) + '" data-video="' + index + '" data-topic="' + escapeHtml(topic.id) + '" aria-haspopup="dialog">' +
-        '<span class="video-thumb video-thumb--' + escapeHtml(topic.section) + '">' +
-          '<svg class="video-thumb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-            (VIDEO_ICONS[topic.id] || VIDEO_ICONS[VIDEO_SECTION_ICONS[topic.section]]) +
-          "</svg>" +
-          (thumb ? '<img src="' + escapeHtml(encodeURI(thumb)) + '" alt="" loading="lazy">' : "") +
-          '<span class="video-thumb-play" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5l11 7-11 7z"/></svg></span>' +
-        "</span>" +
-        '<span class="video-card-title">' + escapeHtml(video.title) + "</span>" +
-        '<span class="video-card-topic">' + escapeHtml(topic.title) + "</span>" +
-      "</a>" +
-    "</li>"
+    '<a class="video-card" href="' + videoLink(topic) + '" data-video="' + index + '" data-topic="' + escapeHtml(topic.id) + '" aria-haspopup="dialog">' +
+      '<span class="video-thumb video-thumb--' + escapeHtml(topic.section) + '">' +
+        '<svg class="video-thumb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          (VIDEO_ICONS[topic.id] || VIDEO_ICONS[VIDEO_SECTION_ICONS[topic.section]]) +
+        "</svg>" +
+        (thumb ? '<img src="' + escapeHtml(encodeURI(thumb)) + '" alt="" loading="lazy">' : "") +
+        '<span class="video-thumb-play" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5l11 7-11 7z"/></svg></span>' +
+      "</span>" +
+      '<span class="video-card-title">' + escapeHtml(video.title) + "</span>" +
+      '<span class="video-card-topic">' + escapeHtml(topic.title + (video.org ? "\u00a0· " + video.org : "")) + "</span>" +
+    "</a>"
   );
+}
+
+/* Карточки роликов в блоке box: нажатие открывает ролик в окне. videos — список, на который указывает data-video у карточки.
+   Возвращает функцию «показать ролик этой карточки» */
+function setupVideoCards(box, videos) {
+  const openModal = createPageModal("video-modal");
+
+  function showVideo(card) {
+    const video = videos[Number(card.dataset.video)];
+    openModal(video.title, videoModalHtml(video), card);
+  }
+
+  box.addEventListener("click", function (e) {
+    const card = e.target.closest(".video-card");
+    if (!card) return;
+    e.preventDefault();
+    showVideo(card);
+  });
+
+  // Картинка thumb не нашлась — остаётся градиент со значком
+  box.addEventListener("error", function (e) {
+    if (e.target.tagName === "IMG") e.target.remove();
+  }, true);
+
+  return showVideo;
 }
 
 function videoArrow(cls, label, path) {
@@ -3755,7 +3804,7 @@ function setupVideosPage() {
     const cards = TOPICS.filter(function (t) { return t.section === section.id && hasVideo(t); }).map(function (topic) {
       return lessonVideos(topic).map(function (video) {
         items.push(video);
-        return renderVideoCard(topic, video, items.length - 1);
+        return '<li class="video-card-item">' + renderVideoCard(topic, video, items.length - 1) + "</li>";
       }).join("");
     }).join("");
     const titleId = "videos-" + section.id;
@@ -3771,24 +3820,7 @@ function setupVideosPage() {
   box.innerHTML = groups || EMPTY_RESULT;
   box.querySelectorAll(".videos-group").forEach(setupVideoRow);
 
-  const openModal = createPageModal("video-modal");
-
-  function showVideo(card) {
-    const video = items[Number(card.dataset.video)];
-    openModal(video.title, '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>", card);
-  }
-
-  box.addEventListener("click", function (e) {
-    const card = e.target.closest(".video-card");
-    if (!card) return;
-    e.preventDefault();
-    showVideo(card);
-  });
-
-  // Картинка thumb не нашлась — остаётся градиент со значком
-  box.addEventListener("error", function (e) {
-    if (e.target.tagName === "IMG") e.target.remove();
-  }, true);
+  const showVideo = setupVideoCards(box, items);
 
   const topicId = new URLSearchParams(location.search).get("topic");
   const cards = Array.from(box.querySelectorAll(".video-card")).filter(function (c) { return c.dataset.topic === topicId; });
@@ -4456,7 +4488,7 @@ function setupSelfCare() {
     if (!opener) return;
     if (opener.dataset.video !== undefined) {
       const video = videos[Number(opener.dataset.video)];
-      body.innerHTML = '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>";
+      body.innerHTML = videoModalHtml(video);
       show(video.title, true);
       return;
     }

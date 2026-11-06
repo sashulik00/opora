@@ -135,8 +135,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Ожоги", org: "", thumb: "images/videos/ozhogi.jpg",
+      { title: "Перевязка ран в домашних условиях: запомните эти правила", org: "Центр Хирургии стопы ГКБ им С. С. Юдина", thumb: "images/videos/ozhogi.jpg",
         embedUrl: "https://rutube.ru/play/embed/369e641b585d828ae4b1e9303013a412/",
         pageUrl: "https://rutube.ru/video/369e641b585d828ae4b1e9303013a412/" }
     ],
@@ -422,8 +421,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Раны и швы", org: "", thumb: "images/videos/rany.jpg",
+      { title: "Как обрабатывать швы после операции", org: "Клуб Успешных Врачей", thumb: "images/videos/rany.jpg",
         embedUrl: "https://dzen.ru/embed/veeHnMKyNA0Q?mute=0&autoplay=0",
         pageUrl: "" }
     ],
@@ -714,12 +712,10 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео 1: Пролежни", org: "", thumb: "images/videos/prolezhni.jpg",
+      { title: "Пролежни у лежачих больных — видео как ухаживать и обрабатывать правильно", org: "С заботой о пожилых", thumb: "images/videos/prolezhni.jpg",
         embedUrl: "https://dzen.ru/embed/vkDTKn85ilF4?mute=0&autoplay=0",
         pageUrl: "" },
-      // TODO: название и автор
-      { title: "Видео 2: Пролежни", org: "", thumb: "images/videos/prolezhni.jpg",
+      { title: "МЗЖ: Особенности домашней реабилитации", org: "МЫ ЗДЕСЬ ЖИВЁМ | Архангельская область", thumb: "images/videos/prolezhni.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-195155417&id=456240576&hd=4",
         pageUrl: "https://vkvideo.ru/video-195155417_456240576" }
     ],
@@ -1014,8 +1010,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Уход после ампутации", org: "", thumb: "images/videos/amputaciya.jpg",
+      { title: "Как правильно ухаживать за культей и лайнером?", org: "Ухаживайте за своей кожей с любовью", thumb: "images/videos/amputaciya.jpg",
         embedUrl: "https://rutube.ru/play/embed/e78d00383550e363d2717709f190782c/",
         pageUrl: "https://rutube.ru/video/e78d00383550e363d2717709f190782c/" }
     ],
@@ -1301,12 +1296,10 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео 1: Перемещение и подвижность", org: "", thumb: "images/videos/peremeshenie.jpg",
+      { title: "Перемещение больного в постели", org: "ПРО ПАЛЛИАТИВ", thumb: "images/videos/peremeshenie.jpg",
         embedUrl: "https://dzen.ru/embed/vWfKtRI0O8Gc?mute=0&autoplay=0",
         pageUrl: "" },
-      // TODO: название и автор
-      { title: "Видео 2: Перемещение и подвижность", org: "", thumb: "images/videos/peremeshenie.jpg",
+      { title: "Как пересадить больного с кровати на стул", org: "ПРО ПАЛЛИАТИВ", thumb: "images/videos/peremeshenie.jpg",
         embedUrl: "https://dzen.ru/embed/vMR2P1XMAIiU?mute=0&autoplay=0",
         pageUrl: "" }
     ],
@@ -1592,8 +1585,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Питание и режим", org: "", thumb: "images/videos/pitanie.jpg",
+      { title: "Как УСКОРИТЬ заживление? Как питаться при переломах и травмах", org: "Свобода Движения", thumb: "images/videos/pitanie.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-168920485&id=456239208&hd=4",
         pageUrl: "https://vkvideo.ru/video-168920485_456239208" }
     ],
@@ -1942,8 +1934,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Бессонница и кошмары", org: "", thumb: "images/videos/bessonnica.jpg",
+      { title: "Что такое ПТСР", org: "СВОИРОДНЫЕ", thumb: "images/videos/bessonnica.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239021&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239021" }
     ],
@@ -2134,8 +2125,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Приступы агрессии (что делать семье)", org: "", thumb: "images/videos/agressiya.jpg",
+      { title: "Как контролировать агрессию?", org: "Защитники Отечества | Севастополь", thumb: "images/videos/agressiya.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-220870023&id=456239409&hd=3",
         pageUrl: "https://vkvideo.ru/video-220870023_456239409" }
     ],
@@ -2331,8 +2321,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Как разговаривать с раненым", org: "", thumb: "images/videos/razgovor.jpg",
+      { title: "Как понять близкого, который вернулся с фронта", org: "СВОИРОДНЫЕ", thumb: "images/videos/razgovor.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239026&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239026" }
     ],
@@ -2526,8 +2515,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Выгорание у ухаживающего", org: "", thumb: "images/videos/vygoranie.jpg",
+      { title: "Как жене участника СВО сохранить ментальное здоровье?", org: "СВОИРОДНЫЕ", thumb: "images/videos/vygoranie.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239293&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239293" }
     ],
@@ -2594,8 +2582,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      // TODO: название и автор
-      { title: "Видео: Поддержка детей в семье", org: "", thumb: "images/videos/deti.jpg",
+      { title: "Как выстраивать отношения с ребенком во время СВО и после возвращения", org: "СВОИРОДНЫЕ", thumb: "images/videos/deti.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239212&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239212" }
     ],
@@ -2796,7 +2783,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как получить справки, связанные с участием в СВО", org: "Своиродные", thumb: "images/videos/dokumenty.jpg",
+      { title: "Как получить справки, связанные с участием в СВО", org: "СВОИРОДНЫЕ", thumb: "images/videos/dokumenty.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239036&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239036" }
     ],
@@ -2867,7 +2854,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как участникам СВО и их родным получить льготы и компенсации?", org: "Своиродные", thumb: "images/videos/vyplaty.jpg",
+      { title: "Как участникам СВО и их родным получить льготы и компенсации?", org: "СВОИРОДНЫЕ", thumb: "images/videos/vyplaty.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239353&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239353" }
     ],
@@ -2946,7 +2933,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как ветеранам СВО получить медицинскую помощь по ОМС", org: "Своиродные", thumb: "images/videos/mse.jpg",
+      { title: "Как ветеранам СВО получить медицинскую помощь по ОМС", org: "СВОИРОДНЫЕ", thumb: "images/videos/mse.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239041&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239041" }
     ],
@@ -3016,7 +3003,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как получить протез и правильно ухаживать за ним?", org: "Своиродные", thumb: "images/videos/protezy.jpg",
+      { title: "Как получить протез и правильно ухаживать за ним?", org: "СВОИРОДНЫЕ", thumb: "images/videos/protezy.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239280&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239280" }
     ],
@@ -3183,11 +3170,10 @@ const PRACTICES = [
 
 /* Видео в «Минутке для себя»: плитка (short — короткое название на ней, source — площадка) и окно с плеером */
 const SUPPORT_VIDEOS = [
-  // TODO: название и автор
-  { title: "Дыхательная практика", org: "", source: "Rutube",
+  { title: "Физкультминутка. Дыхательные упражнения для избавления от стресса", short: "Дыхательная практика", org: "Петербургский Дневник. Спецпроекты", source: "Rutube",
     embedUrl: "https://rutube.ru/play/embed/ddef2f44bc22cf2267792d2fb6b32c7b/",
     pageUrl: "https://rutube.ru/video/ddef2f44bc22cf2267792d2fb6b32c7b/" },
-  { title: "Дыхательная гимнастика Стрельниковой", short: "Гимнастика Стрельниковой", org: "", source: "VK",
+  { title: "Дыхательная гимнастика Стрельниковой", short: "Гимнастика Стрельниковой", org: "Московское долголетие", source: "VK",
     embedUrl: "https://vkvideo.ru/video_ext.php?oid=-163162044&id=456240390&hash=7ced63d4ac186e68&hd=4",
     pageUrl: "https://vkvideo.ru/video-163162044_456240390" }
 ];
