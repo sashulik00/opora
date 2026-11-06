@@ -1486,7 +1486,7 @@ function practiceResultCards(cells, listen) {
     if (open.length) showCard(open[open.length - 1]);
   }, listen);
 
-  return function (extraClass, tagClass, tagText, label, text) {
+  return function (extraClass, tagClass, tagText, label, text, tagNote) {
     const cell = cells.querySelector(".practice-cell.is-empty");
     if (!cell) return;
     cells.querySelectorAll(".practice-card").forEach(function (card) { setOpen(card, false); });
@@ -1494,6 +1494,7 @@ function practiceResultCards(cells, listen) {
     cell.innerHTML =
       '<h3><button type="button" class="practice-card-head" title="' + escapeHtml(label) + '">' +
         '<span class="practice-tag ' + tagClass + '">' + tagText + "</span>" +
+        (tagNote ? '<span class="practice-card-note">' + tagNote + "</span>" : "") +
         '<span class="practice-card-name">' + escapeHtml(label) + "</span>" +
       "</button></h3>" +
       "<p>" + escapeHtml(text) + "</p>";
@@ -1807,8 +1808,8 @@ function setupPractice(topic, task, taskIndex, onDone) {
 
   /* Карточка выбранного предмета — в следующую свободную ячейку справа */
   function addCard(unit) {
-    const ok = unit.role === "ok";
-    addResultCard(ok ? " practice-card--ok" : "", ok ? "practice-tag--ok" : "practice-tag--error", ok ? "Верно" : "Ошибка", unit.label, unit.explanation);
+    if (unit.role === "ok") addResultCard(" practice-card--neutral", "practice-tag--neutral", "Здесь всё верно", unit.label, unit.explanation, "Это не ошибка");
+    else addResultCard(" practice-card--found", "practice-tag--found", "✓ Вы нашли ошибку", unit.label, unit.explanation);
   }
 
   /* После выбора с клавиатуры — фокус на следующий ещё не выбранный предмет */
@@ -1823,12 +1824,12 @@ function setupPractice(topic, task, taskIndex, onDone) {
     misses = 0;
 
     if (unit.role === "ok") {
-      // Верный предмет: не исчезает и не считается; дальше обведён зелёным и показывает подсказку
+      // Верный предмет: не исчезает и не считается; дальше обведён голубым и показывает подсказку
       unit.accepted = true;
       itemLayers(unit).forEach(function (l) { l.classList.add("is-ok"); });
       unit.keyButton.textContent = "Верный предмет: " + (unit.label || unit.key);
       addCard(unit);
-      say("Верно, этот предмет нужен, его оставляем: " + unit.label + ".");
+      say("Здесь всё верно: " + unit.label + ".");
       focusNext(byKey);
       return;
     }
@@ -1842,7 +1843,7 @@ function setupPractice(topic, task, taskIndex, onDone) {
     addCard(unit);
 
     const n = updateCount();
-    say("Верно, это ошибка: " + unit.label + ". Найдено ошибок: " + n + " из " + errorUnits.length + ".");
+    say("Вы нашли ошибку: " + unit.label + ". Найдено ошибок: " + n + " из " + errorUnits.length + ".");
 
     if (n === errorUnits.length) {
       bar.classList.add("is-done");
@@ -2841,9 +2842,11 @@ function setupMatch(topic, task, taskIndex, onDone) {
 /* Задание «Заполни пропуск» (type "fill") на странице practice.html.
    В тексте предложения (поле sentences) ровно один ___ — на этом месте пропуск; варианты = answer + wrong, сайт их перемешивает.
    Нажатие на пропуск (или Enter) открывает меню: выбор щелчком или стрелками и Enter, Esc закрывает.
-   После проверки верные пропуски закрепляются, неверные краснеют, и их можно выбрать заново; правильный ответ не показывается.
+   После проверки верные пропуски зеленеют и закрепляются, неверные краснеют, и их можно выбрать заново; правильный ответ не показывается.
    onDone() вызывается, когда все пропуски верны (чтобы обновить список заданий слева) */
 const FILL_MENU_GAP = 6;   // зазор между меню и пропуском или краем окна, px
+const FILL_GENERAL_DESC = "Выберите в каждом пропуске верный вариант.";
+const FILL_HINT = "Нажмите на оранжевый овал и выберите верный вариант.";
 
 function setupFill(topic, task, taskIndex, onDone) {
   const box = document.getElementById("practice-task");
@@ -2865,30 +2868,33 @@ function setupFill(topic, task, taskIndex, onDone) {
     });
   });
   let opened = null;   // пропуск, для которого открыто меню
+  let checked = false; // была ли уже проверка
 
   box.innerHTML =
     '<div class="practice-work practice-zone">' +
-    '<div class="practice-zone-head"><h2 class="practice-zone-title">Текст</h2></div>' +
-    '<ol class="fill-text">' +
+    '<div class="practice-zone-head fill-head"><h2 class="practice-zone-title">Текст</h2><p class="fill-count"></p></div>' +
+    '<div class="fill-progress" aria-hidden="true"><span></span></div>' +
+    // Строки распределяются по высоте зоны; не влезли — прокручивается только этот блок
+    '<div class="fill-scroll"><ol class="fill-text">' +
       items.map(function (item) {
         const parts = item.text.split("___");
         return '<li class="fill-line">' +
           '<span class="order-num" aria-hidden="true">' + (item.index + 1) + "</span>" +
           '<p class="fill-sentence">' + escapeHtml(parts[0]) +
-            // Не кнопка, а строчный элемент: длинный ответ переносится вместе со строкой
+            // Не кнопка: кнопка не переносит длинный ответ на вторую строку
             '<span class="fill-blank" data-item="' + item.index + '" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false">' +
-              '<span class="fill-arrow" aria-hidden="true">▾</span>&nbsp;<span class="fill-value"></span>' +
+              '<span class="fill-value"></span><span class="fill-arrow" aria-hidden="true">▾</span>' +
             "</span>" +
             escapeHtml(parts[1] || "") +
           "</p>" +
         "</li>";
       }).join("") +
-    "</ol>" +
+    "</ol></div>" +
     "</div>" +
 
     // Внизу: сообщения, «Проверить», а когда все пропуски верны — «Готово!» и кнопки дальше
     practiceBar(topic, taskIndex, "Готово! Все пропуски заполнены верно",
-      '<p class="order-result" aria-live="polite"></p><p class="fill-say visually-hidden" aria-live="polite"></p>',
+      '<p class="fill-result" aria-live="polite"></p><p class="fill-say visually-hidden" aria-live="polite"></p>',
       '<button type="button" class="btn btn-primary fill-check" disabled>Проверить</button>') +
 
     // Меню одно на все пропуски; стоит вне текста, чтобы его не обрезала прокрутка внутри зоны
@@ -2897,18 +2903,19 @@ function setupFill(topic, task, taskIndex, onDone) {
   side.classList.remove("is-done");
   side.setAttribute("aria-label", "Пояснения");
   side.innerHTML =
-    '<div class="practice-zone-head"><h2 class="order-pool-title" tabindex="-1">Пояснения</h2></div>' +
-    '<p class="fill-hint">Пояснения появятся после проверки</p>' +
-    '<ol class="order-why-list fill-why" hidden></ol>';
+    '<div class="practice-zone-head fill-head"><h2 class="order-pool-title" tabindex="-1">Пояснения</h2><p class="fill-count">по номерам</p></div>' +
+    '<ol class="order-why-list fill-why"></ol>';
 
   const textBox = box.querySelector(".fill-text");
+  const textArea = box.querySelector(".fill-scroll");
+  const count = box.querySelector(".fill-count");
+  const progress = box.querySelector(".fill-progress span");
   const menu = box.querySelector(".fill-menu");
-  const result = box.querySelector(".order-result");
+  const result = box.querySelector(".fill-result");
   const message = box.querySelector(".fill-say");
   const check = box.querySelector(".fill-check");
   const bar = box.querySelector(".practice-bar");
   const firstAction = bar.querySelector(".practice-after");
-  const hint = side.querySelector(".fill-hint");
   const why = side.querySelector(".fill-why");
 
   items.forEach(function (item) {
@@ -2927,6 +2934,40 @@ function setupFill(topic, task, taskIndex, onDone) {
     } else {
       el.setAttribute("aria-label", "Пропуск " + (item.index + 1) + ": " + (item.chosen || "не выбрано") + (item.wrongNow ? ", неверно" : ""));
     }
+  }
+
+  /* Счётчик над текстом: сколько заполнено, а после проверки — сколько верно. Полоса всегда показывает заполнение */
+  function renderCount() {
+    const filled = items.filter(function (item) { return item.chosen; }).length;
+    const right = items.filter(function (item) { return item.ok; }).length;
+    count.textContent = (checked ? "Верно " + right : "Заполнено " + filled) + " из " + items.length;
+    progress.style.width = filled / items.length * 100 + "%";
+  }
+
+  /* Сообщение в строке кнопок: пока остаются красные пропуски */
+  function renderResult() {
+    const wrong = items.filter(function (item) { return item.wrongNow; }).length;
+    const right = items.filter(function (item) { return item.ok; }).length;
+    result.textContent = wrong
+      ? "Верно " + right + " из " + items.length + " — исправьте " + (wrong > 1 ? "красные пропуски" : "красный пропуск")
+      : "";
+  }
+
+  /* Высота строки рассчитана на самый длинный вариант: выбор ответа не двигает остальные строки */
+  function reserveLines() {
+    items.forEach(function (item) {
+      const line = item.el.closest(".fill-line");
+      const value = item.el.querySelector(".fill-value");
+      const current = value.textContent;
+      line.style.minHeight = "";
+      let tallest = line.offsetHeight;
+      item.options.forEach(function (option) {
+        value.textContent = option;
+        tallest = Math.max(tallest, line.offsetHeight);
+      });
+      value.textContent = current;
+      line.style.minHeight = tallest + "px";
+    });
   }
 
   /* --- Меню --- */
@@ -2983,6 +3024,8 @@ function setupFill(topic, task, taskIndex, onDone) {
     closeMenu(true);
     renderBlank(item);
     check.disabled = items.some(function (it) { return !it.chosen; });
+    renderCount();
+    renderResult();
     message.textContent = "Пропуск " + (item.index + 1) + ": " + item.chosen;
   }
 
@@ -3029,26 +3072,24 @@ function setupFill(topic, task, taskIndex, onDone) {
   window.addEventListener("resize", function () { closeMenu(false); }, listen);
   window.addEventListener("scroll", function (e) {
     if (!opened || e.target === menu) return;
-    const rect = opened.el.getBoundingClientRect(), area = textBox.getBoundingClientRect();
+    const rect = opened.el.getBoundingClientRect(), area = textArea.getBoundingClientRect();
     const top = Math.max(area.top, document.querySelector(".site-header").getBoundingClientRect().bottom);
     if (rect.bottom < top || rect.top > Math.min(area.bottom, window.innerHeight)) closeMenu(false);
     else placeMenu(opened);
   }, { capture: true, passive: true, signal: listen.signal });
 
   /* --- Проверка --- */
+  /* Плашка на каждый пропуск: до проверки все серые, после — у верных пояснение, у неверных просьба выбрать другой вариант */
   function renderWhy() {
-    const right = items.filter(function (item) { return item.ok; });
-    why.innerHTML = right.map(function (item) {
-      return '<li><span class="order-num" aria-hidden="true">' + (item.index + 1) + "</span><span>" + escapeHtml(item.explanation) + "</span></li>";
+    why.innerHTML = items.map(function (item) {
+      const text = item.ok ? item.explanation : checked ? "Выберите другой вариант" : "Пояснение откроется после проверки";
+      return '<li class="fill-why-item' + (item.ok ? " is-ok" : "") + '"><span class="order-num" aria-hidden="true">' + (item.index + 1) + "</span><span>" + escapeHtml(text) + "</span></li>";
     }).join("");
-    why.hidden = right.length === 0;
-    hint.hidden = right.length > 0;
   }
 
   function finish(byKey) {
     bar.classList.add("is-done");
     check.hidden = true;
-    result.textContent = "";
     saveTaskDone(topic, task);
     message.textContent = "Готово! Все пропуски заполнены верно";
     if (byKey) firstAction.focus();
@@ -3061,13 +3102,14 @@ function setupFill(topic, task, taskIndex, onDone) {
       item.wrongNow = !item.ok;
       renderBlank(item);
     });
+    checked = true;
     renderWhy();
-    const right = items.filter(function (item) { return item.ok; }).length;
-    if (right === items.length) {
+    renderCount();
+    renderResult();
+    if (items.every(function (item) { return item.ok; })) {
       finish(e.detail === 0);
       return;
     }
-    result.textContent = "Верно " + right + " из " + items.length;
     if (e.detail === 0) items.find(function (item) { return !item.ok; }).el.focus();
   });
 
@@ -3077,6 +3119,19 @@ function setupFill(topic, task, taskIndex, onDone) {
   });
 
   items.forEach(renderBlank);
+  renderCount();
+  renderWhy();
+  reserveLines();
+
+  // Ширина текста изменилась (окно, свёрнутая панель слева) — строки переносятся иначе
+  let textWidth = textBox.offsetWidth;
+  const textResize = new ResizeObserver(function () {
+    if (textBox.offsetWidth === textWidth) return;
+    textWidth = textBox.offsetWidth;
+    reserveLines();
+  });
+  textResize.observe(textBox);
+  listen.signal.addEventListener("abort", function () { textResize.disconnect(); });
 }
 
 /* ---------- Страница практики (practice.html?topic=ID&task=номер) ----------
@@ -3093,6 +3148,14 @@ function renderPracticeNote(note) {
       (note.footnote ? '<p class="practice-note-foot">' + escapeHtml(note.footnote) + "</p>" : "") +
     "</aside>"
   );
+}
+
+/* Описание под заголовком задания. У «Заполни пропуск» общее описание заменяет подсказка, как обращаться с овалами */
+function practiceDescHtml(task) {
+  const isFill = task.type === "fill";
+  const description = isFill && task.description === FILL_GENERAL_DESC ? "" : task.description;
+  return (description ? '<p class="practice-task-desc">' + escapeHtml(description) + "</p>" : "") +
+    (isFill ? '<p class="practice-task-desc">' + FILL_HINT + "</p>" : "");
 }
 
 function renderPracticePage() {
@@ -3124,7 +3187,7 @@ function renderPracticePage() {
       '<section class="practice-main-col">' +
         '<div class="practice-head">' +
           '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
-          (task.description ? '<p class="practice-task-desc">' + escapeHtml(task.description) + "</p>" : "") +
+          practiceDescHtml(task) +
         "</div>" +
         renderPracticeNote(task.note) +
         '<div id="practice-task"></div>' +

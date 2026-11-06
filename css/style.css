@@ -54,7 +54,7 @@
   --practice-desc-color: #3c4557;   /* цвет описания */
   --practice-zones-gap: 44px;       /* место для линий между зонами в «Подбери пару» */
   --practice-explain-h: 58px;       /* высота строки «Пояснение» в «Подбери пару» */
-  --practice-fill-size: 18px;       /* размер текста в «Заполни пропуск» */
+  --practice-fill-size: 20px;       /* размер текста в «Заполни пропуск» */
 }
 
 * {
@@ -2803,9 +2803,9 @@ body.page-practice { background: var(--page-bg); }
 .practice-layer.is-hover {
   filter: drop-shadow(0 0 3px rgba(255, 222, 100, 0.95)) drop-shadow(0 0 12px rgba(250, 180, 40, 0.85));
 }
-/* Выбранный верный предмет: мягкая зелёная обводка остаётся */
+/* Выбранный верный предмет: нейтральная голубая обводка остаётся */
 .practice-layer.is-ok {
-  filter: drop-shadow(0 0 2px rgba(120, 200, 120, 0.95)) drop-shadow(0 0 8px rgba(46, 125, 50, 0.6));
+  filter: drop-shadow(0 0 2px rgba(140, 190, 225, 0.95)) drop-shadow(0 0 8px rgba(61, 107, 140, 0.6));
 }
 /* Найденная ошибка растворяется за 0.8 сек */
 .practice-layer.is-gone {
@@ -2841,7 +2841,7 @@ body.page-practice { background: var(--page-bg); }
   display: flex;
   gap: 10px;
 }
-.practice-popup-btns .btn { min-width: 76px; }
+.practice-popup-btns .btn { min-width: 76px; border-radius: 999px; }
 
 /* Маленькая подсказка у выбранного верного предмета */
 .practice-tip {
@@ -2953,8 +2953,16 @@ body.page-practice { background: var(--page-bg); }
   font-size: 0.78rem;
   font-weight: bold;
 }
-.practice-tag--error { background: #fbe1cf; color: #9a3f1b; }
 .practice-tag--ok { background: #e1f0dc; color: #2e6b30; }
+/* «Что здесь не так?»: найденная ошибка — зелёная, верный предмет — нейтральный. Ярлык сверху, ниже название и пояснение */
+.practice-card--found { background: #e9f5e6; border-color: #c5e3bd; }
+.practice-card--neutral { background: #eef3f7; border-color: #d3dfe9; }
+.practice-tag--found { background: #2e7d32; color: #fff; }
+.practice-tag--neutral { background: #dbe6ef; color: #2f5573; }
+.practice-card-note { flex: none; font-size: 0.8rem; color: var(--muted); }
+.practice-card--found .practice-card-name,
+.practice-card--neutral .practice-card-name { order: 3; flex: 0 0 100%; }
+.practice-scene .practice-tip { border-color: #a9c3d6; }
 
 /* Задание «Найди на картинке» (type "find-zones").
    Сцена по центру колонки: её наибольшую ширину считает fitImage в js/main.js, чтобы картинка помещалась в окно */
@@ -3379,6 +3387,34 @@ body.page-practice { background: var(--page-bg); }
 .match-dialog-list p { margin: 4px 0 0; color: var(--practice-desc-color); }
 
 /* Задание «Заполни пропуск» (type "fill"): зоны «Текст» и «Пояснения» */
+.practice-page-grid--fill {
+  --fill-orange: #e2692f;
+  --fill-orange-dark: #cf5a22;
+  --fill-orange-soft: #fde3d3;
+  --fill-green: #2e7d32;
+  --fill-red: #c62828;
+  --fill-grey: #f3ebe5;
+  --fill-grey-text: #80786f;
+}
+.practice-page-grid--fill .practice-bar .btn { border-radius: 999px; }
+.fill-head { display: flex; align-items: center; }
+.fill-count { margin: 0 0 0 auto; font-size: 0.95rem; color: var(--muted); white-space: nowrap; }
+.fill-progress {
+  flex: none;
+  height: 6px;
+  margin: 2px 0 8px;
+  border-radius: 3px;
+  background: #f3e3d8;
+  overflow: hidden;
+}
+.fill-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--fill-orange);
+  transition: width 0.25s ease;
+}
 .fill-text {
   list-style: none;
   margin: 0;
@@ -3386,18 +3422,24 @@ body.page-practice { background: var(--page-bg); }
   display: grid;
   gap: 10px;
   font-size: var(--practice-fill-size);
-  line-height: 1.7;
+  line-height: 1.55;
 }
 .fill-line {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 1px 6px rgba(107, 74, 53, 0.08);
 }
-.fill-line .order-num { margin-top: 1px; font-size: 1rem; }
-.fill-line.is-ok .order-num {
-  border-color: #2e7d32;
-  background: #2e7d32;
-  color: #fff;
+.fill-line .order-num {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: var(--fill-orange-soft);
+  color: var(--accent);
+  font-size: 1rem;
 }
 .fill-sentence {
   flex: 1 1 0;
@@ -3405,36 +3447,33 @@ body.page-practice { background: var(--page-bg); }
   margin: 0;
   overflow-wrap: break-word;
 }
-/* Пропуск в строке: пунктир снизу; после проверки — цвет и значок, чтобы различать не только по цвету */
+/* Пропуск — овал: пустой, с выбранным вариантом, верный, неверный. Толщина рамки и жирность одни во всех видах, чтобы строка не менялась */
 .fill-blank {
-  padding: 0 3px;
-  border-bottom: 2px dashed var(--accent);
-  border-radius: 4px 4px 0 0;
-  color: var(--accent-dark);
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 14px;
+  border: 2px solid var(--fill-orange);
+  border-radius: 20px;
+  background: var(--fill-orange-soft);
+  color: var(--accent);
   font-weight: bold;
+  line-height: 1.3;
   cursor: pointer;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
   -webkit-tap-highlight-color: transparent;
 }
 .fill-blank:hover,
-.fill-blank.is-open { background: #fbe6d8; }
-.fill-blank.is-filled { color: var(--text); }
-.fill-arrow { font-size: 0.8em; color: var(--accent); }
-.fill-blank.is-ok {
-  border-bottom: 2px solid #2e7d32;
-  background: #e6f3e1;
-  color: #1f5e23;
-  cursor: default;
-}
+.fill-blank.is-open { background: #fbd3ba; }
+.fill-arrow { margin-left: 0.35em; }
+.fill-blank.is-filled { background: var(--fill-orange); color: #fff; }
+.fill-blank.is-filled:hover,
+.fill-blank.is-filled.is-open { background: var(--fill-orange-dark); border-color: var(--fill-orange-dark); }
+.fill-blank.is-ok,
+.fill-blank.is-ok:hover { background: var(--fill-green); border-color: var(--fill-green); color: #fff; cursor: default; }
 .fill-blank.is-ok .fill-arrow { display: none; }
-.fill-blank.is-ok::after { content: "\00a0✓"; }
-.fill-blank.is-wrong {
-  border-bottom: 2px solid #c62828;
-  background: #fdecea;
-  color: #a31515;
-}
-.fill-blank.is-wrong::after { content: "\00a0✕"; }
+.fill-blank.is-ok::after { content: "✓"; margin-left: 0.35em; }
+.fill-blank.is-wrong,
+.fill-blank.is-wrong:hover,
+.fill-blank.is-wrong.is-open { background: var(--fill-red); border-color: var(--fill-red); color: #fff; }
 /* Меню вариантов: положение в координатах окна считает js/main.js (placeMenu) */
 .fill-menu {
   position: fixed;
@@ -3444,26 +3483,47 @@ body.page-practice { background: var(--page-bg); }
   min-width: 170px;
   max-width: min(420px, calc(100vw - 12px));
   margin: 0;
-  padding: 4px;
+  padding: 8px;
   overflow-y: auto;
   background: var(--card);
-  border: 1px solid var(--accent);
-  border-radius: 12px;
-  box-shadow: 0 10px 26px rgba(107, 74, 53, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(107, 74, 53, 0.26);
   font-size: 1rem;
+  font-weight: bold;
   line-height: 1.3;
 }
 .fill-option {
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 9px 16px;
+  border-radius: 20px;
+  color: #3c4557;
   cursor: pointer;
 }
 .fill-option:hover,
-.fill-option:focus { background: #fbe6d8; outline: none; }
+.fill-option:focus { background: #fde3d3; color: var(--accent); outline: none; }
 .fill-option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.fill-option[aria-selected="true"] { font-weight: bold; }
-.fill-hint { margin: 0; font-size: 1rem; color: var(--muted); }
-.order-why-list.fill-why { font-size: 1rem; }
+/* Строка кнопок: сообщение слева */
+.fill-result { margin: 0; color: #c62828; font-weight: bold; }
+.fill-result:empty { display: none; }
+/* Зона «Пояснения»: плашка на каждый пропуск */
+.order-why-list.fill-why { font-size: 1rem; line-height: 1.4; }
+.order-why-list.fill-why li + li { margin-top: 10px; }
+.order-why-list .fill-why-item {
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--fill-grey);
+  color: var(--fill-grey-text);
+}
+.order-why-list .fill-why-item .order-num {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: #e7ddd6;
+  color: var(--fill-grey-text);
+  font-size: 0.9rem;
+}
+.order-why-list .fill-why-item.is-ok { background: #fff; color: var(--text); box-shadow: 0 1px 6px rgba(107, 74, 53, 0.08); }
+.order-why-list .fill-why-item.is-ok .order-num { background: var(--fill-green); color: #fff; }
 
 /* Нет картинок — серый блок вместо задания */
 .practice-missing {
@@ -3762,6 +3822,12 @@ body.page-practice { background: var(--page-bg); }
     text-overflow: ellipsis;
   }
   .practice-card:not(.is-open) p { display: none; }
+  /* Раскрытая карточка: ярлык и стрелка в первой строке, название ниже. Свёрнутая — всё в одну строку */
+  .practice-card.is-open .practice-card-head:has(.practice-tag--found, .practice-tag--neutral) { flex-wrap: wrap; }
+  .practice-card.is-open .practice-card-head:has(.practice-tag--found, .practice-tag--neutral)::after { order: 2; margin-left: auto; }
+  .practice-card:not(.is-open) .practice-card-note { display: none; }
+  .practice-card--found:not(.is-open) .practice-card-name,
+  .practice-card--neutral:not(.is-open) .practice-card-name { order: 0; flex: 1 1 0; }
 
   /* «Расставь по порядку», «Подбери пару», «Заполни пропуск»: две зоны рядом. Заголовок, «Пояснение» и кнопки идут над и под обеими —
      иначе зоны не будут одной высоты. display: contents ставит содержимое центра прямо в сетку страницы */
@@ -3828,7 +3894,6 @@ body.page-practice { background: var(--page-bg); }
      Поля нужны, чтобы рамка выбранной карточки и дрожь неверной пары не обрезались краем списка */
   .order-slots,
   .order-pool,
-  .fill-text,
   .match-list {
     flex: 1;
     min-height: 0;
@@ -3840,7 +3905,6 @@ body.page-practice { background: var(--page-bg); }
     padding: 3px 6px;
   }
   .order-slots { grid-auto-rows: minmax(min-content, 96px); }
-  .fill-text { gap: 12px; }
   .order-slot { min-height: 52px; padding: 4px 8px; gap: 10px; }
   .order-num { width: 28px; height: 28px; }
   .order-card { padding: 5px 10px; }
@@ -3899,6 +3963,40 @@ body.page-practice { background: var(--page-bg); }
   .match-explain .btn { flex: none; }
 }
 
+/* «Заполни пропуск» на компьютере: строки равномерно по высоте зоны. Не влезли — сначала исчезают промежутки, потом прокрутка внутри зоны.
+   Прокручивается внешний блок: при нехватке места space-evenly сдвинул бы первую строку за верхний край */
+@media (min-width: 1000px) {
+  .practice-page-grid--fill .practice-zone,
+  .practice-page-grid--fill .practice-side-col { padding: 14px 20px 16px; }
+  .fill-scroll {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    margin: 0 -6px;
+    padding: 3px 6px 6px;
+  }
+  .fill-text {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    gap: 6px;
+  }
+  .fill-line { flex: none; }
+}
+/* Окно пониже: сначала уменьшаются промежутки и поля, размер текста тот же */
+@media (min-width: 1000px) and (max-height: 820px) {
+  .practice-page-grid--fill .practice-zone,
+  .practice-page-grid--fill .practice-side-col { padding: 8px 20px 8px; }
+  .fill-scroll { padding-bottom: 3px; }
+  .fill-text { gap: 4px; }
+  .fill-line { padding: 6px 16px; }
+  .fill-progress { margin-bottom: 6px; }
+}
+
 /* Низкое окно (например, ноутбук 1366×768: вкладки браузера оставляют около 630px) — меньше воздуха, размер текста и картинок тот же */
 @media (min-width: 1000px) and (max-height: 720px) {
   :root { --practice-explain-h: 54px; }
@@ -3915,7 +4013,15 @@ body.page-practice { background: var(--page-bg); }
   .order-slots,
   .order-pool,
   .match-list { gap: 3px; padding-top: 2px; padding-bottom: 2px; }
-  .fill-text { gap: 6px; padding-top: 2px; padding-bottom: 2px; }
+  .practice-page-grid--fill .practice-zone,
+  .practice-page-grid--fill .practice-side-col { padding: 4px 14px 4px; }
+  .fill-head { min-height: 28px; }
+  .fill-progress { margin: 0 0 3px; }
+  .fill-scroll { padding-top: 1px; padding-bottom: 2px; }
+  .fill-text { gap: 2px; }
+  .fill-line { padding: 3px 14px; }
+  .order-why-list.fill-why li + li { margin-top: 6px; }
+  .order-why-list .fill-why-item { padding: 6px 12px; }
   .order-slot { min-height: 44px; padding: 2px 8px; }
   .order-card { padding: 2px 10px; }
   .match-card { padding-top: 2px; padding-bottom: 2px; }
