@@ -2657,8 +2657,7 @@ html.modal-open {
 
 /* ===== Практика (страница practice.html; поле practice.tasks в js/data.js) ===== */
 
-/* Тёплый фон страницы практики и широкий контейнер — чтобы картинка была крупной */
-body.page-practice { background: var(--page-bg); }
+/* Широкий контейнер — чтобы картинка была крупной. Цвета страницы — в разделе «Палитра практики» в конце файла */
 .practice-container { max-width: 1440px; }
 
 /* Уже 1000px всё идёт друг под другом; раскладка в три области — в блоке «Компьютер» в конце раздела */
@@ -4127,3 +4126,332 @@ body.page-practice { background: var(--page-bg); }
   .order-card.is-back { animation: none; opacity: 1; }
   .match-card.is-wrong { animation-name: match-wrong-still; }
 }
+
+/* ===== Палитра практики: цвета только этой страницы (body.page-practice). Числа меняются здесь, в первом блоке =====
+   Общие цвета сайта подменяются внутри #practice-page, поэтому шапка и подвал остаются прежними. Зелёный и красный — общие, не меняются */
+body.page-practice {
+  --p-blue: #3F6FCC;
+  --p-blue-dark: #335CB0;
+  --p-coral: #EE7A50;
+  --p-coral-dark: #D9663D;
+  --p-bg: #EEF3FD;         /* фон страницы */
+  --p-beige: #FEF3EE;      /* подложки */
+  --p-blue-soft: #E6EEFB;
+  --p-ink: #222B3D;        /* текст */
+  --p-ink-2: #56607A;      /* второстепенный текст */
+  --p-coral-soft: #FDE5DB; /* куда сейчас можно положить карточку */
+  --p-line: rgba(34, 43, 61, 0.12);
+  --p-shadow: 0 2px 10px rgba(34, 43, 61, 0.08);
+  --p-shadow-big: 0 8px 22px rgba(34, 43, 61, 0.18);
+}
+/* Фон на main, а не на body: шапка полупрозрачная и пропускала бы новый цвет */
+body.page-practice main { background: var(--p-bg); }
+body.page-practice #practice-page {
+  --text: var(--p-ink);
+  --muted: var(--p-ink-2);
+  --accent: var(--p-coral);
+  --accent-dark: var(--p-coral-dark);
+  --bg: var(--p-beige);
+  --practice-desc-color: var(--p-ink-2);
+  color: var(--p-ink);
+}
+
+/* --- Панели --- */
+body.page-practice .practice-nav {
+  background: var(--p-beige);
+  border-color: var(--p-line);
+}
+body.page-practice .practice-side-col,
+body.page-practice .practice-none,
+body.page-practice .practice-note-card,
+body.page-practice .practice-zone,
+body.page-practice .practice-page-grid--zones .practice-side-col,
+body.page-practice .match-explain {
+  border-color: var(--p-line);
+  box-shadow: var(--p-shadow);
+}
+/* Записка над картинкой: полоса слева коралловая */
+body.page-practice .practice-note-card { border-left-color: var(--p-coral); }
+body.page-practice .practice-page-grid--zones .practice-side-col { background: var(--p-beige); }
+body.page-practice .practice-page-grid .practice-side-col.is-over { background: var(--p-coral-soft); }
+body.page-practice .match-explain { box-shadow: none; }
+@media (min-width: 1000px) {
+  body.page-practice .practice-zone { background: var(--p-beige); }
+}
+
+/* Шапка правой панели: полоса до краёв панели. Отрицательные поля возвращают то, что добавляют внутренние: список карточек остаётся на месте */
+body.page-practice .practice-count {
+  margin: -16px -16px 6px;
+  padding: 16px 16px 8px;
+  border-radius: 13px 13px 0 0;
+  background: var(--p-beige);
+}
+@media (min-width: 1000px) {
+  body.page-practice .practice-count {
+    margin: -12px -14px 2px;
+    padding: 12px 14px 6px;
+  }
+}
+/* Число в счётчике: крупнее, но строка от него не растёт */
+body.page-practice .practice-count strong,
+body.page-practice .match-count strong,
+body.page-practice .fill-count strong {
+  color: var(--p-coral);
+  font-size: 1.35em;
+  line-height: 0;
+}
+
+/* --- Левая панель --- */
+body.page-practice .practice-nav-topic,
+body.page-practice .practice-nav-back,
+body.page-practice .practice-note a { color: var(--p-blue); }
+body.page-practice .practice-nav-back:hover { color: var(--p-blue-dark); }
+body.page-practice .practice-nav-fold { color: var(--p-coral); }
+body.page-practice .practice-nav-fold:hover { background: var(--p-coral-soft); color: var(--p-coral-dark); }
+body.page-practice .practice-nav-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+body.page-practice .practice-nav-item:hover { background: rgba(255, 255, 255, 0.65); }
+body.page-practice .practice-nav-item.is-current {
+  border-color: transparent;
+  background: #fff;
+  box-shadow: var(--p-shadow);
+}
+/* Номер в кружке; цифру в тексте слышит только программа чтения (сам кружок для неё скрыт) */
+body.page-practice .practice-nav-circle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  border: 2px solid var(--p-coral);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--p-coral);
+  font-size: 0.8rem;
+  font-weight: bold;
+  line-height: 1;
+}
+body.page-practice .is-current .practice-nav-circle {
+  background: var(--p-coral);
+  color: #fff;
+}
+body.page-practice .practice-nav-num {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+/* Полоска под «Выполнено заданий» */
+body.page-practice .practice-nav-count { margin-bottom: 6px; }
+body.page-practice .practice-nav-progress {
+  height: 6px;
+  margin-bottom: 12px;
+  border-radius: 3px;
+  background: #fff;
+  overflow: hidden;
+}
+body.page-practice .practice-nav-progress span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--p-coral);
+  transition: width 0.25s ease;
+}
+@media (min-width: 1000px) {
+  body.page-practice .practice-nav > .practice-nav-progress { display: none; }
+  /* Свёрнутая панель: только кружки, без белой плашки и полоски */
+  body.page-practice .is-nav-folded .practice-nav-item,
+  body.page-practice .is-nav-folded .practice-nav-item:hover,
+  body.page-practice .is-nav-folded .practice-nav-item.is-current {
+    background: none;
+    box-shadow: none;
+  }
+  body.page-practice .is-nav-folded .practice-nav-progress { display: none; }
+  body.page-practice .is-nav-folded .practice-nav-circle {
+    width: 32px;
+    height: 32px;
+    margin-top: 0;
+    font-size: 0.95rem;
+  }
+}
+@media (max-width: 999px) {
+  body.page-practice .practice-nav-body .practice-nav-progress { display: none; }   /* как и счётчик: он уже есть в кнопке «Задания» */
+  body.page-practice .practice-nav > .practice-nav-progress { margin: 0 14px 10px; }
+  body.page-practice .practice-nav { box-shadow: var(--p-shadow); }
+}
+
+/* --- Плашка у заголовка --- */
+body.page-practice .practice-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+}
+body.page-practice .practice-task-badge {
+  flex: none;
+  margin-bottom: 6px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--p-beige);
+  color: var(--p-coral);
+  font-size: 0.8rem;
+  font-weight: bold;
+  line-height: 1.5;
+}
+@media (min-width: 1000px) {
+  body.page-practice .practice-task-badge { margin-bottom: 2px; }
+}
+
+/* --- Кнопки. «Проверить», «К следующему заданию», «Да» и обводка «Пройти ещё раз», «Нет» — коралловые через --accent --- */
+body.page-practice .practice-bar .btn,
+body.page-practice .match-explain .btn { border-radius: 999px; }
+body.page-practice .practice-page-grid .btn-secondary:hover { background: var(--p-beige); }
+body.page-practice .practice-page-grid .btn:disabled {
+  border-color: #DDE2EC;
+  background: #DDE2EC;
+  color: var(--p-ink-2);
+}
+body.page-practice .practice-bar .practice-to-test {
+  border-color: var(--p-blue);
+  background: var(--p-blue);
+  color: #fff;
+}
+body.page-practice .practice-bar .practice-to-test:hover {
+  border-color: var(--p-blue-dark);
+  background: var(--p-blue-dark);
+}
+body.page-practice .practice-bar .practice-lesson {
+  border-color: var(--p-blue);
+  background: #fff;
+  color: var(--p-blue);
+}
+body.page-practice .practice-bar .practice-lesson:hover { background: var(--p-blue-soft); }
+
+/* --- Задания с картинкой. Рамка нарисована тенью и занимает те же 8px: белая 5px и обводка 3px, размер картинки не меняется --- */
+body.page-practice .practice-stage {
+  background: var(--p-blue-soft);
+  box-shadow: 0 0 0 5px #fff, 0 0 0 8px var(--p-coral), 0 10px 30px rgba(34, 43, 61, 0.16);
+}
+body.page-practice .practice-popup,
+body.page-practice .practice-tip,
+body.page-practice .zones-miss,
+body.page-practice .practice-finish.has-note { box-shadow: var(--p-shadow-big); }
+@media (min-width: 1000px) {
+  @container practice-bar (max-width: 940px) {
+    body.page-practice .practice-finish { box-shadow: var(--p-shadow-big); }
+  }
+}
+body.page-practice .practice-scene .practice-tip { border-color: var(--p-blue); }
+body.page-practice .practice-message { color: var(--p-ink); }
+body.page-practice .practice-cell.is-empty { background: var(--p-bg); }
+body.page-practice .practice-card {
+  border-color: var(--p-line);
+  box-shadow: 0 2px 8px rgba(34, 43, 61, 0.08);
+}
+body.page-practice .practice-card--found { border-color: #c5e3bd; }
+body.page-practice .practice-card--neutral {
+  background: var(--p-blue-soft);
+  border-color: var(--p-blue-soft);
+}
+body.page-practice .practice-tag--neutral {
+  background: #fff;
+  color: var(--p-blue);
+}
+body.page-practice .practice-card-head::after { color: var(--p-coral); }
+body.page-practice .zones-mark {
+  background: var(--p-coral);
+  background: color-mix(in srgb, var(--p-coral) 85%, transparent);
+}
+
+/* --- Текстовые задания: подложка бежевая, карточки белые, акцент коралловый --- */
+@media (max-width: 999px) {
+  /* Подложку левой зоны рисует тень: на узком экране у зоны нет своих полей, и так ничего не сдвигается */
+  body.page-practice .practice-page-grid--zones .practice-zone {
+    border-radius: 4px;
+    background: var(--p-beige);
+    box-shadow: 0 0 0 10px var(--p-beige);
+  }
+  body.page-practice .practice-page-grid--order .practice-side-col:not(.is-done) { box-shadow: 0 -6px 18px rgba(34, 43, 61, 0.16); }
+}
+body.page-practice .order-result {
+  color: var(--p-ink);
+  border-left-color: var(--p-coral);
+}
+body.page-practice .order-slot {
+  border-color: rgba(238, 122, 80, 0.45);
+  background: rgba(255, 255, 255, 0.6);
+}
+body.page-practice .order-slots.is-choosing .order-slot:not(.is-locked) {
+  border-color: var(--p-coral);
+  background: #fff;
+}
+body.page-practice .order-slots.is-choosing .order-slot.is-over:not(.is-locked) { background: var(--p-coral-soft); }
+body.page-practice .order-slot.is-locked { border-color: #2e7d32; background: #e6f3e1; }
+body.page-practice .order-card,
+body.page-practice .match-card {
+  border-color: var(--p-line);
+  box-shadow: 0 2px 6px rgba(34, 43, 61, 0.08);
+}
+body.page-practice .order-card.is-selected,
+body.page-practice .order-card.is-dragging,
+body.page-practice .match-card.is-selected {
+  border-color: var(--p-coral);
+  box-shadow: 0 0 0 2px var(--p-coral);
+  background: #fff;
+}
+body.page-practice .order-card.is-locked {
+  background: #f4faf1;
+  border-color: #a5c99a;
+  box-shadow: none;
+}
+body.page-practice .order-card-x:hover,
+body.page-practice .match-dialog-x:hover { background: var(--p-beige); color: var(--p-coral-dark); }
+@media (hover: hover) {
+  body.page-practice .match-card:not(:disabled):hover { border-color: var(--p-coral); }
+}
+body.page-practice .match-answers.is-choosing .match-right:not(:disabled) { border-color: var(--p-coral); }
+body.page-practice .match-card.is-over { background: var(--p-coral-soft); }
+body.page-practice .match-card.is-found {
+  border-color: #2e7d32;
+  background: #e6f3e1;
+  box-shadow: none;
+}
+/* Анимация неверной пары сильнее обычных правил и остаётся красной. На телефоне все пары зелёные, различает их цифра */
+body.page-practice .match-num[data-color] { background: #2e7d32; }
+body.page-practice .match-picked,
+body.page-practice .match-explain-label { color: var(--p-ink); }
+body.page-practice .match-dialog-list li + li { border-top-color: var(--p-line); }
+
+/* «Заполни пропуск»: пустой овал белый, выбранный залит. Зелёный и красный здесь свои, не меняются */
+body.page-practice .practice-page-grid--fill {
+  --fill-orange: var(--p-coral);
+  --fill-orange-dark: var(--p-coral-dark);
+  --fill-orange-soft: #fff;
+  --fill-grey: #fff;
+  --fill-grey-text: var(--p-ink-2);
+}
+body.page-practice .fill-blank:hover,
+body.page-practice .fill-blank.is-open { background: var(--p-beige); }
+body.page-practice .fill-blank.is-filled:hover,
+body.page-practice .fill-blank.is-filled.is-open { background: var(--fill-orange-dark); }
+body.page-practice .fill-blank.is-ok,
+body.page-practice .fill-blank.is-ok:hover { background: var(--fill-green); }
+body.page-practice .fill-blank.is-wrong,
+body.page-practice .fill-blank.is-wrong:hover,
+body.page-practice .fill-blank.is-wrong.is-open { background: var(--fill-red); }
+body.page-practice .fill-progress { background: #fff; }
+body.page-practice .fill-line { box-shadow: 0 1px 6px rgba(34, 43, 61, 0.08); }
+body.page-practice .fill-line .order-num { border: 2px solid var(--p-coral); }
+body.page-practice .fill-menu { box-shadow: 0 10px 28px rgba(34, 43, 61, 0.24); }
+body.page-practice .fill-option { color: var(--p-ink); }
+body.page-practice .fill-option:hover,
+body.page-practice .fill-option:focus { background: var(--p-beige); color: var(--p-coral-dark); }
+body.page-practice .order-why-list .fill-why-item:not(.is-ok) .order-num { background: var(--p-beige); color: var(--p-ink-2); }
+body.page-practice .order-why-list .fill-why-item.is-ok { box-shadow: 0 1px 6px rgba(34, 43, 61, 0.08); }

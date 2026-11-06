@@ -1459,7 +1459,7 @@ function practiceBar(topic, taskIndex, doneText, messages, first) {
       (hasNext
         ? '<a href="' + practiceLink(topic, taskIndex + 2) + '" data-task="' + (taskIndex + 2) + '" class="btn btn-primary practice-after">К следующему заданию</a>'
         : "") +
-      '<a href="' + topicTestLink(topic) + '" class="btn ' + (hasNext ? "btn-secondary" : "btn-primary") + ' practice-after">К тесту</a>' +
+      '<a href="' + topicTestLink(topic) + '" class="btn ' + (hasNext ? "btn-secondary" : "btn-primary") + ' practice-after practice-to-test">К тесту</a>' +
       '<button type="button" class="btn btn-secondary practice-again">Пройти ещё раз</button>' +
       '<a href="' + lessonLink + '" class="btn btn-secondary practice-lesson practice-before">К уроку</a>' +
       '<a href="' + lessonLink + '" class="btn btn-secondary practice-lesson practice-after">Вернуться к уроку</a>' +
@@ -2676,7 +2676,7 @@ function setupMatch(topic, task, taskIndex, onDone) {
   }
 
   function updateCount() {
-    count.textContent = "Найдено пар: " + found + " из " + pairs.length;
+    count.innerHTML = "Найдено пар: <strong>" + found + "</strong> из " + pairs.length;
   }
 
   /* Строка над ответами заменяет подсказку: что выбрано (карточка слева на телефоне уже за краем окна) */
@@ -2957,7 +2957,7 @@ function setupFill(topic, task, taskIndex, onDone) {
   function renderCount() {
     const filled = items.filter(function (item) { return item.chosen; }).length;
     const right = items.filter(function (item) { return item.ok; }).length;
-    count.textContent = (checked ? "Верно " + right : "Заполнено " + filled) + " из " + items.length;
+    count.innerHTML = (checked ? "Верно <strong>" + right : "Заполнено <strong>" + filled) + "</strong> из " + items.length;
     progress.style.width = filled / items.length * 100 + "%";
   }
 
@@ -3203,7 +3203,10 @@ function renderPracticePage() {
       '<nav class="practice-nav" aria-label="Задания практики"></nav>' +
       '<section class="practice-main-col">' +
         '<div class="practice-head">' +
-          '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
+          '<div class="practice-title-row">' +
+            '<h1 class="practice-task-title">' + escapeHtml(task.title) + "</h1>" +
+            '<span class="practice-task-badge">Задание ' + (index + 1) + " из " + tasks.length + "</span>" +
+          "</div>" +
           practiceDescHtml(task) +
         "</div>" +
         renderPracticeNote(task.note) +
@@ -3216,6 +3219,8 @@ function renderPracticePage() {
   let navOpen = false;   // открыт ли выпадающий список (уже 1000px)
   function renderNav() {
     const foldLabel = practiceNavFolded ? "Развернуть список заданий" : "Свернуть список заданий";
+    // Только вид: то же число написано рядом словами
+    const progressBar = '<div class="practice-nav-progress" aria-hidden="true"><span style="width:' + countTasksDone(topic) / tasks.length * 100 + '%"></span></div>';
     nav.innerHTML =
       '<button type="button" class="practice-nav-fold" aria-expanded="' + !practiceNavFolded + '" aria-label="' + foldLabel + '" title="' + foldLabel + '">' +
         (practiceNavFolded ? "»" : "«") +
@@ -3224,10 +3229,12 @@ function renderPracticePage() {
         "<strong>Задания</strong> " +
         '<span class="practice-nav-drop-count">Выполнено ' + countTasksDone(topic) + " из " + tasks.length + "</span>" +
       "</button>" +
+      progressBar +
       '<div class="practice-nav-body">' +
         '<h2 class="practice-nav-title">Практика</h2>' +
         '<p class="practice-nav-topic">' + escapeHtml(topic.title) + "</p>" +
         '<p class="practice-nav-count">Выполнено заданий: ' + countTasksDone(topic) + " из " + tasks.length + "</p>" +
+        progressBar +
         '<ol class="practice-nav-list">' +
           tasks.map(function (t, i) {
             const done = isTaskDone(topic, t);
@@ -3242,7 +3249,7 @@ function renderPracticePage() {
                 '<span class="practice-nav-circle" aria-hidden="true">' + (i + 1) + "</span>" +
                 '<span class="practice-nav-label">' +
                   '<span class="practice-nav-num">' + (i + 1) + ".</span> " + escapeHtml(t.title) +
-                  (done ? ' <span class="practice-nav-check" aria-label="выполнено">✓</span>' : "") +
+                  (done ? '\u00a0<span class="practice-nav-check" aria-label="выполнено">✓</span>' : "") +   // галочка не уходит на строку одна
                 "</span>" +
               "</a></li>";
           }).join("") +
