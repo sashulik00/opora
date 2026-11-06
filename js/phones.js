@@ -10,4 +10,11 @@ const CRISIS_PHONES = [
   { number: "117, затем 1", tel: "117", note: "горячая линия фонда «Защитники Отечества»", short: "горячая линия фонда «Защитники Отечества»", title: "«Защитники Отечества»" }
 ];
 
+/* Карточка «Срочно» на странице консультанта. Скорая стоит отдельно: кризисный список выше читает и сервер */
+const URGENT_PHONES = [
+  { number: "103", tel: "103", title: "Скорая" },
+  Object.assign({}, CRISIS_PHONES[0], { title: "Единый номер" }),
+  CRISIS_PHONES[1]
+];
+
 if (typeof module !== "undefined") module.exports = { CRISIS_PHONES };

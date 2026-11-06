@@ -8,14 +8,21 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <!-- data-page="articles" — чтобы в меню подсвечивались «Справочник» и нужный пункт подменю -->
-<body data-page="articles">
+<body data-page="articles" class="ref-page soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
-    <section class="block">
+    <section class="ref-banner ref-banner--article">
+      <!-- Заголовок, раздел, хлебные крошки и кнопки статьи: заполняет js/main.js -->
+      <div class="soft-container ref-banner-in">
+        <div class="soft-intro" id="article-head"></div>
+      </div>
+    </section>
+
+    <section class="block ref-content">
       <!-- Статья строится из js/main.js: тема берётся из адреса (article.html?id=burns) -->
-      <div class="container lesson-container" id="article-page"></div>
+      <div class="container" id="article-page"></div>
     </section>
   </main>
 

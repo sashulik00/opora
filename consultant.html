@@ -7,41 +7,62 @@
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body data-page="consultant">
+<body data-page="consultant" class="page-consultant soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
-    <section class="block">
-      <div class="container lesson-container">
-        <h1>Задайте вопрос по уходу</h1>
+    <section class="soft-banner soft-banner--low chat-banner">
+      <div class="soft-container soft-banner-in">
+        <div class="soft-intro">
+          <h1>Консультант</h1>
+          <p class="lead">Ответит по материалам школы, подскажет, что делать сейчас, или просто выслушает.</p>
+        </div>
+        <!-- Кнопки режимов ставит js/main.js: они есть только через сервер и после входа -->
+        <div class="soft-glass chat-modes-card" id="chat-modes-card" hidden>
+          <p class="chat-modes-title">О чём хотите поговорить?</p>
+        </div>
+      </div>
+    </section>
 
-        <!-- Постоянная заметка над чатом -->
-        <p class="chat-note" role="note">
-          Консультант отвечает по материалам школы, может ошибаться и не заменяет врача.
-          Не вводите личные данные. При опасности звоните <a href="tel:103">103</a> или <a href="tel:112">112</a>.
-        </p>
+    <section class="block soft-over chat-page">
+      <div class="soft-container chat-layout">
+        <div class="chat-main">
+          <div class="card chat">
+            <!-- Постоянная заметка над перепиской -->
+            <p class="chat-note" role="note">
+              <span class="chat-note-icon" aria-hidden="true">!</span>
+              <span>Консультант отвечает по материалам школы, может ошибаться и не заменяет врача.
+              Не вводите личные данные. При опасности звоните <a href="tel:103">103</a> или <a href="tel:112">112</a>.</span>
+            </p>
 
-        <div class="card chat">
-          <!-- Переписка. Живёт только на странице: при обновлении очищается и нигде не сохраняется -->
-          <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Переписка с консультантом"></div>
+            <!-- Переписка. Живёт только на странице: при обновлении очищается и нигде не сохраняется -->
+            <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-label="Переписка с консультантом"></div>
 
-          <div id="chat-hints" class="chat-hints" aria-label="Примеры вопросов">
-            <button type="button" class="chat-hint">Как обрабатывать ожог?</button>
-            <button type="button" class="chat-hint">Что делать при пролежнях?</button>
-            <button type="button" class="chat-hint">Как поддержать близкого?</button>
-            <button type="button" class="chat-hint">Как справиться с усталостью?</button>
+            <form id="chat-form" class="chat-form">
+              <label for="chat-input" class="visually-hidden">Ваш вопрос</label>
+              <input type="text" id="chat-input" placeholder="Напишите вопрос…" autocomplete="off" enterkeyhint="send" maxlength="500">
+              <button type="submit" id="chat-send" class="btn btn-primary">Отправить</button>
+            </form>
           </div>
 
-          <form id="chat-form" class="chat-form">
-            <label for="chat-input" class="visually-hidden">Ваш вопрос</label>
-            <input type="text" id="chat-input" placeholder="Напишите вопрос…" autocomplete="off" enterkeyhint="send" maxlength="500">
-            <button type="submit" id="chat-send" class="btn btn-primary">Отправить</button>
-          </form>
+          <!-- Режим работы (подставляет js/main.js): ИИ через сервер или упрощённые ответы без сервера -->
+          <p class="chat-disclaimer" id="chat-mode"></p>
         </div>
 
-        <!-- Режим работы (подставляет js/main.js): ИИ через сервер или упрощённые ответы без сервера -->
-        <p class="chat-disclaimer" id="chat-mode"></p>
+        <aside class="chat-side">
+          <!-- Вопросы зависят от режима: подставляет js/main.js -->
+          <section class="card chat-faq" id="chat-faq" aria-labelledby="chat-faq-title">
+            <div class="soft-title"><span class="soft-icon" aria-hidden="true">?</span><h2 id="chat-faq-title">Частые вопросы</h2></div>
+            <div id="chat-hints" class="chat-hints"></div>
+          </section>
+
+          <!-- Номера из js/phones.js -->
+          <section class="card chat-urgent" aria-labelledby="chat-urgent-title">
+            <div class="soft-title"><span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6.5 3.5h3l1.5 4.5-2 1.5a12 12 0 0 0 5.5 5.5l1.5-2 4.5 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z"/></svg></span><h2 id="chat-urgent-title">Срочно</h2></div>
+            <ul class="support-where-list" id="chat-phones"></ul>
+          </section>
+        </aside>
       </div>
     </section>
   </main>

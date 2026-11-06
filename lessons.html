@@ -7,16 +7,31 @@
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body data-page="lessons">
+<body data-page="lessons" class="page-lessons soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
+    <!-- Баннер: фото и дымка нарисованы в css/style.css (раздел «Общее для „Уроков“, „Поддержки“ и „Консультанта“») -->
+    <section class="soft-banner">
+      <div class="soft-container soft-banner-in">
+        <div class="soft-intro">
+          <h1>Уроки</h1>
+          <p class="lead">Все уроки открыты: идите по порядку или выберите нужную тему.</p>
+          <form class="les-search" id="lessons-search" role="search">
+            <label for="lessons-search-input" class="visually-hidden">Найти урок</label>
+            <input type="search" id="lessons-search-input" placeholder="Найти урок: ожог, сон, протез…" autocomplete="off">
+            <button type="submit" class="les-search-btn">Найти</button>
+          </form>
+        </div>
+        <!-- «Ваш прогресс», фильтры и список уроков заполняются из js/main.js по данным из js/data.js -->
+        <div id="lessons-progress"></div>
+      </div>
+    </section>
+
     <section class="block">
-      <div class="container">
-        <h1>Уроки</h1>
-        <p class="lead">Все уроки открыты: идите по порядку или выберите нужную тему.</p>
-        <!-- Прогресс и список уроков заполняются из js/main.js по данным из js/data.js -->
+      <div class="soft-container">
+        <div id="lessons-filters" class="filters les-filters" role="group" aria-label="Какие уроки показать"></div>
         <div id="lessons-page"></div>
       </div>
     </section>

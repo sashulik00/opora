@@ -78,6 +78,15 @@ function escapeHtml(text) {
 
 /* ---------- Шапка и подвал ---------- */
 
+/* Разделы справочника: выпадающее меню в шапке и вкладки в баннере страниц */
+const REFERENCE_PAGES = [
+  { href: "reference.html", text: "Поиск", page: "reference" },
+  { href: "videos.html", text: "Видео", page: "videos" },
+  { href: "articles.html", text: "Статьи", page: "articles" },
+  { href: "faq.html", text: "Частые вопросы", page: "faq" },
+  { href: "rights.html", text: "Права и документы", page: "rights" }
+];
+
 function renderHeader() {
   const header = document.getElementById("site-header");
   if (!header) return;
@@ -90,13 +99,7 @@ function renderHeader() {
     { href: "lessons.html", text: "Уроки", page: "lessons" },
     {
       href: "reference.html", text: "Справочник", page: "reference",
-      children: [
-        { href: "reference.html", text: "Поиск", page: "reference" },
-        { href: "videos.html", text: "Видео", page: "videos" },
-        { href: "articles.html", text: "Статьи", page: "articles" },
-        { href: "faq.html", text: "Частые вопросы", page: "faq" },
-        { href: "rights.html", text: "Права и документы", page: "rights" }
-      ]
+      children: REFERENCE_PAGES
     },
     { href: "consultant.html", text: "Консультант", page: "consultant" },
     { href: "help.html", text: "Поддержка", page: "help" }
@@ -413,19 +416,84 @@ function renderHomeStartButton() {
   button.href = "lesson.html?id=" + encodeURIComponent((started ? next : LESSONS[0]).id);
 }
 
-/* Полоса прогресса «Пройдено N из M» на странице «Уроки» */
-function renderProgressBar(progress) {
-  const passedCount = countPassed(progress);
-  const percent = Math.round((passedCount / LESSONS.length) * 100);
+/* «Ваш прогресс»: кольцо и три плашки. «Пройдено» — как в счётчике на главной и в кабинете (сдан тест), остальные — по статусу урока */
+function renderLessonsProgress(progress) {
+  const passed = countPassed(progress);
+  function withStatus(status) {
+    return LESSONS.filter(function (t) { return lessonProgress(t, progress).status === status; }).length;
+  }
+  const active = withStatus(STATUS_ACTIVE);
   return (
-    '<div class="card progress-card">' +
-      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + LESSONS.length + "</p>" +
-      '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length +
-        '" aria-valuenow="' + passedCount + '" aria-label="Прогресс обучения">' +
-        '<div class="progress-fill" style="width:' + percent + '%"></div>' +
+    '<div class="soft-glass les-progress">' +
+      progressRing("les", passed) +
+      "<div>" +
+        "<h2>Ваш прогресс</h2>" +
+        '<p class="les-progress-text">Пройдено ' + passed + ", в процессе — " + active + "</p>" +
+        '<p class="les-chips">' +
+          '<span class="les-chip les-chip--done">' + passed + " пройдено</span>" +
+          '<span class="les-chip les-chip--active">' + active + " в процессе</span>" +
+          '<span class="les-chip les-chip--ahead">' + withStatus(STATUS_NEW) + " впереди</span>" +
+        "</p>" +
       "</div>" +
     "</div>"
   );
+}
+
+/* Значки разделов: содержимое svg с viewBox 0 0 24 24 */
+const LESSON_SECTION_ICONS = {
+  medical: '<path d="M12 4v16M4 12h16"/>',
+  psychology: '<path d="M12 20s-7.5-4.6-8.6-9.6C2.7 7 5 4.5 7.8 4.5c1.8 0 3.2 1 4.2 2.5 1-1.5 2.4-2.5 4.2-2.5 2.8 0 5.1 2.5 4.4 5.9C19.5 15.4 12 20 12 20z"/>'
+};
+
+/* Карточка на странице «Уроки». Вся карточка — одна ссылка, кнопка внутри только нарисована.
+   «Тест сдан»: практика ещё не вся, поэтому кнопка «Продолжить» */
+function renderLessonTile(topic, progress) {
+  const state = lessonProgress(topic, progress);
+  const badge = state.status === STATUS_NEW ? state.status
+    : state.status === STATUS_PASSED ? state.status + " ✓"
+    : state.status + (state.passed ? " ✓" : "") + " · " + state.done + " из " + state.steps;
+  const badgeKind = state.passed ? "done" : state.status === STATUS_ACTIVE ? "active" : "new";
+  const button = state.status === STATUS_NEW ? "Начать →" : state.status === STATUS_PASSED ? "Повторить" : "Продолжить →";
+  return (
+    '<a class="les-card les-card--' + escapeHtml(topic.section) + '" href="lesson.html?id=' + encodeURIComponent(topic.id) + '" data-lesson="' + escapeHtml(topic.id) + '">' +
+      '<div class="les-card-top">' +
+        '<span class="les-num">' + (LESSONS.indexOf(topic) + 1) + "</span>" +
+        '<span class="les-badge les-badge--' + badgeKind + '">' + badge + "</span>" +
+      "</div>" +
+      "<h3>" + escapeHtml(topic.title) + "</h3>" +
+      '<p class="les-desc">' + escapeHtml(topic.description) + "</p>" +
+      '<div class="lesson-bar" role="progressbar" aria-valuemin="0" aria-valuemax="' + state.steps +
+        '" aria-valuenow="' + state.done + '" aria-label="Прогресс урока">' +
+        '<div class="lesson-bar-fill" style="width:' + Math.round(state.done / state.steps * 100) + '%"></div>' +
+      "</div>" +
+      '<div class="les-card-foot">' +
+        '<span class="les-steps">' + state.steps + " " + plural(state.steps, "шаг", "шага", "шагов") + "</span>" +
+        '<span class="les-btn' + (state.status === STATUS_PASSED ? " les-btn--again" : "") + '">' + button + "</span>" +
+      "</div>" +
+    "</a>"
+  );
+}
+
+function lessonsCountText(n) {
+  return n + " " + plural(n, "урок", "урока", "уроков");
+}
+
+/* Список уроков по разделам. Разделы без уроков (сейчас «Социально-правовая помощь») не показываются */
+function renderLessonSections(progress) {
+  return SECTIONS.map(function (section) {
+    const lessons = LESSONS.filter(function (t) { return t.section === section.id; });
+    if (!lessons.length) return "";
+    return (
+      '<section class="les-section les-section--' + escapeHtml(section.id) + '">' +
+        '<div class="les-section-head">' +
+          '<span class="les-section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + (LESSON_SECTION_ICONS[section.id] || "") + "</svg></span>" +
+          '<h2 id="' + section.id + '">' + escapeHtml(section.title) + "</h2>" +
+          '<span class="les-section-count">' + lessonsCountText(lessons.length) + "</span>" +
+        "</div>" +
+        '<div class="les-grid">' + lessons.map(function (t) { return renderLessonTile(t, progress); }).join("") + "</div>" +
+      "</section>"
+    );
+  }).join("");
 }
 
 function renderLessonsPage() {
@@ -434,20 +502,55 @@ function renderLessonsPage() {
 
   const user = getCurrentUser();
   const progress = getProgress();
+  document.getElementById("lessons-progress").innerHTML = renderLessonsProgress(progress);
 
-  let html = renderProgressBar(progress);
+  page.innerHTML =
+    (user ? "" : '<p class="hint">Войдите, чтобы прогресс сохранялся. Смотреть уроки можно и без входа. ' +
+      '<a href="' + loginLinkBack() + '">Войти</a></p>') +
+    renderLessonSections(progress) +
+    '<p class="les-empty" id="lessons-empty" role="status"></p>';
 
-  if (!user) {
-    html +=
-      '<p class="hint">Войдите, чтобы прогресс сохранялся. Смотреть уроки можно и без входа. ' +
-      '<a href="' + loginLinkBack() + '">Войти</a></p>';
+  const input = document.getElementById("lessons-search-input");
+  const empty = document.getElementById("lessons-empty");
+  let currentFilter = "all";
+
+  /* Поиск и фильтр вместе: карточки не строятся заново, а только прячутся. Разделы без карточек прячутся целиком */
+  function showLessons() {
+    const words = normalizeText(input.value).split(" ").filter(Boolean);
+    let shown = 0;
+    page.querySelectorAll(".les-section").forEach(function (section) {
+      let inSection = 0;
+      section.querySelectorAll(".les-card").forEach(function (card) {
+        const topic = LESSONS.find(function (t) { return t.id === card.dataset.lesson; });
+        const text = normalizeText(topic.title + " " + topic.description);
+        const fits = (currentFilter === "all" || topic.section === currentFilter ||
+            currentFilter === "active" && lessonProgress(topic, progress).status === STATUS_ACTIVE) &&
+          words.every(function (word) { return text.indexOf(word) !== -1; });
+        card.hidden = !fits;
+        if (fits) inSection++;
+      });
+      section.hidden = !inSection;
+      section.querySelector(".les-section-count").textContent = lessonsCountText(inSection);
+      shown += inSection;
+    });
+    empty.textContent = shown ? "" : "Ничего не найдено";
   }
 
-  html += renderLessonCards(progress);
-  page.innerHTML = html;
+  const filters = SECTION_FILTERS.filter(function (f) {
+    return f.id === "all" || LESSONS.some(function (t) { return t.section === f.id; });
+  }).concat({ id: "active", title: "В процессе" });
+  setupFilterButtons(document.getElementById("lessons-filters"), filters, function (id) {
+    currentFilter = id;
+    showLessons();
+  });
+  input.addEventListener("input", showLessons);
+  document.getElementById("lessons-search").addEventListener("submit", function (e) {
+    e.preventDefault();
+    showLessons();
+  });
 }
 
-/* Карточка урока: номер, название, описание, полоска прогресса и строка «В процессе · 3 из 6», «Тест сдан ✓ · 2 из 6» */
+/* Карточка урока в кабинете («Мои уроки»): номер, название, описание, полоска прогресса и строка «В процессе · 3 из 6», «Тест сдан ✓ · 2 из 6» */
 function renderLessonCard(topic, progress) {
   const state = lessonProgress(topic, progress);
   const text = state.status === STATUS_NEW ? state.status
@@ -464,24 +567,6 @@ function renderLessonCard(topic, progress) {
       '<div class="lesson-bar-text' + (state.passed ? " is-passed" : "") + '">' + text + "</div>" +
     "</a>"
   );
-}
-
-/* Список всех уроков по разделам. Разделы без уроков (сейчас «Социально-правовая помощь») не показываются */
-function renderLessonCards(progress) {
-  let html = "";
-  SECTIONS.forEach(function (section) {
-    if (!LESSONS.some(function (t) { return t.section === section.id; })) return;
-
-    html += '<h2 class="lessons-section-title" id="' + section.id + '">' + escapeHtml(section.title) + "</h2>";
-    html += '<div class="lessons-grid">';
-
-    LESSONS.forEach(function (topic) {
-      if (topic.section === section.id) html += renderLessonCard(topic, progress);
-    });
-
-    html += "</div>";
-  });
-  return html;
 }
 
 /* ---------- Личный кабинет ---------- */
@@ -513,19 +598,26 @@ function cabinetGreeting(passed) {
     " из " + LESSONS.length + ". Вы движетесь — это главное.";
 }
 
+/* Кольцо «N из 10» (кабинет, «Уроки»). prefix — начало имён классов: своя страница задаёт ему цвета и размер */
+function progressRing(prefix, passed) {
+  return (
+    '<div class="' + prefix + '-ring" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length + '" aria-valuenow="' + passed + '" aria-label="Пройдено уроков">' +
+      '<svg viewBox="0 0 110 110" aria-hidden="true" focusable="false">' +
+        '<circle class="' + prefix + '-ring-track" cx="55" cy="55" r="48.5"/>' +
+        '<circle class="' + prefix + '-ring-value" cx="55" cy="55" r="48.5" pathLength="100" stroke-dasharray="' + passed / LESSONS.length * 100 + ' 100" transform="rotate(-90 55 55)"/>' +
+      "</svg>" +
+      '<p class="' + prefix + '-ring-text" aria-hidden="true"><strong>' + passed + "</strong><span>из " + LESSONS.length + "</span></p>" +
+    "</div>"
+  );
+}
+
 /* Приветствие: кольцо «N из 10», имя и карточка «Продолжить» (первый непройденный урок; всё пройдено — к списку уроков) */
 function renderCabinetHello(user, progress) {
   const passed = countPassed(progress);
   const next = firstUnfinishedLesson(progress);
   return (
     '<div class="card cab-hello">' +
-      '<div class="cab-ring" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length + '" aria-valuenow="' + passed + '" aria-label="Пройдено уроков">' +
-        '<svg viewBox="0 0 110 110" aria-hidden="true" focusable="false">' +
-          '<circle class="cab-ring-track" cx="55" cy="55" r="48.5"/>' +
-          '<circle class="cab-ring-value" cx="55" cy="55" r="48.5" pathLength="100" stroke-dasharray="' + passed / LESSONS.length * 100 + ' 100" transform="rotate(-90 55 55)"/>' +
-        "</svg>" +
-        '<p class="cab-ring-text" aria-hidden="true"><strong>' + passed + "</strong><span>из " + LESSONS.length + "</span></p>" +
-      "</div>" +
+      progressRing("cab", passed) +
       '<div class="cab-hello-text">' +
         "<h1>Здравствуйте" + (user.name ? ", " + escapeHtml(user.name) : "") + "!</h1>" +
         "<p>" + cabinetGreeting(passed) + "</p>" +
@@ -3678,6 +3770,22 @@ const EMPTY_RESULT =
     '<a href="consultant.html">спросите консультанта</a>.</p>' +
   "</div>";
 
+/* Баннер страниц справочника: вкладки разделов. Поиск ищет на лету, поэтому «Найти» только не даёт форме перезагрузить страницу */
+function setupReferenceBanner() {
+  const form = document.querySelector(".ref-search");
+  if (form) form.addEventListener("submit", function (e) { e.preventDefault(); });
+
+  const box = document.getElementById("reference-tabs");
+  if (!box) return;
+  const here = document.body.dataset.page;
+  box.innerHTML = REFERENCE_PAGES.map(function (p) {
+    return '<a class="ref-tab" href="' + p.href + '"' + (p.page === here ? ' aria-current="page"' : "") + ">" + escapeHtml(p.text) + "</a>";
+  }).join("");
+  // На телефоне вкладки прокручиваются: текущая не должна оставаться за краем
+  const current = box.querySelector('[aria-current="page"]');
+  box.scrollLeft = current.getBoundingClientRect().left - box.getBoundingClientRect().left - 20;
+}
+
 /* ---------- Справочник: поиск (reference.html) ---------- */
 
 function setupReferencePage() {
@@ -3731,7 +3839,7 @@ function setupReferencePage() {
       });
     });
 
-    counter.textContent = cards.length ? "Найдено материалов: " + cards.length : "";
+    counter.innerHTML = cards.length ? "Найдено материалов: <strong>" + cards.length + "</strong>" : "";
     list.innerHTML = cards.length ? cards.join("") : EMPTY_RESULT;
   }
 
@@ -3970,24 +4078,24 @@ function topicFromAddress(page, listHref, listTitle) {
   const id = new URLSearchParams(location.search).get("id");
   const topic = TOPICS.find(function (t) { return t.id === id; });
   if (!topic) {
+    document.getElementById("article-head").innerHTML = "<h1>Материал не найден</h1>";
     page.innerHTML =
-      '<div class="card"><h1>Материал не найден</h1>' +
-      "<p>Возможно, ссылка устарела.</p>" +
+      '<div class="card"><p>Возможно, ссылка устарела.</p>' +
       '<a href="' + listHref + '" class="btn btn-primary">' + escapeHtml(listTitle) + "</a></div>";
   }
   return topic || null;
 }
 
-/* Хлебные крошки «Справочник → Раздел → Тема» и заголовок */
+/* Верх баннера статьи: заголовок, раздел и хлебные крошки «Справочник → Статьи → Тема» */
 function renderMaterialHead(topic, listHref, listTitle) {
   return (
+    "<h1>" + escapeHtml((topic.articleTitle || "").trim() || topic.title) + "</h1>" +
+    '<p class="lead">' + escapeHtml(sectionOf(topic).title) + "</p>" +
     '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
       '<a href="reference.html">Справочник</a> <span aria-hidden="true">→</span> ' +
       '<a href="' + listHref + '">' + escapeHtml(listTitle) + "</a> <span aria-hidden=\"true\">→</span> " +
       '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
-    "</nav>" +
-    '<p class="lesson-num">' + escapeHtml(sectionOf(topic).title) + "</p>" +
-    "<h1>" + escapeHtml((topic.articleTitle || "").trim() || topic.title) + "</h1>"
+    "</nav>"
   );
 }
 
@@ -4047,13 +4155,14 @@ function renderArticlePage() {
 
   const memoBlocks = renderMemo(topic.memo, sectionOf(topic), false);
   document.title = topic.title + " — Статья — Опора";
-  page.innerHTML =
+  document.getElementById("article-head").innerHTML =
     renderMaterialHead(topic, "articles.html", "Статьи") +
     '<div class="article-buttons">' +
       (memoBlocks ? '<button type="button" class="btn btn-primary" id="article-memo-open" aria-haspopup="dialog">Памятка</button>' : "") +
       (hasVideo(topic) ? '<a href="' + videoLink(topic) + '" class="btn btn-secondary">Видео по теме</a>' : "") +
       (isLesson(topic) ? '<a href="' + topicLink("lesson.html", topic) + '" class="btn btn-secondary">Урок по теме</a>' : "") +
-    "</div>" +
+    "</div>";
+  page.innerHTML =
     renderArticleImage(topic) +
     (hasItems(topic.article) ? renderArticleSections(topic) + renderArticleFaq(topic) : renderReferenceArticle(topic));
 
@@ -4088,7 +4197,7 @@ function renderSupportContacts() {
   }).join("");
 }
 
-/* Плашка над тестом: сохраняется ли результат */
+/* Стеклянная плашка в баннере: сохраняется ли результат */
 function renderSupportBanner() {
   const box = document.getElementById("support-banner");
   if (!box) return;
@@ -4098,7 +4207,7 @@ function renderSupportBanner() {
       '<svg viewBox="0 0 24 24" focusable="false"><path d="M6 12.5l4 4 8-9"/></svg>' +
     "</span>" +
     "<p>" + escapeHtml(user ? WELLBEING.noteUser : WELLBEING.noteGuest) + "</p>" +
-    (user ? '<a href="cabinet.html">Открыть кабинет</a>' : '<a href="' + loginLinkBack() + '">Войти</a>');
+    (user ? '<a href="cabinet.html">В кабинет →</a>' : '<a href="' + loginLinkBack() + '">Войти →</a>');
 }
 
 /* Уровень нагрузки по баллам теста: первый, у которого сумма не больше max. На сервере то же считает server/wellbeing.js */
@@ -4124,6 +4233,9 @@ function wellbeingRing(score, max) {
   "</div>";
 }
 
+/* Значок-сердце у заголовка теста */
+const SURVEY_ICON = '<span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + LESSON_SECTION_ICONS.psychology + "</svg></span>";
+
 /* Тест «Проверить себя»: по одному вопросу, результат на том же месте. Вошедшим результат сохраняется */
 function setupWellbeingSurvey() {
   const box = document.getElementById("check");
@@ -4145,7 +4257,7 @@ function setupWellbeingSurvey() {
     finished = false;
     const last = current === total - 1;
     box.innerHTML =
-      '<div class="survey-head"><h2>Проверить себя</h2><p>Вопрос ' + (current + 1) + " из " + total + "</p></div>" +
+      '<div class="survey-head"><div class="soft-title">' + SURVEY_ICON + "<h2>Проверить себя</h2></div><p>Вопрос " + (current + 1) + " из " + total + "</p></div>" +
       '<div class="survey-progress" aria-hidden="true">' +
         WELLBEING.questions.map(function (q, i) {
           return '<span class="' + (i < current ? "is-done" : i === current ? "is-current" : "") + '"></span>';
@@ -4189,7 +4301,7 @@ function setupWellbeingSurvey() {
     score = answers.reduce(function (sum, a) { return sum + a; }, 0);
     const level = wellbeingLevelOf(score);
     box.innerHTML =
-      '<div class="survey-head"><h2 id="survey-result" tabindex="-1">Ваш результат</h2><p>' +
+      '<div class="survey-head"><div class="soft-title">' + SURVEY_ICON + '<h2 id="survey-result" tabindex="-1">Ваш результат</h2></div><p>' +
         escapeHtml(new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long" })) + "</p></div>" +
       '<div class="result-main result-' + level.id + '">' +
         wellbeingRing(score, scoreMax) +
@@ -4722,9 +4834,20 @@ const CONSULTANT_MODES = [
   { id: "care", label: "Вопрос по урокам", greeting: "" }  // пусто — обычное приветствие CONSULTANT.greeting
 ];
 
+/* Сообщение консультанта с аватаром (страница consultant.html): значок слева, облачко, ссылки под облачком */
+function wrapBotBubble(msg, avatar) {
+  const bubble = document.createElement("div");
+  bubble.className = "msg-bubble";
+  while (msg.firstChild) bubble.appendChild(msg.firstChild);
+  msg.classList.add("msg-with-avatar");
+  msg.innerHTML = '<span class="msg-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + avatar + "</svg></span>";
+  msg.appendChild(bubble);
+  bubble.querySelectorAll(".msg-links").forEach(function (links) { msg.appendChild(links); });
+}
+
 /* Чат консультанта — один и тот же и на странице consultant.html, и в окне на главной:
    сообщения, запрос к серверу (или ответы по ключевым словам без него), тревожные ответы, источники.
-   parts — { log, form, input, send } */
+   parts — { log, form, input, send }; botAvatar(режим) — необязательный значок у ответов (страница consultant.html) */
 function createConsultantChat(parts) {
   const chat = parts.log;
   const input = parts.input;
@@ -4739,6 +4862,10 @@ function createConsultantChat(parts) {
     msg.className = "msg msg-" + who + (extraClass ? " " + extraClass : "");
     msg.innerHTML =
       '<span class="visually-hidden">' + (who === "user" ? "Вы:" : "Консультант:") + "</span>" + html;
+    // Тревожные блоки остаются сплошными, без аватара
+    if (who === "bot" && parts.botAvatar && extraClass !== "msg-alarm" && extraClass !== "msg-crisis") {
+      wrapBotBubble(msg, parts.botAvatar(mode));
+    }
     chat.appendChild(msg);
     chat.scrollTop = chat.scrollHeight;
     return msg;
@@ -4842,18 +4969,23 @@ function createConsultantChat(parts) {
     input.focus();
   });
 
-  /* Кнопки режимов над чатом. Они нужны только там, где отвечает сервер и человек вошёл.
-     Смена режима начинает разговор заново: прошлые реплики на сервер не уходят, иначе модель подхватит прежний тон */
-  function showModes(onChange) {
+  /* Кнопки режимов. Они нужны только там, где отвечает сервер и человек вошёл.
+     Смена режима начинает разговор заново: прошлые реплики на сервер не уходят, иначе модель подхватит прежний тон.
+     place — необязательно: { box, order }: куда поставить кнопки и в каком порядке. Без него — над чатом, в порядке CONSULTANT_MODES */
+  function showModes(onChange, place) {
     if (!serverMode || !getCurrentUser()) return;
+    const modes = place ? place.order.map(function (id) {
+      return CONSULTANT_MODES.find(function (m) { return m.id === id; });
+    }) : CONSULTANT_MODES;
     const bar = document.createElement("div");
     bar.className = "chat-modes";
     bar.setAttribute("role", "group");
     bar.setAttribute("aria-label", "О чём хотите спросить");
-    bar.innerHTML = CONSULTANT_MODES.map(function (m) {
+    bar.innerHTML = modes.map(function (m) {
       return '<button type="button" class="chat-mode" data-mode="' + m.id + '" aria-pressed="' + (m.id === mode) + '">' + escapeHtml(m.label) + "</button>";
     }).join("");
-    chat.parentNode.insertBefore(bar, chat);
+    if (place) place.box.appendChild(bar);
+    else chat.parentNode.insertBefore(bar, chat);
     bar.addEventListener("click", function (e) {
       const button = e.target.closest(".chat-mode");
       if (!button || button.dataset.mode === mode) return;
@@ -4869,21 +5001,38 @@ function createConsultantChat(parts) {
   return { addMessage: addMessage, ask: ask, setBusy: setBusy, replyHtml: replyHtml, showModes: showModes, serverMode: serverMode };
 }
 
+/* Сердечко на аватаре в режиме «Мне тяжело» */
+const MSG_HEART = "M12 20s-7.5-4.6-8.6-9.6C2.7 7 5 4.5 7.8 4.5c1.8 0 3.2 1 4.2 2.5 1-1.5 2.4-2.5 4.2-2.5 2.8 0 5.1 2.5 4.4 5.9C19.5 15.4 12 20 12 20z";
+
+/* Частые вопросы на странице консультанта: нажатие отправляет вопрос в чат */
+const CONSULTANT_FAQ = {
+  care: { title: "Частые вопросы", items: ["Как обрабатывать ожог?", "Что делать при пролежнях?", "Как помочь встать с кровати?", "Как оформить инвалидность?"] },
+  urgent: { title: "Частые вопросы", items: ["Температура 38 и выше", "Повязка промокла кровью", "Упал и не может встать", "Не ест второй день"] },
+  support: { title: "Можно начать с…", items: ["Мне тревожно", "Я злюсь на близкого и мне стыдно", "Не с кем поговорить", "Как не выгореть?"] }
+};
+
 function setupConsultantPage() {
   const log = document.getElementById("chat-log");
   if (!log) return;
 
   const input = document.getElementById("chat-input");
   const hintsBox = document.getElementById("chat-hints");
+  const faqCard = document.getElementById("chat-faq");
+  const modesCard = document.getElementById("chat-modes-card");
   // consultant.html?mode=support — сразу нужный режим. Неизвестный режим — обычный
   const modeParam = new URLSearchParams(location.search).get("mode");
   const startMode = CONSULTANT_MODES.find(function (m) { return m.id === modeParam; });
+  // Через сервер консультант работает только для вошедших: гостю пока нужно только войти
+  const needsLogin = Store.getMode() === "server" && !getCurrentUser();
   const chat = createConsultantChat({
     log: log,
     form: document.getElementById("chat-form"),
     input: input,
     send: document.getElementById("chat-send"),
-    mode: startMode ? startMode.id : "care"
+    mode: startMode && !needsLogin ? startMode.id : "care",
+    botAvatar: function (mode) {
+      return mode === "support" ? '<path d="' + MSG_HEART + '"/>' : CABINET_ICONS.insight;
+    }
   });
   const serverMode = chat.serverMode;
 
@@ -4891,11 +5040,13 @@ function setupConsultantPage() {
     ? "Ответы готовит ИИ по материалам уроков и справочника школы."
     : "Сайт открыт без сервера: консультант отвечает упрощённо, по ключевым словам.";
 
-  // Первое сообщение консультанта: у выбранного режима оно своё, а гостю пока нужно только войти
-  const needsLogin = serverMode && !getCurrentUser();
+  document.getElementById("chat-phones").innerHTML = URGENT_PHONES.map(function (p) {
+    return "<li><span>" + escapeHtml(p.title) + '</span><a href="tel:' + escapeHtml(p.tel) + '">' + escapeHtml(p.number) + "</a></li>";
+  }).join("");
+
+  // Первое сообщение консультанта: у выбранного режима оно своё
   chat.addMessage("bot", "<p>" + escapeHtml(!needsLogin && startMode && startMode.greeting || CONSULTANT.greeting) + "</p>");
 
-  // Через сервер консультант работает только для вошедших
   if (needsLogin) {
     chat.addMessage("bot",
       "<p>Чтобы задать вопрос, войдите или зарегистрируйтесь.</p>" +
@@ -4906,18 +5057,29 @@ function setupConsultantPage() {
       "</div>");
     chat.setBusy(true);
     input.disabled = true;
-    hintsBox.hidden = true;
+    faqCard.hidden = true;
     return;
   }
 
-  // Примеры вопросов подходят только к вопросам по урокам
-  chat.showModes(function (mode) { hintsBox.hidden = mode !== "care"; });
-  hintsBox.hidden = Boolean(startMode) && startMode.id !== "care";
+  function showFaq(mode) {
+    const faq = CONSULTANT_FAQ[mode];
+    document.getElementById("chat-faq-title").textContent = faq.title;
+    hintsBox.innerHTML = faq.items.map(function (q) {
+      return '<button type="button" class="chat-hint">' + escapeHtml(q) + "</button>";
+    }).join("");
+  }
+  showFaq(startMode ? startMode.id : "care");
 
-  // Кнопки-подсказки отправляют свой текст как вопрос
+  // Режимы — в стеклянной карточке баннера
+  chat.showModes(showFaq, { box: modesCard, order: ["care", "urgent", "support"] });
+  modesCard.hidden = !modesCard.querySelector(".chat-mode");
+
+  // Вопрос из карточки уходит в чат. На телефоне чат выше карточки — возвращаем к нему, иначе ответа не видно
   hintsBox.addEventListener("click", function (e) {
     const hint = e.target.closest(".chat-hint");
-    if (hint) chat.ask(hint.textContent);
+    if (!hint) return;
+    chat.ask(hint.textContent);
+    if (matchMedia("(max-width: 900px)").matches) log.parentNode.scrollIntoView({ block: "end" });
   });
 
   // consultant.html?topic=burns — сразу спросить про тему и показать ответ именно по ней
@@ -5106,8 +5268,19 @@ document.addEventListener("DOMContentLoaded", function () {
   Store.ready.then(startPage);
 });
 
+/* «Уроки» и «Поддержка» строятся после ответа сервера, и браузер уже не находит блок из адреса (lessons.html#psychology, help.html#selfcare).
+   Прокручиваем сами, когда всё построено. Только при новом переходе: после «Назад» и обновления к блоку не перебрасываем */
+function scrollToAddressBlock() {
+  if (!document.getElementById("lessons-page") && !document.getElementById("practice-list")) return;
+  const navigation = performance.getEntriesByType("navigation")[0];
+  if (navigation && navigation.type !== "navigate") return;
+  const target = location.hash && document.getElementById(location.hash.slice(1));
+  if (target) target.scrollIntoView();
+}
+
 function startPage() {
   renderHeader();
+  setupReferenceBanner();
   renderFileWarning();
   renderFooter();
   renderSections();
@@ -5131,4 +5304,5 @@ function startPage() {
   setupSelfCare();
   setupConsultantPage();
   setupConsultantWidget();
+  scrollToAddressBlock();
 }

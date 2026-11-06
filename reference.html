@@ -7,27 +7,41 @@
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body data-page="reference">
+<body data-page="reference" class="ref-page soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
-    <section class="block">
-      <div class="container" id="reference-page">
-        <h1>Справочник</h1>
-        <p class="lead">Найдите нужную тему без прохождения курса</p>
+    <section class="ref-banner">
+      <div class="soft-container ref-banner-in">
+        <div class="soft-intro">
+          <h1>Справочник</h1>
+          <p class="lead">Найдите нужную тему без прохождения курса</p>
+        </div>
+        <form class="ref-search" role="search">
+          <label for="search-input" class="visually-hidden">Поиск по темам</label>
+          <input type="search" id="search-input" placeholder="Например: ожог, пролежни, выплаты" autocomplete="off">
+          <button type="submit" class="ref-search-btn">Найти</button>
+        </form>
+        <!-- Вкладки разделов строит js/main.js -->
+        <nav class="ref-tabs" id="reference-tabs" aria-label="Разделы справочника"></nav>
+      </div>
+    </section>
 
-        <label for="search-input" class="visually-hidden">Поиск по темам</label>
-        <input type="search" id="search-input" class="search-input"
-               placeholder="Например: ожог, пролежни, стресс" autocomplete="off">
-
+    <section class="block ref-content">
+      <div class="soft-container" id="reference-page">
         <!-- Кнопки-фильтры создаются из js/main.js -->
-        <p class="filters-label">Что показать</p>
-        <div id="type-filters" class="filters" role="group" aria-label="Тип материала"></div>
-        <p class="filters-label">Раздел</p>
-        <div id="filters" class="filters" role="group" aria-label="Раздел"></div>
-
-        <p id="results-count" class="muted" aria-live="polite"></p>
+        <div class="card ref-filters">
+          <div class="ref-filter-row">
+            <p class="filters-label">Что показать</p>
+            <div id="type-filters" class="filters" role="group" aria-label="Тип материала"></div>
+          </div>
+          <div class="ref-filter-row">
+            <p class="filters-label">Раздел</p>
+            <div id="filters" class="filters" role="group" aria-label="Раздел"></div>
+          </div>
+          <p id="results-count" class="ref-count" aria-live="polite"></p>
+        </div>
 
         <!-- Карточки тем заполняются из js/main.js по данным из js/data.js -->
         <div id="reference-list" class="tile-grid"></div>

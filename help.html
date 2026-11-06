@@ -7,33 +7,38 @@
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body data-page="help">
+<body data-page="help" class="page-help soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
-    <section class="support-page">
-      <div class="container">
-        <h1>Поддержка для вас</h1>
-        <p class="lead">Вы не одни. Небольшой опрос о самочувствии, короткие практики и контакты служб — для тех, кто ухаживает.</p>
-
+    <section class="soft-banner soft-banner--low">
+      <div class="soft-container soft-banner-in">
+        <div class="soft-intro">
+          <h1>Поддержка для вас</h1>
+          <p class="lead">Вы не одни. Небольшой опрос о самочувствии, короткие практики и контакты служб — для тех, кто ухаживает.</p>
+        </div>
         <!-- Сохраняется ли результат: заполняет js/main.js -->
-        <div class="support-banner" id="support-banner"></div>
+        <div class="soft-glass support-banner" id="support-banner"></div>
+      </div>
+    </section>
 
+    <section class="support-page soft-over">
+      <div class="soft-container">
         <div class="support-top">
           <!-- Тест: вопросы и тексты результатов из WELLBEING в js/data.js, строит js/main.js -->
           <section class="card support-test" id="check" aria-label="Проверить себя"></section>
 
           <div class="support-side">
             <section class="card support-talk" id="talk">
-              <h2>Поговорить</h2>
+              <div class="soft-title"><span class="soft-icon soft-icon--blue" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v10a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17A1.5 1.5 0 0 1 4 15.5z"/></svg></span><h2>Поговорить</h2></div>
               <p>Иногда нужно просто выговориться. Консультант выслушает и подскажет, куда обратиться.</p>
               <a href="consultant.html?mode=support" class="btn btn-primary">Поговорить с консультантом</a>
             </section>
 
             <!-- Телефоны из js/phones.js — те же, что у консультанта -->
             <section class="card support-where" id="where">
-              <h2>Куда обратиться</h2>
+              <div class="soft-title"><span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M6.5 3.5h3l1.5 4.5-2 1.5a12 12 0 0 0 5.5 5.5l1.5-2 4.5 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z"/></svg></span><h2>Куда обратиться</h2></div>
               <ul class="support-where-list" id="support-phones"></ul>
               <p class="support-where-site"><a href="https://xn--b1aedk0adbpf1i.xn--p1ai/" target="_blank" rel="noopener">Видеокурсы для семей участников СВО — своиродные.рф</a></p>
             </section>
@@ -41,7 +46,7 @@
         </div>
 
         <div class="support-section-head" id="selfcare">
-          <h2>Минутка для себя</h2>
+          <div class="soft-title"><span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path class="soft-icon-fill" d="M12 4c.7 4.8 3.2 7.3 8 8-4.8.7-7.3 3.2-8 8-.7-4.8-3.2-7.3-8-8 4.8-.7 7.3-3.2 8-8z"/></svg></span><h2>Минутка для себя</h2></div>
           <p>1–3 минуты · можно прямо сейчас</p>
         </div>
         <!-- Практики (PRACTICES) и видео (SUPPORT_VIDEOS) из js/data.js, открываются в окне поверх страницы -->
