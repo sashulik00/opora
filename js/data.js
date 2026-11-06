@@ -17,8 +17,10 @@
     video       — ссылка на видео (пока пусто: ""). Подходят обычные ссылки
                   YouTube (youtube.com/watch?v=..., youtu.be/...) и Rutube (rutube.ru/video/...).
                   Это же видео показывается в разделе «Видео» справочника (videos.html)
-    videos      — плееры в уроке и в разделе «Видео» справочника: [{ title, org, embedUrl, pageUrl }, ...]. Если роликов несколько, под плеером список.
+    videos      — плееры в уроке и в разделе «Видео» справочника: [{ title, org, embedUrl, pageUrl, thumb }, ...]. Если роликов несколько, под плеером список.
                   org и pageUrl могут быть пустыми. Домен нового плеера нужно разрешить в frame-src (server/app.js).
+                  thumb — необязательно: путь к картинке для карточки в разделе «Видео», пропорции 16:9, например
+                  thumb: "images/videos/ozhogi.jpg" (640×360, JPEG). Нет поля или файл не нашёлся — градиент и значок темы.
     lessonMemo  — памятка урока: doList (что делать), dontList (чего нельзя),
                   urgentList (когда срочно к врачу / когда срочно обращаться)
     quiz        — тест (страница test.html): вопросы, варианты ответов, номер верного ответа
@@ -134,7 +136,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Ожоги", org: "",
+      { title: "Видео: Ожоги", org: "", thumb: "images/videos/ozhogi.jpg",
         embedUrl: "https://rutube.ru/play/embed/369e641b585d828ae4b1e9303013a412/",
         pageUrl: "https://rutube.ru/video/369e641b585d828ae4b1e9303013a412/" }
     ],
@@ -421,7 +423,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Раны и швы", org: "",
+      { title: "Видео: Раны и швы", org: "", thumb: "images/videos/rany.jpg",
         embedUrl: "https://dzen.ru/embed/veeHnMKyNA0Q?mute=0&autoplay=0",
         pageUrl: "" }
     ],
@@ -713,11 +715,11 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео 1: Пролежни", org: "",
+      { title: "Видео 1: Пролежни", org: "", thumb: "images/videos/prolezhni.jpg",
         embedUrl: "https://dzen.ru/embed/vkDTKn85ilF4?mute=0&autoplay=0",
         pageUrl: "" },
       // TODO: название и автор
-      { title: "Видео 2: Пролежни", org: "",
+      { title: "Видео 2: Пролежни", org: "", thumb: "images/videos/prolezhni.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-195155417&id=456240576&hd=4",
         pageUrl: "https://vkvideo.ru/video-195155417_456240576" }
     ],
@@ -1013,7 +1015,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Уход после ампутации", org: "",
+      { title: "Видео: Уход после ампутации", org: "", thumb: "images/videos/amputaciya.jpg",
         embedUrl: "https://rutube.ru/play/embed/e78d00383550e363d2717709f190782c/",
         pageUrl: "https://rutube.ru/video/e78d00383550e363d2717709f190782c/" }
     ],
@@ -1300,11 +1302,11 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео 1: Перемещение и подвижность", org: "",
+      { title: "Видео 1: Перемещение и подвижность", org: "", thumb: "images/videos/peremeshenie.jpg",
         embedUrl: "https://dzen.ru/embed/vWfKtRI0O8Gc?mute=0&autoplay=0",
         pageUrl: "" },
       // TODO: название и автор
-      { title: "Видео 2: Перемещение и подвижность", org: "",
+      { title: "Видео 2: Перемещение и подвижность", org: "", thumb: "images/videos/peremeshenie.jpg",
         embedUrl: "https://dzen.ru/embed/vMR2P1XMAIiU?mute=0&autoplay=0",
         pageUrl: "" }
     ],
@@ -1591,7 +1593,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Питание и режим", org: "",
+      { title: "Видео: Питание и режим", org: "", thumb: "images/videos/pitanie.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-168920485&id=456239208&hd=4",
         pageUrl: "https://vkvideo.ru/video-168920485_456239208" }
     ],
@@ -1868,7 +1870,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "ПТСР у ветеранов СВО: как помочь и куда обращаться? Советы психолога и бойца", org: "URA.RU",
+      { title: "ПТСР у ветеранов СВО: как помочь и куда обращаться? Советы психолога и бойца", org: "URA.RU", thumb: "images/videos/stress.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-25280329&id=456276359&hd=4",
         pageUrl: "https://vkvideo.ru/video-25280329_456276359" }
     ],
@@ -1941,7 +1943,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Бессонница и кошмары", org: "",
+      { title: "Видео: Бессонница и кошмары", org: "", thumb: "images/videos/bessonnica.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239021&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239021" }
     ],
@@ -2133,7 +2135,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Приступы агрессии (что делать семье)", org: "",
+      { title: "Видео: Приступы агрессии (что делать семье)", org: "", thumb: "images/videos/agressiya.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-220870023&id=456239409&hd=3",
         pageUrl: "https://vkvideo.ru/video-220870023_456239409" }
     ],
@@ -2330,7 +2332,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Как разговаривать с раненым", org: "",
+      { title: "Видео: Как разговаривать с раненым", org: "", thumb: "images/videos/razgovor.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239026&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239026" }
     ],
@@ -2525,7 +2527,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Выгорание у ухаживающего", org: "",
+      { title: "Видео: Выгорание у ухаживающего", org: "", thumb: "images/videos/vygoranie.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239293&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239293" }
     ],
@@ -2593,7 +2595,7 @@ const TOPICS = [
     video: "",
     videos: [
       // TODO: название и автор
-      { title: "Видео: Поддержка детей в семье", org: "",
+      { title: "Видео: Поддержка детей в семье", org: "", thumb: "images/videos/deti.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239212&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239212" }
     ],
@@ -2794,7 +2796,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как получить справки, связанные с участием в СВО", org: "Своиродные",
+      { title: "Как получить справки, связанные с участием в СВО", org: "Своиродные", thumb: "images/videos/dokumenty.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239036&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239036" }
     ],
@@ -2865,7 +2867,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как участникам СВО и их родным получить льготы и компенсации?", org: "Своиродные",
+      { title: "Как участникам СВО и их родным получить льготы и компенсации?", org: "Своиродные", thumb: "images/videos/vyplaty.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239353&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239353" }
     ],
@@ -2944,7 +2946,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как ветеранам СВО получить медицинскую помощь по ОМС", org: "Своиродные",
+      { title: "Как ветеранам СВО получить медицинскую помощь по ОМС", org: "Своиродные", thumb: "images/videos/mse.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239041&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239041" }
     ],
@@ -3014,7 +3016,7 @@ const TOPICS = [
     /* --- Урок --- */
     video: "",
     videos: [
-      { title: "Как получить протез и правильно ухаживать за ним?", org: "Своиродные",
+      { title: "Как получить протез и правильно ухаживать за ним?", org: "Своиродные", thumb: "images/videos/protezy.jpg",
         embedUrl: "https://vkvideo.ru/video_ext.php?oid=-227543018&id=456239280&hd=4",
         pageUrl: "https://vkvideo.ru/video-227543018_456239280" }
     ],

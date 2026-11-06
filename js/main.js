@@ -3429,11 +3429,11 @@ function renderCover(topic, section) {
 }
 
 /* ОДНА общая карточка для справочника и видео.
-   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием), attrs (доп. атрибуты ссылки) */
+   options: href, badge (надпись поверх обложки), play (показать ▶), text (текст под названием) */
 function renderTile(topic, options) {
   const section = sectionOf(topic);
   return (
-    '<a class="tile' + (options.play ? " tile-video" : "") + '" href="' + options.href + '"' + (options.attrs || "") + ">" +
+    '<a class="tile' + (options.play ? " tile-video" : "") + '" href="' + options.href + '">' +
       '<div class="tile-media">' +
         renderCover(topic, section) +
         (options.play ? '<span class="tile-play" aria-label="Есть видео">▶</span>' : "") +
@@ -3593,52 +3593,146 @@ function setupReferencePage() {
 
 /* ---------- Справочник: разделы Видео и Статьи ---------- */
 
-/* Раздел видео: ролики из поля videos тем, по разделам. Темы без роликов не показываются.
-   videos.html?topic=ID прокручивает к теме и отмечает её; если ролик у темы один, он сразу открывается в окне */
+/* Значки тем на превью роликов: содержимое svg с viewBox 0 0 24 24 */
+const VIDEO_ICONS = {
+  burns: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.8 1.2 2.7 2 3 .3-3-.2-5.7 1-8.5z"/>',
+  wounds: '<rect x="2.5" y="8" width="19" height="8" rx="4" transform="rotate(-45 12 12)"/><path d="M10.5 10.5l3 3M13.5 10.5l-3 3"/>',
+  bedsores: '<path d="M3 7v11M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-8v5"/><circle cx="6.5" cy="10.5" r="1.7"/>',
+  amputation: '<path d="M9 3h6M12 3v6M8.5 9h7l-1 5h-5zM12 14v7M10 21h4"/>',
+  mobility: '<circle cx="11" cy="3.5" r="1.5"/><path d="M11 6.5V12h6l3 6M8 10.5a5.5 5.5 0 1 0 7 6.5"/>',
+  nutrition: '<path d="M12 7c-1.5-1.5-6-1.5-7 3-.8 4 1.8 10 4.5 10 1 0 1.6-.6 2.5-.6s1.5.6 2.5.6c2.7 0 5.3-6 4.5-10-1-4.5-5.5-4.5-7-3zM12 7c0-2 1-3.5 3-4"/>',
+  stress: '<path d="M12 20s-7.5-4.6-9-9.5C2 7 4.5 4 7.5 4c1.9 0 3.5 1 4.5 2.5C13 5 14.6 4 16.5 4 19.5 4 22 7 21 10.5 19.5 15.4 12 20 12 20z"/><path d="M6.5 12h2.5l1.5-3 2.5 5 1.5-2h3"/>',
+  insomnia: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  aggression: '<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>',
+  talking: '<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4v-4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/>',
+  burnout: '<rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22.5 11v2M6 10.5v3"/>',
+  children: '<circle cx="8.5" cy="7" r="3"/><circle cx="17" cy="11" r="2.2"/><path d="M3 20c0-3.5 2.5-6 5.5-6s5.5 2.5 5.5 6M15 20c.1-2.5 1-4 3-4s3 1.5 3 4"/>',
+  documents: '<path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/>',
+  payments: '<circle cx="12" cy="12" r="9"/><path d="M10 17V7h3a3 3 0 0 1 0 6H8.5M8.5 15.5H13"/>',
+  disability: '<path d="M8 4h8v3H8zM8 5.5H6v15h12v-15h-2M9 13.5l2 2 4-4"/>',
+  prosthetics: '<path d="M8.5 3h7L14 9h-4zM12 12v7M12 19v2h6c0-1-1-1.5-2.5-2z"/><circle cx="12" cy="10.5" r="1.5"/>'
+};
+/* Новая тема без своего значка: значок раздела */
+const VIDEO_SECTION_ICONS = { medical: "wounds", psychology: "stress", legal: "documents" };
+
+/* Карточка ролика: превью (картинка thumb или градиент раздела со значком темы), название ролика и название темы */
+function renderVideoCard(topic, video, index) {
+  const thumb = (video.thumb || "").trim();
+  return (
+    '<li class="video-card-item">' +
+      '<a class="video-card" href="' + videoLink(topic) + '" data-video="' + index + '" data-topic="' + escapeHtml(topic.id) + '" aria-haspopup="dialog">' +
+        '<span class="video-thumb video-thumb--' + escapeHtml(topic.section) + '">' +
+          '<svg class="video-thumb-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+            (VIDEO_ICONS[topic.id] || VIDEO_ICONS[VIDEO_SECTION_ICONS[topic.section]]) +
+          "</svg>" +
+          (thumb ? '<img src="' + escapeHtml(encodeURI(thumb)) + '" alt="" loading="lazy">' : "") +
+          '<span class="video-thumb-play" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5l11 7-11 7z"/></svg></span>' +
+        "</span>" +
+        '<span class="video-card-title">' + escapeHtml(video.title) + "</span>" +
+        '<span class="video-card-topic">' + escapeHtml(topic.title) + "</span>" +
+      "</a>" +
+    "</li>"
+  );
+}
+
+function videoArrow(cls, label, path) {
+  return (
+    '<button type="button" class="video-arrow ' + cls + '" aria-label="' + label + '">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' + path + '"/></svg>' +
+    "</button>"
+  );
+}
+
+/* Лента: стрелки листают на страницу карточек, на краю стрелка бледная и не работает.
+   Неактивную стрелку не выключаем совсем (disabled): у того, кто листает с клавиатуры, пропал бы фокус */
+function setupVideoRow(group) {
+  const track = group.querySelector(".video-track");
+  const prev = group.querySelector(".video-arrow-prev");
+  const next = group.querySelector(".video-arrow-next");
+  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function update() {
+    const end = track.scrollWidth - track.clientWidth;
+    prev.setAttribute("aria-disabled", track.scrollLeft <= 1);
+    next.setAttribute("aria-disabled", track.scrollLeft >= end - 1);
+  }
+
+  function turn(direction, arrow) {
+    if (arrow.getAttribute("aria-disabled") === "true") return;
+    const style = getComputedStyle(track);
+    const gap = parseFloat(style.columnGap) || 0;
+    const step = track.firstElementChild.offsetWidth + gap;
+    const width = track.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const perPage = Math.max(1, Math.floor((width + gap + 1) / step));
+    track.scrollBy({ left: direction * perPage * step, behavior: calm ? "auto" : "smooth" });
+  }
+
+  prev.addEventListener("click", function () { turn(-1, prev); });
+  next.addEventListener("click", function () { turn(1, next); });
+  track.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  // Tab на край следующей карточки: браузер считает её видимой и не прокручивает. Только клавиатура: при нажатии мышью сдвиг сорвал бы клик
+  track.addEventListener("focusin", function (e) {
+    if (!e.target.matches(":focus-visible")) return;
+    const card = e.target.getBoundingClientRect();
+    const row = track.getBoundingClientRect();
+    if (card.left < row.left || card.right > row.right) e.target.closest(".video-card-item").scrollIntoView({ block: "nearest", inline: "start" });
+  });
+  update();
+}
+
+/* Раздел видео: ролики из поля videos тем, по лентам разделов. Темы без роликов не показываются.
+   videos.html?topic=ID прокручивает ленту к теме, отмечает её карточки и сразу открывает первый ролик темы в окне */
 function setupVideosPage() {
   const box = document.getElementById("videos-list");
   if (!box) return;
 
   const items = [];
   const groups = SECTIONS.map(function (section) {
-    const tiles = TOPICS.filter(function (t) { return t.section === section.id && hasVideo(t); }).map(function (topic) {
-      const videos = lessonVideos(topic);
-      return videos.map(function (video, i) {
-        items.push({ topic: topic, video: video });
-        return renderTile(topic, {
-          href: videoLink(topic),
-          play: true,
-          text: videos.length > 1 ? "Ролик " + (i + 1) + " из " + videos.length : "",
-          attrs: ' data-video="' + (items.length - 1) + '" data-topic="' + escapeHtml(topic.id) + '" aria-haspopup="dialog"'
-        });
+    const cards = TOPICS.filter(function (t) { return t.section === section.id && hasVideo(t); }).map(function (topic) {
+      return lessonVideos(topic).map(function (video) {
+        items.push(video);
+        return renderVideoCard(topic, video, items.length - 1);
       }).join("");
     }).join("");
-    return tiles
-      ? '<section class="videos-group"><h2>' + escapeHtml(section.title) + '</h2><div class="tile-grid">' + tiles + "</div></section>"
+    const titleId = "videos-" + section.id;
+    return cards
+      ? '<section class="videos-group" aria-labelledby="' + titleId + '">' +
+          '<h2 id="' + titleId + '">' + escapeHtml(section.title) + "</h2>" +
+          videoArrow("video-arrow-prev", "Назад", "M19 12H5M11 6l-6 6 6 6") +
+          '<ul class="video-track">' + cards + "</ul>" +
+          videoArrow("video-arrow-next", "Вперёд", "M5 12h14M13 6l6 6-6 6") +
+        "</section>"
       : "";
   }).join("");
   box.innerHTML = groups || EMPTY_RESULT;
+  box.querySelectorAll(".videos-group").forEach(setupVideoRow);
 
   const openModal = createPageModal("video-modal");
 
-  function showVideo(tile) {
-    const video = items[Number(tile.dataset.video)].video;
-    openModal(video.title, '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>", tile);
+  function showVideo(card) {
+    const video = items[Number(card.dataset.video)];
+    openModal(video.title, '<div class="lesson-video-screen">' + lessonVideoScreen(video) + "</div>", card);
   }
 
   box.addEventListener("click", function (e) {
-    const tile = e.target.closest(".tile");
-    if (!tile) return;
+    const card = e.target.closest(".video-card");
+    if (!card) return;
     e.preventDefault();
-    showVideo(tile);
+    showVideo(card);
   });
 
+  // Картинка thumb не нашлась — остаётся градиент со значком
+  box.addEventListener("error", function (e) {
+    if (e.target.tagName === "IMG") e.target.remove();
+  }, true);
+
   const topicId = new URLSearchParams(location.search).get("topic");
-  const tiles = Array.from(box.querySelectorAll(".tile")).filter(function (t) { return t.dataset.topic === topicId; });
-  if (!tiles.length) return;
-  tiles.forEach(function (t) { t.classList.add("is-target"); });
-  tiles[0].scrollIntoView({ block: "start" });
-  if (tiles.length === 1) showVideo(tiles[0]);
+  const cards = Array.from(box.querySelectorAll(".video-card")).filter(function (c) { return c.dataset.topic === topicId; });
+  if (!cards.length) return;
+  cards.forEach(function (c) { c.classList.add("is-target"); });
+  cards[0].scrollIntoView({ block: "start", inline: "start" });
+  showVideo(cards[0]);
 }
 
 function renderArticlesPage() {
