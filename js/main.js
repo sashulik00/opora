@@ -413,14 +413,13 @@ function renderHomeStartButton() {
   button.href = "lesson.html?id=" + encodeURIComponent((started ? next : LESSONS[0]).id);
 }
 
-/* Полоса прогресса «Пройдено N из M» — общая для «Уроков» и кабинета.
-   suffix — слово после числа, например « уроков» */
-function renderProgressBar(progress, suffix) {
+/* Полоса прогресса «Пройдено N из M» на странице «Уроки» */
+function renderProgressBar(progress) {
   const passedCount = countPassed(progress);
   const percent = Math.round((passedCount / LESSONS.length) * 100);
   return (
     '<div class="card progress-card">' +
-      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + LESSONS.length + (suffix || "") + "</p>" +
+      '<p class="progress-text">Пройдено <strong>' + passedCount + "</strong> из " + LESSONS.length + "</p>" +
       '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length +
         '" aria-valuenow="' + passedCount + '" aria-label="Прогресс обучения">' +
         '<div class="progress-fill" style="width:' + percent + '%"></div>' +
@@ -506,41 +505,81 @@ function renderMyLessons(progress) {
   "</div>";
 }
 
-/* «Моя статистика»: четыре карточки, всё считается из прогресса.
-   Средний результат — по тестам уроков, которые хоть раз проходили */
+/* Фраза под приветствием */
+function cabinetGreeting(passed) {
+  if (!passed) return "Начните с первого урока — это займёт 10–15 минут.";
+  if (passed === LESSONS.length) return "Все уроки пройдены. Вы большой молодец!";
+  return plural(passed, "Пройден ", "Пройдено ", "Пройдено ") + passed + " " + plural(passed, "урок", "урока", "уроков") +
+    " из " + LESSONS.length + ". Вы движетесь — это главное.";
+}
+
+/* Приветствие: кольцо «N из 10», имя и карточка «Продолжить» (первый непройденный урок; всё пройдено — к списку уроков) */
+function renderCabinetHello(user, progress) {
+  const passed = countPassed(progress);
+  const next = firstUnfinishedLesson(progress);
+  return (
+    '<div class="card cab-hello">' +
+      '<div class="cab-ring" role="progressbar" aria-valuemin="0" aria-valuemax="' + LESSONS.length + '" aria-valuenow="' + passed + '" aria-label="Пройдено уроков">' +
+        '<svg viewBox="0 0 110 110" aria-hidden="true" focusable="false">' +
+          '<circle class="cab-ring-track" cx="55" cy="55" r="48.5"/>' +
+          '<circle class="cab-ring-value" cx="55" cy="55" r="48.5" pathLength="100" stroke-dasharray="' + passed / LESSONS.length * 100 + ' 100" transform="rotate(-90 55 55)"/>' +
+        "</svg>" +
+        '<p class="cab-ring-text" aria-hidden="true"><strong>' + passed + "</strong><span>из " + LESSONS.length + "</span></p>" +
+      "</div>" +
+      '<div class="cab-hello-text">' +
+        "<h1>Здравствуйте" + (user.name ? ", " + escapeHtml(user.name) : "") + "!</h1>" +
+        "<p>" + cabinetGreeting(passed) + "</p>" +
+      "</div>" +
+      '<div class="cab-next">' +
+        (next
+          ? '<div class="cab-next-text"><p class="cab-next-label">Продолжить с урока</p><p class="cab-next-title">' + escapeHtml(next.title) + "</p></div>" +
+            '<a href="lesson.html?id=' + encodeURIComponent(next.id) + '" class="btn btn-primary cab-btn">Продолжить →</a>'
+          : '<div class="cab-next-text"><p class="cab-next-title">Все уроки пройдены <span class="cab-check">✓</span></p></div>' +
+            '<a href="lessons.html" class="btn btn-primary cab-btn">К урокам →</a>') +
+      "</div>" +
+    "</div>"
+  );
+}
+
+/* Значки карточек статистики и комментария: содержимое svg с viewBox 0 0 24 24 */
+const CABINET_ICONS = {
+  tasks: '<path class="cab-icon-fill" d="M12 .5 23.5 12 12 23.5 .5 12z"/>',
+  tests: '<path d="M6 12.5l4 4 8-9"/>',
+  mood: '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14c1 1.6 2.2 2.3 3.5 2.3s2.5-.7 3.5-2.3"/><circle class="cab-icon-fill" cx="9" cy="10" r="1"/><circle class="cab-icon-fill" cx="15" cy="10" r="1"/>',
+  insight: '<path class="cab-icon-fill" d="M12 4c.7 4.8 3.2 7.3 8 8-4.8.7-7.3 3.2-8 8-.7-4.8-3.2-7.3-8-8 4.8-.7 7.3-3.2 8-8z"/>'
+};
+
+/* Карточка статистики: значок, подпись, число с припиской и полоска. Полоска только для вида: то же число написано рядом */
+function statCard(kind, label, value, note, percent) {
+  return '<div class="card stat-card stat-card--' + kind + '">' +
+    '<span class="stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + CABINET_ICONS[kind] + "</svg></span>" +
+    '<div class="stat-body">' +
+      '<p class="stat-label">' + label + "</p>" +
+      '<p class="stat-value"><strong id="stat-' + kind + '-value">' + value + '</strong> <span class="stat-note">' + note + "</span></p>" +
+      '<div class="stat-bar" aria-hidden="true"><span id="stat-' + kind + '-bar" style="width:' + percent + '%"></span></div>' +
+    "</div>" +
+  "</div>";
+}
+
+/* Статистика: три карточки. Практика и тесты считаются из прогресса; средний результат — по тестам уроков, которые хоть раз проходили.
+   Число отметок настроения подставляет drawMyWellbeing, когда они загрузятся */
 function renderMyStats(progress) {
   const states = LESSONS.map(function (t) { return lessonProgress(t, progress); });
-  const passed = states.filter(function (s) { return s.passed; }).length;
   const tasks = states.reduce(function (sum, s) { return sum + s.tasks; }, 0);
   const tasksDone = states.reduce(function (sum, s) { return sum + s.tasksDone; }, 0);
   const scores = LESSONS.map(function (t) { return progress[t.id]; })
     .filter(function (r) { return r && r.total > 0; })
     .map(function (r) { return r.best / r.total; });
   const average = scores.length
-    ? Math.round(scores.reduce(function (sum, x) { return sum + x; }, 0) / scores.length * 100) + "%"
-    : "—";
-  const next = firstUnfinishedLesson(progress);
+    ? Math.round(scores.reduce(function (sum, x) { return sum + x; }, 0) / scores.length * 100)
+    : 0;
 
-  function card(label, value, more) {
-    return '<div class="card stat-card">' +
-      '<p class="stat-label">' + label + "</p>" +
-      '<p class="stat-value">' + value + "</p>" +
-      (more || "") +
-    "</div>";
-  }
   return (
     '<div class="stats-grid">' +
-      card("Уроков пройдено", passed + " из " + LESSONS.length) +
-      card("Средний результат тестов", average,
-        scores.length ? '<p class="stat-note">по ' + scores.length + " " + plural(scores.length, "тесту", "тестам", "тестам") + "</p>" : "") +
-      card("Заданий практики", tasksDone + " из " + tasks) +
-      '<div class="card stat-card">' +
-        '<p class="stat-label">Продолжить</p>' +
-        (next
-          ? '<p class="stat-lesson">' + escapeHtml(next.title) + "</p>" +
-            '<a href="lesson.html?id=' + encodeURIComponent(next.id) + '" class="btn btn-small btn-primary">Продолжить</a>'
-          : '<p class="stat-lesson">Все уроки пройдены ✓</p>') +
-      "</div>" +
+      statCard("tasks", "Заданий практики", tasksDone, "из " + tasks, tasks ? tasksDone / tasks * 100 : 0) +
+      statCard("tests", "Средний результат тестов", scores.length ? average + "%" : "—",
+        scores.length ? "по " + scores.length + " " + plural(scores.length, "тесту", "тестам", "тестам") : "", average) +
+      statCard("mood", "Отметок настроения", "—", "за " + CHART_DAYS + " дней", 0) +
     "</div>"
   );
 }
@@ -579,15 +618,15 @@ function daysBetween(from, to) {
   return Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000);
 }
 
-/* График за 14 дней: точка на каждый отмеченный день, линия только между соседними днями, пропуски пустые.
-   Подписи рисуются один к одному в пикселях, поэтому при смене ширины график строится заново */
+/* График за 14 дней: точка на каждый отмеченный день, линия и заливка под ней только между соседними днями, пропуски пустые.
+   Какой это день — в подсказке над точкой. Подписи рисуются один к одному в пикселях, поэтому при смене ширины график строится заново */
 function moodChartHtml(entries, width) {
   const today = Store.localDay(new Date());
-  const height = 190;
-  const left = 26;
-  const right = 12;
-  const top = 12;
-  const bottom = 28;
+  const height = 135;
+  const left = 39;
+  const right = 18;
+  const top = 9;
+  const bottom = 6;
   const step = (width - left - right) / (CHART_DAYS - 1);
   const byDay = {};
   entries.forEach(function (e) { byDay[e.day] = e.mood; });
@@ -597,13 +636,12 @@ function moodChartHtml(entries, width) {
   let grid = "";
   for (let mood = 1; mood <= 5; mood++) {
     grid += '<line class="mood-grid" x1="' + left + '" x2="' + (width - right) + '" y1="' + y(mood) + '" y2="' + y(mood) + '"/>' +
-      '<text class="mood-axis" x="' + (left - 8) + '" y="' + (y(mood) + 4) + '" text-anchor="end">' + mood + "</text>";
+      '<text class="mood-axis" x="' + (left - 12) + '" y="' + (y(mood) + 4) + '" text-anchor="end">' + mood + "</text>";
   }
 
-  const labelEvery = Math.ceil(38 / step);  // подписи дат не наезжают друг на друга; сегодняшняя есть всегда
+  let areas = "";
   let lines = "";
   let dots = "";
-  let labels = "";
   let targets = "";
   const spoken = [];
   for (let i = 0; i < CHART_DAYS; i++) {
@@ -613,22 +651,18 @@ function moodChartHtml(entries, width) {
     const next = byDay[shiftLocalDay(day, 1)];
     if (mood && next && i < CHART_DAYS - 1) {
       lines += '<line class="mood-line" x1="' + x + '" y1="' + y(mood) + '" x2="' + (x + step) + '" y2="' + y(next) + '"/>';
+      areas += '<polygon class="mood-area" points="' + x + "," + y(mood) + " " + (x + step) + "," + y(next) + " " + (x + step) + "," + (height - 1) + " " + x + "," + (height - 1) + '"/>';
     }
     if (mood) {
-      dots += '<circle class="mood-dot" cx="' + x + '" cy="' + y(mood) + '" r="5"/>';
+      dots += '<circle class="mood-dot' + (i === CHART_DAYS - 1 ? " mood-dot--today" : "") + '" cx="' + x + '" cy="' + y(mood) + '" r="6"/>';
       targets += '<rect class="mood-target" x="' + (x - step / 2) + '" y="0" width="' + step + '" height="' + height + '" data-tip="' +
         escapeHtml(dayTitle(day) + ": " + MOOD_LABELS[mood - 1]) + '" data-x="' + x + '" data-y="' + y(mood) + '"/>';
       spoken.push(dayTitle(day) + " — " + MOOD_LABELS[mood - 1]);
     }
-    if ((CHART_DAYS - 1 - i) % labelEvery === 0) {
-      const parts = day.split("-");
-      labels += '<text class="mood-axis" x="' + x + '" y="' + (height - 8) + '" text-anchor="' + (i === CHART_DAYS - 1 ? "end" : "middle") + '">' +
-        Number(parts[2]) + "." + parts[1] + "</text>";
-    }
   }
   const summary = spoken.length ? "Настроение за 14 дней: " + spoken.join(", ") : "За 14 дней отметок нет";
   return '<svg class="mood-chart-svg" role="img" aria-label="' + escapeHtml(summary) + '" width="' + width + '" height="' + height +
-    '" viewBox="0 0 ' + width + " " + height + '">' + grid + lines + dots + labels + targets + "</svg>" +
+    '" viewBox="0 0 ' + width + " " + height + '">' + grid + areas + lines + dots + targets + "</svg>" +
     '<div class="mood-tip" hidden></div>';
 }
 
@@ -662,7 +696,7 @@ function setupMoodTip(box) {
 }
 
 function myWellbeingBlock() {
-  return '<h2 class="lesson-h2">Моё самочувствие</h2><div id="my-wellbeing"><p class="muted">Загружаем…</p></div>';
+  return '<h2 class="visually-hidden">Моё самочувствие</h2><div id="my-wellbeing"><p class="muted">Загружаем…</p></div>';
 }
 
 function setupMyWellbeing() {
@@ -682,10 +716,12 @@ function drawMyWellbeing(box, entries, results, share) {
   const last = results[0];
 
   box.innerHTML =
+    '<div id="mood-hints"></div>' +
+
     '<div class="my-wellbeing-grid">' +
       '<form class="card mood-form" id="mood-form">' +
         '<fieldset class="mood-fieldset">' +
-          "<legend><h3>Как вы сегодня?</h3></legend>" +
+          '<legend class="mood-head"><h3>Как вы сегодня?</h3><span class="mood-head-note">' + dayTitle(today) + "</span></legend>" +
           '<div class="mood-options">' +
             MOOD_LABELS.map(function (label, i) {
               const mood = i + 1;
@@ -697,42 +733,47 @@ function drawMyWellbeing(box, entries, results, share) {
             }).join("") +
           "</div>" +
         "</fieldset>" +
-        '<label for="mood-note" class="mood-note-label">Заметка <span class="muted">(необязательно)</span></label>' +
-        '<textarea id="mood-note" rows="2" maxlength="' + MOOD_NOTE_MAX + '">' + escapeHtml(todayEntry && todayEntry.note || "") + "</textarea>" +
         '<div class="mood-save">' +
-          '<button type="submit" class="btn btn-small btn-primary">Сохранить</button>' +
-          '<p class="mood-status" id="mood-status" role="status">' + (todayEntry ? "Сегодняшнюю отметку можно поменять" : "") + "</p>" +
+          '<label for="mood-note" class="visually-hidden">Заметка (необязательно)</label>' +
+          '<input type="text" id="mood-note" maxlength="' + MOOD_NOTE_MAX + '" placeholder="Заметка (необязательно)" autocomplete="off">' +
+          '<button type="submit" class="btn btn-primary cab-btn">Сохранить</button>' +
         "</div>" +
+        '<p class="mood-status" id="mood-status" role="status">' + (todayEntry ? "Сегодняшнюю отметку можно поменять" : "") + "</p>" +
       "</form>" +
 
       '<div class="card mood-history">' +
-        "<h3>Настроение за 14 дней</h3>" +
+        '<div class="mood-head"><h3>Настроение за 14 дней</h3><span class="mood-head-note">1 — очень плохо · 5 — отлично</span></div>' +
         '<div class="mood-chart" id="mood-chart"></div>' +
         '<p class="mood-last">' +
           (last
-            ? "<strong>" + escapeHtml(wellbeingLevelById(last.level).title) + " · " +
-              escapeHtml(new Date(last.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })) + "</strong> " +
-              '<a href="help.html#check">Пройти тест ещё раз</a>'
-            : 'Тест ещё не пройден. <a href="help.html#check">Пройти тест</a>') +
+            ? "<span>Тест о самочувствии: " +
+                '<span class="mood-level mood-level--' + escapeHtml(last.level) + '">' + escapeHtml(wellbeingLevelById(last.level).title) + "</span>" +
+                "\u00a0· " + escapeHtml(new Date(last.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })) +
+              "</span>" +
+              '<a href="help.html#check">Пройти ещё раз →</a>'
+            : '<span>Тест о самочувствии ещё не пройден</span><a href="help.html#check">Пройти тест →</a>') +
         "</p>" +
       "</div>" +
     "</div>" +
 
-    '<div id="mood-hints"></div>' +
-
-    '<div class="card mood-settings">' +
-      '<label class="mood-share">' +
-        '<input type="checkbox" id="share-wellbeing"' + (share ? " checked" : "") + ">" +
-        "<span>Консультант может учитывать мои отметки настроения и результаты теста (заметки не передаются)</span>" +
-      "</label>" +
-      '<p class="error" id="share-error" role="alert"></p>' +
-      '<div class="mood-insight">' +
-        '<button type="button" class="btn btn-small btn-secondary" id="insight-btn">Комментарий консультанта</button>' +
-        '<p class="muted small" id="insight-hint"></p>' +
-        (Store.getMode() === "server" ? '<p class="muted small insight-privacy">Консультанту отправятся только оценки настроения и результат теста, без заметок</p>' : "") +
+    '<section class="cab-insight" aria-labelledby="insight-title">' +
+      '<span class="cab-insight-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + CABINET_ICONS.insight + "</svg></span>" +
+      '<div class="cab-insight-main">' +
+        '<h2 id="insight-title">Комментарий консультанта</h2>' +
+        '<p id="insight-hint"></p>' +
+        '<div class="insight-card" id="insight-card" aria-live="polite" hidden></div>' +
+        '<label class="mood-share">' +
+          '<input type="checkbox" class="visually-hidden" role="switch" id="share-wellbeing"' + (share ? " checked" : "") + ">" +
+          '<span class="mood-switch" aria-hidden="true"></span>' +
+          "<span>Консультант может учитывать мои отметки и результаты теста (заметки не передаются)</span>" +
+        "</label>" +
+        '<p class="error" id="share-error" role="alert"></p>' +
       "</div>" +
-      '<div class="insight-card" id="insight-card" aria-live="polite" hidden></div>' +
-    "</div>";
+      '<button type="button" class="btn cab-btn cab-insight-btn" id="insight-btn">Получить комментарий</button>' +
+    "</section>";
+
+  // Значением, а не атрибутом в разметке: в заметке могут быть кавычки
+  document.getElementById("mood-note").value = todayEntry && todayEntry.note || "";
 
   const chart = document.getElementById("mood-chart");
   const hints = document.getElementById("mood-hints");
@@ -743,7 +784,14 @@ function drawMyWellbeing(box, entries, results, share) {
     drawMoodChart(chart, entries);
     hints.innerHTML = moodHintsHtml(entries, last);
     insightBtn.disabled = entries.length < INSIGHT_MIN_MARKS;
-    insightHint.textContent = entries.length < INSIGHT_MIN_MARKS ? "Станет доступен после " + INSIGHT_MIN_MARKS + " отметок настроения" : "";
+    const marksLeft = INSIGHT_MIN_MARKS - entries.length;
+    insightHint.textContent = marksLeft > 0
+      ? "Станет доступен после " + INSIGHT_MIN_MARKS + " отметок настроения — " + plural(marksLeft, "осталась", "осталось", "осталось") + " " + marksLeft + "."
+      : Store.getMode() === "server" ? "Консультанту отправятся только оценки настроения и результат теста, без заметок" : "";
+    // Карточка статистики: отметки приходят за 30 дней, здесь нужны последние 14
+    const marks = entries.filter(function (e) { return daysBetween(e.day, today) < CHART_DAYS; }).length;
+    document.getElementById("stat-mood-value").textContent = marks;
+    document.getElementById("stat-mood-bar").style.width = marks / CHART_DAYS * 100 + "%";
   }
   refresh();
   setupMoodTip(chart);
@@ -786,6 +834,7 @@ function drawMyWellbeing(box, entries, results, share) {
   const insightCard = document.getElementById("insight-card");
   insightBtn.addEventListener("click", function () {
     insightCard.hidden = false;
+    insightHint.hidden = true;   // вместо строки состояния теперь ответ
     if (Store.getMode() !== "server") {
       insightCard.innerHTML = "<p>Доступно при работе через сервер</p>";
       return;
@@ -852,10 +901,9 @@ function renderCabinetPage() {
   const progress = getProgress();
 
   page.innerHTML =
-    "<h1>Здравствуйте" + (user.name ? ", " + escapeHtml(user.name) : "") + "!</h1>" +
-    renderProgressBar(progress, " уроков") +
+    renderCabinetHello(user, progress) +
 
-    '<h2 class="lesson-h2">Моя статистика</h2>' +
+    '<h2 class="visually-hidden">Моя статистика</h2>' +
     renderMyStats(progress) +
 
     myWellbeingBlock() +
