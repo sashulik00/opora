@@ -30,19 +30,16 @@
   --muted: #5b6478;     /* второстепенный текст */
   --radius: 14px;
 
-  /* Оранжевая шапка и главное фото */
-  --orange: 252, 80, 3;          /* цвет шапки #fc5003 — три числа R, G, B (для прозрачности rgba) */
-  --header-alpha: 0.45;          /* прозрачность оранжевой шапки поверх фото на главной (0 — нет цвета, 1 — сплошной) */
-  --header-alpha-solid: 0.92;    /* прозрачность шапки на остальных страницах, где под ней нет фото */
+  /* Шапка и главное фото */
+  --header-bg: #FC5003;          /* сплошной фон шапки на всех страницах */
+  --orange: 252, 80, 3;          /* прежний оранжевый: три числа R, G, B (для прозрачности rgba) */
   --hero-photo-opacity: 0.92;    /* непрозрачность главного фото (images/hero.jpg): 1 — полностью яркое */
   --hero-shade: 0.38;            /* затемнение фото слева под текстом: 0 — нет, 0.5 — заметно темнее */
   --hero-shade-end: 55%;         /* где затемнение сходит на нет (доля ширины фото); до 1100px — 62% */
   --header-h: 84px;              /* примерная высота шапки — отступ текста на фото под ней */
-  --hero-fade: 30%;              /* высота плавного перехода фото в фон страницы (доля высоты блока фото) */
   --lesson-max: 1320px;          /* урок: наибольшая ширина содержимого */
   --lesson-side: 360px;          /* урок: ширина правой колонки с карточками */
-  --hero-text-bottom: 27vh;      /* место под кнопками на фото — чтобы текст не заходил в зону перехода.
-                                    Увеличили --hero-fade — увеличьте и это (примерно --hero-fade × 0.9 в vh) */
+  --hero-text-bottom: 27vh;      /* место под кнопками на фото */
 
   /* Страница практики на компьютере (от 1000px): всё задание в окне без прокрутки */
   --practice-nav-w: 260px;          /* ширина левой панели со списком заданий */
@@ -159,26 +156,19 @@ img { max-width: 100%; }
 }
 
 /* ===== Шапка и меню ===== */
-/* Оранжевая полупрозрачная шапка с размытием под ней; весь текст в ней белый */
+/* Шапка одна на все страницы: сплошной коралловый фон, текст белый */
 .site-header {
-  background: rgba(var(--orange), var(--header-alpha-solid));
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: var(--header-bg);
   position: sticky;
   top: 0;
   z-index: 10;
   color: #fff;
 }
-/* Главная: шапка лежит поверх фото (фото начинается от самого верха окна) и уходит вверх вместе с ним */
+/* Главная: шапка лежит поверх фото (фото начинается от самого верха окна) */
 body[data-page="home"] .site-header {
   position: absolute;
   left: 0;
   right: 0;
-  background: rgba(var(--orange), var(--header-alpha));
-}
-/* Открытое меню на телефоне ложится поверх текста на фото — делаем шапку плотной, как на других страницах */
-body[data-page="home"] .site-header:has(.menu.open) {
-  background: rgba(var(--orange), var(--header-alpha-solid));
 }
 .header-inner {
   display: flex;
@@ -192,28 +182,35 @@ body[data-page="home"] .site-header:has(.menu.open) {
 /* Компьютер: три колонки 1fr auto 1fr — слева «Опора», строго по центру меню, справа вход/выход.
    Боковые колонки одинаковой ширины, поэтому меню стоит ровно по центру окна */
 @media (min-width: 1001px) {
-  .site-header .container { max-width: none; padding: 0 32px; }
+  /* Боковые отступы растут с шириной окна: 40px при 1280, 140px при 1920 */
+  .site-header .container { max-width: none; padding: 0 clamp(32px, 15.625vw - 160px, 140px); }
   .header-inner {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     column-gap: 16px;
+    min-height: 78px;
   }
   .logo { justify-self: start; }
   .site-header nav { justify-self: center; }
-  .header-actions { justify-self: end; }
+  .header-actions { justify-self: end; max-width: 100%; margin-right: -14px; }   /* длинное имя обрезается, а не наезжает на меню; текст справа стоит на линии отступа */
   .menu { flex-wrap: nowrap; }
 }
 .logo {
-  font-size: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 62.6875px;     /* прежняя высота блока: шапка от размера логотипа не растёт */
+  font-size: 30px;
   font-weight: bold;
+  line-height: 1.2;
   color: #fff;
   text-decoration: none;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .logo span {
   display: block;
-  font-size: 0.85rem;
+  font-size: 15px;
   font-weight: normal;
+  line-height: 1.3;
   color: #fff;
 }
 .menu {
@@ -232,13 +229,13 @@ body[data-page="home"] .site-header:has(.menu.open) {
   border-radius: 10px;
   color: #fff;
   text-decoration: none;
-  font-size: 1.05rem;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  font-size: 20px;
+  font-weight: bold;
   white-space: nowrap;
 }
 .menu a:hover,
 .header-actions a:hover { background: rgba(255, 255, 255, 0.16); }
-/* Выбранный пункт — белое подчёркивание 3 px под текстом, без заливки */
+/* Выбранный пункт — голубое подчёркивание 3 px под текстом */
 .menu a.active::after,
 .header-actions a.active::after {
   content: "";
@@ -248,8 +245,7 @@ body[data-page="home"] .site-header:has(.menu.open) {
   bottom: 5px;
   height: 3px;
   border-radius: 3px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  background: #9CC4FF;
 }
 /* Справа: «Войти» или «Кабинет»/имя и «Выйти» */
 .header-actions {
@@ -272,12 +268,36 @@ body[data-page="home"] .site-header:has(.menu.open) {
   background: none;
   color: #fff;
   font: inherit;
-  font-size: 1.05rem;
+  font-size: 20px;
+  font-weight: bold;
   text-align: left;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 .menu-logout:hover { background: rgba(255, 255, 255, 0.16); }
+/* Вошедший: кружок и имя — одна ссылка. Подчёркивание только под именем */
+.header-actions .account-link { display: flex; align-items: center; gap: 8px; min-width: 0; padding-top: 4px; padding-bottom: 4px; }
+.header-actions .menu-logout { flex: none; }
+.account-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  color: #EE7A50;
+}
+.account-avatar svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.header-actions a.account-link.active::after { left: 62px; bottom: 0; }
 .site-header :focus-visible { outline-color: #fff; }
 /* Пункт меню с выпадающим списком («Справочник») */
 .has-sub { position: relative; }
@@ -294,11 +314,10 @@ body[data-page="home"] .site-header:has(.menu.open) {
   color: #fff;
   border: 0;
   border-radius: 10px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 .sub-toggle:hover { background: rgba(255, 255, 255, 0.16); }
-/* Выпадающий список — оранжевый, почти сплошной, чтобы белый текст читался над любым фоном */
+/* Выпадающий список — того же цвета, что и шапка */
 .submenu {
   display: none;
   position: absolute;
@@ -309,7 +328,7 @@ body[data-page="home"] .site-header:has(.menu.open) {
   list-style: none;
   margin: 0;
   padding: 8px;
-  background: rgba(var(--orange), 0.96);
+  background: var(--header-bg);
   border-radius: var(--radius);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
@@ -326,7 +345,6 @@ body[data-page="home"] .site-header:has(.menu.open) {
   color: #fff;
   border: 2px solid #fff;
   border-radius: var(--radius);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 
@@ -348,9 +366,10 @@ body[data-page="home"] .site-header:has(.menu.open) {
   display: flex;
   align-items: center;
   padding: calc(var(--header-h) + 40px) 0 var(--hero-text-bottom);  /* сверху — шапка, снизу — зона перехода */
-  /* Нижние --hero-fade высоты фото плавно уходят в цвет фона страницы: прозрачно → 25% → 60% → 100% */
+  /* Низ фото уходит в цвет фона страницы: короткий переход с голубоватой дымкой */
   --hero-fade-layer: linear-gradient(to bottom,
-    transparent calc(100% - var(--hero-fade)),
+    transparent calc(100% - 120px),
+    rgba(222, 232, 250, 0.5) calc(100% - 50px),
     var(--page-bg) 100%);
   text-align: left;
 }
@@ -358,15 +377,6 @@ body[data-page="home"] .site-header:has(.menu.open) {
    чтобы они не заходили в зону перехода */
 @media (max-height: 700px) {
   .hero { --hero-text-bottom: 34vh; }
-}
-@supports (background: color-mix(in srgb, red 50%, transparent)) {
-  .hero {
-    --hero-fade-layer: linear-gradient(to bottom,
-      color-mix(in srgb, var(--page-bg) 0%, transparent) calc(100% - var(--hero-fade)),
-      color-mix(in srgb, var(--page-bg) 25%, transparent) calc(100% - var(--hero-fade) * 0.62),
-      color-mix(in srgb, var(--page-bg) 60%, transparent) calc(100% - var(--hero-fade) * 0.3),
-      var(--page-bg) 100%);
-  }
 }
 /* Само фото — отдельным слоем: прозрачным может быть только оно, а не текст.
    cover — фото заполняет блок и обрезается; 72% — человек справа остаётся в кадре */
@@ -440,55 +450,10 @@ body[data-page="home"] .site-header:has(.menu.open) {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   transition: background 0.2s;
 }
-.hero .btn-primary { background: rgba(var(--orange), 0.6); border: 2px solid transparent; }
-.hero .btn-primary:hover { background: rgba(var(--orange), 0.8); border-color: transparent; }
-.hero .btn-secondary { background: rgba(255, 255, 255, 0.18); border: 2px solid #fff; }
-.hero .btn-secondary:hover { background: rgba(255, 255, 255, 0.32); }
 .hero .btn:focus-visible { outline-color: #fff; }
 
 /* ===== Блоки на главной ===== */
 .block { padding: 40px 0; }
-
-/* Карточки разделов — ссылки (на уроки раздела или на «Права и документы») */
-a.section-card {
-  display: block;
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-a.section-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 14px rgba(31, 42, 68, 0.1);
-}
-a.section-card p:last-child { margin-bottom: 0; }
-
-.section-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--accent);
-  font-size: 1.6rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-}
-
-.step-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font-weight: bold;
-  font-size: 1.3rem;
-  margin-bottom: 14px;
-}
 
 /* ===== Формы входа ===== */
 .tabs {
@@ -513,6 +478,11 @@ a.section-card p:last-child { margin-bottom: 0; }
   border-color: var(--accent);
   color: #fff;
   font-weight: bold;
+}
+/* Узкий экран: «Зарегистрироваться» рядом с «Войти» не помещается, вкладки друг под другом */
+@media (max-width: 379px) {
+  .tabs { flex-direction: column; }
+  .tab { flex: none; }
 }
 label {
   display: block;
@@ -2307,6 +2277,39 @@ html.modal-open {
 @media (max-width: 860px) {
   .grid-3 { grid-template-columns: 1fr; }
 }
+/* Окно поуже: меню в одну строку и «Кабинет» целиком. 20px помещается от 1325px; ниже сначала уменьшаются поля, потом шрифт, но не меньше 17px */
+@media (min-width: 1231px) and (max-width: 1324px) {
+  .menu a,
+  .header-actions a,
+  .menu-logout { padding-left: 10px; padding-right: 10px; font-size: 19px; }
+  .menu a.active::after,
+  .header-actions a.active::after { left: 10px; right: 10px; }
+  .header-actions a.account-link.active::after { left: 58px; }
+  .site-header .menu { gap: 0; }
+  .site-header .sub-toggle { min-width: 28px; }
+  .header-actions { margin-right: -10px; }
+}
+@media (min-width: 1001px) and (max-width: 1230px) {
+  .menu a,
+  .header-actions a,
+  .menu-logout { padding-left: 9px; padding-right: 9px; font-size: 18px; }
+  .menu a.active::after,
+  .header-actions a.active::after { left: 9px; right: 9px; }
+  .header-actions a.account-link.active::after { left: 57px; }
+  .site-header .menu { gap: 0; }
+  .site-header .sub-toggle { min-width: 28px; }
+  .header-actions { margin-right: -9px; }
+}
+@media (min-width: 1001px) and (max-width: 1098px) {
+  .menu a,
+  .header-actions a,
+  .menu-logout { padding-left: 6px; padding-right: 6px; font-size: 17px; }
+  .menu a.active::after,
+  .header-actions a.active::after { left: 6px; right: 6px; }
+  .header-actions a.account-link.active::after { left: 54px; }
+  .header-actions { margin-right: -6px; }
+  .header-inner { column-gap: 10px; }
+}
 
 /* Шапка: до 1000px меню и вход/выход прячутся под кнопку «☰ Меню»
    (шире меню помещается ровно по центру между «Опорой» и входом) */
@@ -2321,12 +2324,12 @@ html.modal-open {
   .menu.open { display: flex; }
   .menu a,
   .menu-logout,
-  .header-actions a { padding: 14px; font-size: 1.15rem; }
+  .header-actions a { padding: 14px; font-size: 20px; }
   /* В столбце подчёркивание — ровно по длине слова */
   .menu a.active::after,
   .header-actions a.active::after { display: none; }
   .menu a.active,
-  .header-actions a.active { text-decoration: underline 3px #fff; text-underline-offset: 8px; }
+  .header-actions a.active { text-decoration: underline 3px #9CC4FF; text-underline-offset: 8px; }
   .header-actions {
     display: none;
     width: 100%;
@@ -3877,8 +3880,25 @@ body.page-practice {
   --p-shadow: 0 2px 10px rgba(34, 43, 61, 0.08);
   --p-shadow-big: 0 8px 22px rgba(34, 43, 61, 0.18);
 }
-/* Фон на main, а не на body: шапка полупрозрачная и пропускала бы новый цвет */
-body.page-practice main { background: var(--p-bg); }
+/* Фон страницы: фото на весь экран, неподвижное, поверх голубая дымка по диагонали */
+body.page-practice { background: var(--p-bg); }
+body.page-practice::before,
+body.page-practice::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+body.page-practice::before {
+  z-index: -2;
+  background: url("../images/hero.jpg") 72% center / cover no-repeat;
+  filter: grayscale(1);
+  opacity: 0.35;
+}
+body.page-practice::after {
+  z-index: -1;
+  background: linear-gradient(135deg, rgba(214, 228, 250, 0.75) 0%, rgba(233, 239, 251, 0.85) 50%, rgba(253, 238, 230, 0.7) 100%);
+}
 body.page-practice #practice-page {
   --text: var(--p-ink);
   --muted: var(--p-ink-2);
@@ -3891,8 +3911,10 @@ body.page-practice #practice-page {
 
 /* --- Панели --- */
 body.page-practice .practice-nav {
-  background: var(--p-beige);
-  border-color: var(--p-line);
+  background: rgba(255, 255, 255, 0.75);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-color: rgba(63, 111, 204, 0.2);
 }
 body.page-practice .practice-side-col,
 body.page-practice .practice-none,
@@ -3905,25 +3927,30 @@ body.page-practice .match-explain {
 }
 /* Записка над картинкой: полоса слева коралловая */
 body.page-practice .practice-note-card { border-left-color: var(--p-coral); }
-body.page-practice .practice-page-grid--zones .practice-side-col { background: var(--p-beige); }
+body.page-practice .practice-page-grid--zones .practice-side-col { background: #fff; }
 body.page-practice .practice-page-grid .practice-side-col.is-over { background: var(--p-coral-soft); }
 body.page-practice .match-explain { box-shadow: none; }
 @media (min-width: 1000px) {
   body.page-practice .practice-zone { background: var(--p-beige); }
 }
 
-/* Шапка правой панели: полоса до краёв панели. Отрицательные поля возвращают то, что добавляют внутренние: список карточек остаётся на месте */
-body.page-practice .practice-count {
-  margin: -16px -16px 6px;
-  padding: 16px 16px 8px;
-  border-radius: 13px 13px 0 0;
-  background: var(--p-beige);
+/* Шапка правой панели: полоса до краёв панели. Панель обрезает лишнее, поэтому поля шапки не зависят от полей панели,
+   а отрицательные поля возвращают всё, что добавляют внутренние: текст и списки остаются на своих местах */
+body.page-practice .practice-side-col { overflow: hidden; }
+body.page-practice .practice-count,
+body.page-practice .practice-side-col > .practice-zone-head,
+body.page-practice .order-why .order-pool-title {
+  background: linear-gradient(90deg, var(--p-blue-soft), #fff);
 }
+body.page-practice .practice-count { margin: -40px -40px 6px; padding: 40px 40px 6px; }
+body.page-practice .practice-side-col > .practice-zone-head { margin: -40px -40px 8px; padding: 40px 40px 6px; }
+body.page-practice .order-why .order-pool-title { margin: -40px -40px 8px; padding: 48px 40px 10px; }
 @media (min-width: 1000px) {
-  body.page-practice .practice-count {
-    margin: -12px -14px 2px;
-    padding: 12px 14px 6px;
-  }
+  body.page-practice .practice-side-col > .practice-zone-head { min-height: 86px; margin-bottom: 4px; }
+}
+@media (min-width: 1000px) and (max-height: 720px) {
+  body.page-practice .practice-side-col > .practice-zone-head { min-height: 76px; margin-bottom: 0; padding-bottom: 0; }
+  body.page-practice .practice-side-col > .fill-head { min-height: 68px; }
 }
 /* Число в счётчике: крупнее, но строка от него не растёт */
 body.page-practice .practice-count strong,
@@ -3949,8 +3976,8 @@ body.page-practice .practice-nav-item {
 body.page-practice .practice-nav-item:hover { background: rgba(255, 255, 255, 0.65); }
 body.page-practice .practice-nav-item.is-current {
   border-color: transparent;
-  background: #fff;
-  box-shadow: var(--p-shadow);
+  background: var(--p-blue-soft);
+  box-shadow: inset 3px 0 0 var(--p-blue);
 }
 /* Номер в кружке; цифру в тексте слышит только программа чтения (сам кружок для неё скрыт) */
 body.page-practice .practice-nav-circle {
@@ -3987,7 +4014,7 @@ body.page-practice .practice-nav-progress {
   height: 6px;
   margin-bottom: 12px;
   border-radius: 3px;
-  background: #fff;
+  background: var(--p-blue-soft);
   overflow: hidden;
 }
 body.page-practice .practice-nav-progress span {
@@ -4032,9 +4059,10 @@ body.page-practice .practice-task-badge {
   margin-bottom: 6px;
   padding: 2px 12px;
   border-radius: 999px;
-  background: var(--p-beige);
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(34, 43, 61, 0.12);
   color: var(--p-coral);
-  font-size: 0.8rem;
+  font-size: 14px;
   font-weight: bold;
   line-height: 1.5;
 }
@@ -4090,12 +4118,12 @@ body.page-practice .practice-card {
 }
 body.page-practice .practice-card--found { border-color: #c5e3bd; }
 body.page-practice .practice-card--neutral {
-  background: var(--p-blue-soft);
-  border-color: var(--p-blue-soft);
+  background: var(--p-bg);
+  border-color: var(--p-bg);
 }
 body.page-practice .practice-tag--neutral {
-  background: #fff;
-  color: var(--p-blue);
+  background: var(--p-blue);
+  color: #fff;
 }
 body.page-practice .practice-card-head::after { color: var(--p-coral); }
 body.page-practice .zones-mark {
@@ -4167,7 +4195,7 @@ body.page-practice .practice-page-grid--fill {
   --fill-orange: var(--p-coral);
   --fill-orange-dark: var(--p-coral-dark);
   --fill-orange-soft: #fff;
-  --fill-grey: #fff;
+  --fill-grey: var(--p-bg);       /* панель белая: ещё закрытое пояснение видно по подложке */
   --fill-grey-text: var(--p-ink-2);
 }
 body.page-practice .fill-blank:hover,
@@ -4186,7 +4214,7 @@ body.page-practice .fill-menu { box-shadow: 0 10px 28px rgba(34, 43, 61, 0.24); 
 body.page-practice .fill-option { color: var(--p-ink); }
 body.page-practice .fill-option:hover,
 body.page-practice .fill-option:focus { background: var(--p-beige); color: var(--p-coral-dark); }
-body.page-practice .order-why-list .fill-why-item:not(.is-ok) .order-num { background: var(--p-beige); color: var(--p-ink-2); }
+body.page-practice .order-why-list .fill-why-item:not(.is-ok) .order-num { background: #fff; color: var(--p-ink-2); }
 body.page-practice .order-why-list .fill-why-item.is-ok { box-shadow: 0 1px 6px rgba(34, 43, 61, 0.08); }
 
 /* ===== Личный кабинет (cabinet.html): раскладка и цвета только этой страницы, body.page-cabinet =====
@@ -5720,4 +5748,404 @@ body.ref-page .rights-row:hover .rights-row-title { color: var(--l-ink); }
   body.ref-page .ref-filter-row { flex-wrap: wrap; gap: 8px; }
   body.ref-page .ref-filters .filters-label { width: 100%; }
   body.ref-page .ref-filters .filters { flex: 1 1 100%; gap: 8px; }
+}
+
+/* ===== Главная (index.html): body.page-home вместе с soft-page ===== */
+/* Кнопки на фото */
+body.page-home .hero .buttons { max-width: none; }
+body.page-home .hero .btn {
+  min-height: clamp(54px, 3.34vw, 64px);
+  padding: 0 clamp(28px, 1.9vw, 36px);
+  font-size: clamp(18px, 1.15vw, 22px);
+  text-shadow: none;
+}
+body.page-home .hero .btn-primary {
+  border: 2px solid var(--l-coral);
+  background: var(--l-coral);
+  box-shadow: 0 10px 26px rgba(238, 122, 80, 0.42);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+body.page-home .hero .btn-primary:hover { border-color: var(--l-coral-dark); background: var(--l-coral-dark); }
+body.page-home #home-start::after { content: "\00a0→"; }
+body.page-home .hero .btn-secondary {
+  border: 2px solid #CFDCF7;
+  background: rgba(63, 111, 204, 0.45);
+  color: #fff;
+}
+body.page-home .hero .btn-secondary:hover { background: rgba(63, 111, 204, 0.62); }
+
+/* Блоки */
+body.page-home .block { padding: 14px 0 16px; }
+body.page-home .block h2 { margin: 0 0 18px; color: var(--l-ink); font-size: 2.1rem; line-height: 1.2; }
+body.page-home .block + .block { padding-top: 18px; padding-bottom: 28px; }
+body.page-home .grid-3 { gap: 18px; }
+
+/* Карточки разделов — ссылки (на уроки раздела или на «Права и документы») */
+body.page-home a.section-card {
+  --section: var(--l-coral);
+  --section-soft: var(--l-beige);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  overflow: hidden;
+  padding: 24px;
+  border: 0;
+  border-radius: 24px;
+  box-shadow: var(--l-shadow);
+  color: var(--l-ink);
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+body.page-home a.section-card--psychology { --section: var(--l-blue); --section-soft: var(--l-blue-soft); }
+body.page-home a.section-card:hover { box-shadow: 0 10px 26px rgba(107, 74, 53, 0.16); transform: translateY(-3px); }
+body.page-home a.section-card:focus-visible { outline: 3px solid var(--section); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  body.page-home a.section-card { transition: none; }
+  body.page-home a.section-card:hover { transform: none; }
+}
+/* Бледный круг в правом верхнем углу */
+body.page-home a.section-card::before {
+  content: "";
+  position: absolute;
+  top: -20px;
+  right: -26px;
+  width: 136px;
+  height: 136px;
+  border-radius: 50%;
+  background: var(--section-soft);
+  opacity: 0.6;
+}
+body.page-home .section-card > * { position: relative; }
+body.page-home .section-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  border-radius: 14px;
+  background: var(--section-soft);
+  color: var(--section);
+}
+body.page-home .section-icon svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+body.page-home .section-card h3 { margin: 0 0 10px; color: var(--l-ink); font-size: 1.45rem; line-height: 1.25; }
+body.page-home .section-card p { margin: 0 0 12px; color: var(--l-ink-2); font-size: 1.03rem; line-height: 1.42; }
+body.page-home .section-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+body.page-home .section-chips span {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: #F3EFEC;
+  color: var(--l-ink-2);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+body.page-home .section-go { margin-top: auto; color: var(--section); font-size: 1rem; font-weight: bold; }
+
+/* Как это работает: номер слева, справа заголовок и текст */
+body.page-home .steps { grid-template-columns: repeat(4, minmax(0, 1fr)); list-style: none; }
+@media (max-width: 1100px) {
+  body.page-home .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  body.page-home .steps { grid-template-columns: minmax(0, 1fr); }
+}
+body.page-home .step {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  column-gap: 14px;
+  align-content: start;
+  padding: 18px;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: var(--l-shadow);
+}
+body.page-home .step-number {
+  grid-row: 1 / span 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--l-beige);
+  color: var(--l-coral);
+  font-size: 1.05rem;
+  font-weight: bold;
+  line-height: 1;
+}
+body.page-home .step:nth-child(even) .step-number { background: var(--l-blue-soft); color: var(--l-blue); }
+body.page-home .step h3 { margin: 0 0 2px; color: var(--l-ink); font-size: 1.06rem; line-height: 1.3; }
+body.page-home .step p { margin: 0; color: var(--l-ink-2); font-size: 0.94rem; line-height: 1.4; }
+
+/* Кнопка консультанта: голубая, коралловая точка в углу. Само окно не меняется */
+body.page-home .chat-fab {
+  right: 24px;
+  bottom: 24px;
+  width: 72px;
+  height: 72px;
+  border: 0;
+  background: var(--l-blue);
+  box-shadow: 0 8px 22px rgba(63, 111, 204, 0.42);
+}
+body.page-home .chat-fab:hover { background: var(--l-blue-dark); }
+body.page-home .chat-fab:focus-visible { outline-color: var(--l-blue); }
+body.page-home .chat-fab::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--l-coral);
+}
+body.page-home .chat-fab svg { width: 34px; height: 34px; }
+
+/* Телефон */
+@media (max-width: 860px) {
+  body.page-home .block h2 { font-size: 1.6rem; }
+  body.page-home .grid-3 { gap: 12px; }
+  body.page-home a.section-card { padding: 18px; }
+}
+@media (max-width: 600px) {
+  body.page-home .hero .buttons { flex-direction: column; align-items: stretch; }
+  body.page-home .hero .btn { width: 100%; }
+  body.page-home .chat-fab { right: 16px; bottom: 16px; width: 60px; height: 60px; }
+  body.page-home .chat-fab::after { top: 1px; right: 1px; width: 16px; height: 16px; }
+  body.page-home .chat-fab svg { width: 30px; height: 30px; }
+}
+
+/* ===== Практика: читаемость текста. Размеры панелей и карточек не меняются ===== */
+body.page-practice .practice-task-desc { font-size: 18px; line-height: 1.45; color: var(--p-ink-2); }
+body.page-practice .practice-nav-count,
+body.page-practice .practice-nav-drop-count,
+body.page-practice .practice-nav-item,
+body.page-practice .practice-nav-back { font-size: 16px; line-height: 1.3; }
+body.page-practice .practice-nav-count,
+body.page-practice .practice-nav-drop-count { color: var(--p-ink-2); }
+body.page-practice .practice-nav-circle { font-size: 14px; }
+body.page-practice .practice-note-foot { font-size: 14px; }
+/* Правая панель */
+body.page-practice .practice-count { font-size: 20px; line-height: 1.3; }
+body.page-practice .practice-card { font-size: 16px; line-height: 1.35; }
+body.page-practice .practice-card h3 { font-size: 17px; }
+body.page-practice .practice-tag,
+body.page-practice .practice-card-note { font-size: 14px; line-height: 1.4; }
+/* Карточка результата на компьютере, свёрнутая и раскрытая: ярлык и стрелка в первой строке, название ниже и целиком */
+@media (min-width: 1000px) {
+  /* Строка списка всегда по высоте карточки: иначе длинный список сжимает карточки, а не прокручивается */
+  body.page-practice .practice-cells { grid-auto-rows: max-content; }
+  body.page-practice .practice-card-head { flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 2px; }
+  body.page-practice .practice-card-head::after { order: 2; margin-left: auto; }
+  body.page-practice .practice-card .practice-card-name,
+  body.page-practice .practice-card:not(.is-open) .practice-card-name {
+    order: 3;
+    flex: 0 0 100%;
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+}
+/* Подсказки на картинке */
+body.page-practice .practice-tip,
+body.page-practice .zones-miss { font-size: 16px; line-height: 1.35; }
+body.page-practice .zones-mark { font-size: clamp(14px, 2.6cqw, 0.95rem); }
+/* Строка кнопок */
+body.page-practice .practice-bar-msg,
+body.page-practice .practice-finish .success,
+body.page-practice .practice-note { font-size: 16px; }
+/* Текстовые задания */
+body.page-practice .order-card,
+body.page-practice .match-card,
+body.page-practice .fill-option { font-size: 17px; line-height: 1.25; }
+body.page-practice .order-why-list,
+body.page-practice .order-why-list.fill-why { font-size: 17px; line-height: 1.3; }
+body.page-practice .order-pool-hint,
+body.page-practice .match-hint,
+body.page-practice .match-picked,
+body.page-practice .fill-count,
+body.page-practice .order-pool-empty,
+body.page-practice .order-card-note,
+body.page-practice .match-note { font-size: 16px; line-height: 1.25; }
+body.page-practice .order-why-list .order-num { font-size: 14px; }
+body.page-practice .order-why-list .fill-why-item .order-num { font-size: 14.4px; }
+body.page-practice .practice-page-grid .btn { line-height: 1.2; }
+/* Низкое окно: крупный текст помещается за счёт высоты карточек и межстрочных интервалов */
+@media (min-width: 1000px) and (max-height: 720px) {
+  body.page-practice .match-right { min-height: 52px; }
+  body.page-practice .match-hint,
+  body.page-practice .match-picked { line-height: 1.15; }
+}
+
+/* ===== Страница урока (lesson.html): body.page-lesson вместе с soft-page ===== */
+body.page-lesson {
+  --lesson-max: 1420px;
+  --lesson-side: 400px;
+}
+/* Баннер: то же фото, что на «Уроках», чуть заметнее */
+body.page-lesson .lesson-banner { min-height: 250px; padding: 26px 0 52px; }
+body.page-lesson .lesson-banner::before { opacity: 0.55; }
+body.page-lesson .lesson-banner .breadcrumbs { margin: 0 0 8px; color: var(--l-ink-2); font-size: 1rem; line-height: 1.4; }
+body.page-lesson .lesson-num {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--l-coral);
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1.35;
+}
+body.page-lesson .lesson-num::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+body.page-lesson .lesson-banner h1 { margin: 0 0 4px; color: var(--l-navy); font-size: 3.25rem; line-height: 1.15; }
+body.page-lesson .lesson-banner .lead { margin: 0; color: #2F3C5C; font-size: 1.25rem; line-height: 1.35; }
+/* Содержимое слегка заходит на баннер снизу */
+body.page-lesson .lesson-block { position: relative; margin-top: -30px; padding: 0 0 40px; }
+body.page-lesson .soft-banner[hidden] + .lesson-block { margin-top: 0; padding-top: 22px; }
+
+/* Цвета */
+body.page-lesson main a:not(.btn) { color: var(--l-blue); }
+body.page-lesson main a:not(.btn):hover { color: var(--l-blue-dark); }
+body.page-lesson .lesson-article-toggle { color: var(--l-blue); }
+body.page-lesson main .btn-secondary {
+  border-color: var(--l-blue);
+  background: #fff;
+  color: var(--l-blue);
+}
+body.page-lesson main .btn-secondary:hover { background: var(--l-blue-soft); }
+body.page-lesson .lesson-article,
+body.page-lesson .lesson-side-card { box-shadow: var(--l-shadow); }
+body.page-lesson .lesson-video-item.is-current { border-color: var(--l-coral); }
+body.page-lesson .lesson-modal::backdrop { background: rgba(31, 42, 68, 0.55); }
+
+/* Видео: белая рамка и мягкая голубоватая тень; заставка до нажатия */
+body.page-lesson .lesson-video-screen {
+  border: 3px solid #fff;
+  background: var(--l-blue-soft);
+  box-shadow: 0 10px 28px rgba(63, 111, 204, 0.22);
+  overflow: hidden;
+}
+body.page-lesson .lesson-video-screen iframe { border-radius: 0; }
+body.page-lesson .lesson-video-card { border-radius: 0; background: linear-gradient(135deg, var(--l-blue), var(--l-navy)); }
+body.page-lesson .lesson-video-poster {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+body.page-lesson .lesson-video-poster:focus-visible { outline: 3px solid #fff; outline-offset: -8px; }
+body.page-lesson .lesson-video-poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+body.page-lesson .lesson-video-poster::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 55%, rgba(22, 30, 52, 0.78) 100%);
+}
+body.page-lesson .lesson-video-play {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(22, 30, 52, 0.3);
+  transform: translate(-50%, -50%);
+  transition: transform 0.15s;
+}
+body.page-lesson .lesson-video-poster:hover .lesson-video-play { transform: translate(-50%, -50%) scale(1.06); }
+body.page-lesson .lesson-video-play svg { width: 46px; height: 46px; fill: var(--l-coral); }
+body.page-lesson .lesson-video-caption {
+  position: absolute;
+  z-index: 1;
+  left: 24px;
+  right: 24px;
+  bottom: 16px;
+  display: block;
+}
+body.page-lesson .lesson-video-caption-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: 1.4rem;
+  font-weight: bold;
+  line-height: 1.25;
+}
+body.page-lesson .lesson-video-caption-meta { display: block; margin-top: 2px; font-size: 16px; line-height: 1.3; }
+@media (prefers-reduced-motion: reduce) {
+  body.page-lesson .lesson-video-play { transition: none; }
+  body.page-lesson .lesson-video-poster:hover .lesson-video-play { transform: translate(-50%, -50%); }
+}
+body.page-lesson .lesson-video-org { display: flex; align-items: baseline; gap: 8px; color: var(--l-ink-2); font-size: 15px; line-height: 1.35; }
+body.page-lesson .lesson-video-org:empty { display: none; }
+body.page-lesson .lesson-video-org::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--l-blue);
+}
+
+/* Карточки справа: значки прежние */
+body.page-lesson .lesson-side-note,
+body.page-lesson .lesson-side-hint { color: var(--l-ink-2); font-size: 16px; }
+body.page-lesson .lesson-side-card .btn { border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+body.page-lesson .lesson-side-card .lesson-side-btn { display: flex; text-align: center; }
+body.page-lesson .lesson-test-card { background: linear-gradient(135deg, var(--l-blue-soft) 0%, #fff 70%); }
+body.page-lesson .lesson-test-card .btn-primary { border-color: var(--l-blue); background: var(--l-blue); color: #fff; }
+body.page-lesson .lesson-test-card .btn-primary:hover { border-color: var(--l-blue-dark); background: var(--l-blue-dark); }
+body.page-lesson .lesson-article-sources { color: var(--l-ink-2); font-size: 15px; }
+
+@media (max-width: 900px) {
+  body.page-lesson .lesson-banner { min-height: 0; padding: 18px 0 46px; }
+  body.page-lesson .lesson-banner h1 { font-size: 2.25rem; }
+  body.page-lesson .lesson-banner .lead { font-size: 1.05rem; }
+}
+@media (max-width: 600px) {
+  body.page-lesson .lesson-video-play { width: 60px; height: 60px; }
+  body.page-lesson .lesson-video-play svg { width: 34px; height: 34px; }
+  body.page-lesson .lesson-video-caption { left: 12px; right: 12px; bottom: 8px; }
+  body.page-lesson .lesson-video-caption-title { font-size: 16px; }
+  body.page-lesson .lesson-video-caption-meta { font-size: 14px; }
 }

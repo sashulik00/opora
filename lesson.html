@@ -8,11 +8,16 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <!-- data-page="lessons" — чтобы в меню подсвечивался пункт «Уроки» -->
-<body data-page="lessons">
+<body data-page="lessons" class="page-lesson soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
+    <!-- Баннер: фото и дымка в css/style.css, крошки и заголовок заполняет js/main.js -->
+    <section class="soft-banner lesson-banner" id="lesson-banner">
+      <div class="container lesson-page" id="lesson-head"></div>
+    </section>
+
     <section class="lesson-block">
       <!-- Урок целиком строится из js/main.js: тема берётся из адреса (lesson.html?id=burns) -->
       <div class="container lesson-page" id="lesson-page"></div>

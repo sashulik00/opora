@@ -114,6 +114,16 @@ function renderHeader() {
       escapeHtml(link.text) + "</a>";
   }
 
+  /* Вошедший: белый кружок с силуэтом и имя — одна ссылка в кабинет */
+  function accountHtml() {
+    if (!user) return linkHtml(account, account.page === page);
+    const active = account.page === page;
+    return '<a href="' + account.href + '" class="account-link' + (active ? " active" : "") + '"' + (active ? ' aria-current="page"' : "") + ">" +
+      '<span class="account-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6"/></svg></span>' +
+      '<span class="account-name">' + escapeHtml(account.text) + "</span>" +
+    "</a>";
+  }
+
   const items = links.map(function (link) {
     if (!link.children) return "<li>" + linkHtml(link, link.page === page) + "</li>";
 
@@ -141,7 +151,7 @@ function renderHeader() {
       '<button class="menu-toggle" aria-expanded="false" aria-controls="main-menu">☰ Меню</button>' +
       '<nav aria-label="Главное меню"><ul id="main-menu" class="menu">' + items + "</ul></nav>" +
       '<div class="header-actions">' +
-        linkHtml(account, account.page === page) +
+        accountHtml() +
         (user ? '<button type="button" class="menu-logout">Выйти</button>' : "") +
       "</div>" +
     "</div>";
@@ -233,6 +243,13 @@ function renderFooter() {
 
 /* ---------- Главная: три раздела ---------- */
 
+/* Плашки на карточках разделов. Число уроков считается из данных и стоит первым */
+const SECTION_CARD_CHIPS = {
+  medical: ["практика", "видео"],
+  psychology: ["консультант"],
+  legal: ["справочник", "словарь"]
+};
+
 function renderSections() {
   const box = document.getElementById("sections-list");
   if (!box) return;
@@ -241,13 +258,14 @@ function renderSections() {
     // Считаем только уроки (kind: "lesson"). Раздел без уроков ведёт на «Права и документы»
     const count = LESSONS.filter(function (t) { return t.section === section.id; }).length;
     const href = count ? "lessons.html#" + section.id : "rights.html";
-    const note = count ? "Уроков: " + count : "Права и документы: ситуаций " + RIGHTS.length;
+    const chips = (count ? [count + " " + plural(count, "урок", "урока", "уроков")] : []).concat(SECTION_CARD_CHIPS[section.id] || []);
     return (
-      '<a class="card section-card" href="' + href + '">' +
-        '<div class="section-icon" aria-hidden="true">' + section.icon + "</div>" +
+      '<a class="card section-card section-card--' + escapeHtml(section.id) + '" href="' + href + '">' +
+        '<span class="section-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false">' + (LESSON_SECTION_ICONS[section.id] || "") + "</svg></span>" +
         "<h3>" + escapeHtml(section.title) + "</h3>" +
         "<p>" + escapeHtml(section.description) + "</p>" +
-        '<p class="muted">' + note + "</p>" +
+        '<span class="section-chips">' + chips.map(function (c) { return "<span>" + escapeHtml(c) + "</span>"; }).join("") + "</span>" +
+        '<span class="section-go">Перейти →</span>' +
       "</a>"
     );
   }).join("");
@@ -442,7 +460,8 @@ function renderLessonsProgress(progress) {
 /* Значки разделов: содержимое svg с viewBox 0 0 24 24 */
 const LESSON_SECTION_ICONS = {
   medical: '<path d="M12 4v16M4 12h16"/>',
-  psychology: '<path d="M12 20s-7.5-4.6-8.6-9.6C2.7 7 5 4.5 7.8 4.5c1.8 0 3.2 1 4.2 2.5 1-1.5 2.4-2.5 4.2-2.5 2.8 0 5.1 2.5 4.4 5.9C19.5 15.4 12 20 12 20z"/>'
+  psychology: '<path d="M12 20s-7.5-4.6-8.6-9.6C2.7 7 5 4.5 7.8 4.5c1.8 0 3.2 1 4.2 2.5 1-1.5 2.4-2.5 4.2-2.5 2.8 0 5.1 2.5 4.4 5.9C19.5 15.4 12 20 12 20z"/>',
+  legal: '<rect x="5.5" y="3.5" width="13" height="17" rx="2"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/>'
 };
 
 /* Карточка на странице «Уроки». Вся карточка — одна ссылка, кнопка внутри только нарисована.
@@ -1182,6 +1201,33 @@ function lessonVideoScreen(video) {
   );
 }
 
+/* Заставка ролика на странице урока: картинка, название, автор и площадка, кнопка ▶. Плеер загрузится только по нажатию.
+   Нет картинки или ролик нельзя встроить — сразу плеер или ссылка, как раньше */
+function lessonVideoPoster(video) {
+  const thumb = (video.thumb || "").trim();
+  if (!thumb || !webUrl(video.embedUrl)) return lessonVideoScreen(video);
+  const platform = videoPlatform(video);
+  const meta = [video.org, platform].filter(Boolean).join(" · ");
+  const title = video.title || "Видео урока";
+  return (
+    '<button type="button" class="lesson-video-poster" aria-label="Смотреть видео: ' + escapeHtml(title) + '">' +
+      '<img src="' + escapeHtml(encodeURI(thumb)) + '" alt="">' +
+      '<span class="lesson-video-play" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5l11 7-11 7z"/></svg></span>' +
+      '<span class="lesson-video-caption">' +
+        '<span class="lesson-video-caption-title">' + escapeHtml(title) + "</span>" +
+        (meta ? '<span class="lesson-video-caption-meta">' + escapeHtml(meta) + "</span>" : "") +
+      "</span>" +
+    "</button>"
+  );
+}
+
+/* Плеер после нажатия на заставку: с автозапуском, если площадка его разрешает */
+function lessonVideoPlaying(video) {
+  const url = new URL(webUrl(video.embedUrl));
+  url.searchParams.set("autoplay", "1");
+  return lessonVideoScreen(Object.assign({}, video, { embedUrl: url.href }));
+}
+
 function lessonVideoOrg(video) {
   const platform = videoPlatform(video);
   return video.org ? "Видео: " + video.org + (platform ? ", " + platform : "") : platform;
@@ -1214,23 +1260,36 @@ function renderLessonVideos(videos) {
     "</ul>";
   return (
     '<section class="lesson-video" aria-label="Видео урока">' +
-      '<div class="lesson-video-screen">' + lessonVideoScreen(videos[0]) + "</div>" +
+      '<div class="lesson-video-screen">' + lessonVideoPoster(videos[0]) + "</div>" +
       '<p class="lesson-video-org">' + escapeHtml(lessonVideoOrg(videos[0])) + "</p>" +
       list +
     "</section>"
   );
 }
 
-/* Клик по названию ролика — этот ролик в том же плеере */
+/* Нажатие на заставку — плеер. Клик по названию ролика — заставка этого ролика на том же месте */
 function setupLessonVideos(page, videos) {
   const box = page.querySelector(".lesson-video");
   if (!box) return;
+  const screen = box.querySelector(".lesson-video-screen");
+  let current = videos[0];
+
+  // Картинка не загрузилась — сразу плеер, как у ролика без картинки
+  screen.addEventListener("error", function (e) {
+    if (e.target.tagName === "IMG") screen.innerHTML = lessonVideoScreen(current);
+  }, true);
+
   box.addEventListener("click", function (e) {
+    if (e.target.closest(".lesson-video-poster")) {
+      screen.innerHTML = lessonVideoPlaying(current);
+      screen.querySelector("iframe").focus();
+      return;
+    }
     const button = e.target.closest(".lesson-video-item");
     if (!button || button.classList.contains("is-current")) return;
-    const video = videos[Number(button.dataset.video)];
-    box.querySelector(".lesson-video-screen").innerHTML = lessonVideoScreen(video);
-    box.querySelector(".lesson-video-org").textContent = lessonVideoOrg(video);
+    current = videos[Number(button.dataset.video)];
+    screen.innerHTML = lessonVideoPoster(current);
+    box.querySelector(".lesson-video-org").textContent = lessonVideoOrg(current);
     box.querySelectorAll(".lesson-video-item").forEach(function (b) {
       b.classList.toggle("is-current", b === button);
       b.setAttribute("aria-pressed", b === button);
@@ -1291,8 +1350,8 @@ function setupLessonArticle(page) {
 }
 
 /* Карточка правой колонки: значок, заголовок, содержимое */
-function lessonSideCard(icon, title, content) {
-  return '<section class="card lesson-side-card"><h2>' + icon + escapeHtml(title) + "</h2>" + content + "</section>";
+function lessonSideCard(icon, title, content, extraClass) {
+  return '<section class="card lesson-side-card' + (extraClass ? " " + extraClass : "") + '"><h2>' + icon + escapeHtml(title) + "</h2>" + content + "</section>";
 }
 
 function renderLessonMemoCard(hasMemoBlocks) {
@@ -1330,7 +1389,7 @@ function renderLessonTestCard(topic, record, user) {
     (!user
       ? '<p class="lesson-side-hint">Тест можно пройти и без входа, но результат не сохранится. ' +
         '<a href="' + loginLinkBack() + '">Войти</a></p>'
-      : ""));
+      : ""), "lesson-test-card");
 }
 
 /* Окно памятки: тег dialog сам держит фокус внутри и закрывается по Esc.
@@ -1366,6 +1425,7 @@ function renderLessonPage() {
   const topic = TOPICS.find(function (t) { return t.id === id; });
 
   if (!topic) {
+    document.getElementById("lesson-banner").hidden = true;
     page.innerHTML =
       '<div class="card"><h1>Урок не найден</h1>' +
       '<p>Возможно, ссылка устарела.</p>' +
@@ -1375,6 +1435,7 @@ function renderLessonPage() {
 
   // Тема только для справочника (kind: "reference") — урока и теста у неё нет
   if (!isLesson(topic)) {
+    document.getElementById("lesson-banner").hidden = true;
     page.innerHTML = renderNotALesson(topic);
     return;
   }
@@ -1388,7 +1449,7 @@ function renderLessonPage() {
 
   document.title = topic.title + " — Опора. Школа ухода";
 
-  page.innerHTML =
+  document.getElementById("lesson-head").innerHTML =
     '<nav class="breadcrumbs" aria-label="Хлебные крошки">' +
       '<a href="lessons.html">Уроки</a> <span aria-hidden="true">→</span> ' +
       '<span aria-current="page">' + escapeHtml(topic.title) + "</span>" +
@@ -1396,8 +1457,9 @@ function renderLessonPage() {
 
     '<p class="lesson-num">Урок ' + (index + 1) + " · " + escapeHtml(section.title) + "</p>" +
     "<h1>" + escapeHtml(topic.title) + "</h1>" +
-    '<p class="lead">' + escapeHtml(topic.description) + "</p>" +
+    '<p class="lead">' + escapeHtml(topic.description) + "</p>";
 
+  page.innerHTML =
     '<div class="lesson-layout">' +
       '<div class="lesson-main">' +
         renderLessonVideos(videos) +
