@@ -983,8 +983,6 @@ html.modal-open {
   font-size: 1.05rem;
   font-weight: bold;
 }
-.test-progress { margin-bottom: 20px; }
-.test-progress .progress-text { margin-bottom: 8px; }
 .question legend:focus { outline: none; }
 
 .test-result { text-align: center; }
@@ -6148,4 +6146,218 @@ body.page-lesson .lesson-article-sources { color: var(--l-ink-2); font-size: 15p
   body.page-lesson .lesson-video-caption { left: 12px; right: 12px; bottom: 8px; }
   body.page-lesson .lesson-video-caption-title { font-size: 16px; }
   body.page-lesson .lesson-video-caption-meta { font-size: 14px; }
+}
+
+/* ===== Страница теста (test.html): body.page-test вместе с soft-page ===== */
+body.page-test .test-wrap { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
+/* Баннер: то же фото, что на «Уроках» и в уроке */
+body.page-test .test-banner { min-height: 270px; padding: 26px 0 60px; }
+body.page-test .test-banner::before { opacity: 0.55; }
+body.page-test .test-banner .back-link {
+  display: inline-block;
+  margin: 0 0 8px;
+  color: var(--l-blue);
+  font-size: 1.05rem;
+  font-weight: bold;
+  line-height: 1.4;
+}
+body.page-test .test-banner .back-link:hover { color: var(--l-blue-dark); }
+body.page-test .lesson-num {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--l-coral);
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1.35;
+}
+body.page-test .lesson-num::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+body.page-test .test-banner h1 { margin: 0 0 4px; color: var(--l-navy); font-size: 3.25rem; line-height: 1.15; }
+body.page-test .test-banner .lead { margin: 0; color: #2F3C5C; font-size: 1.25rem; line-height: 1.35; }
+
+/* Карточка слегка заходит на баннер снизу */
+body.page-test .test-block { position: relative; margin-top: -44px; padding: 0 0 48px; }
+body.page-test .soft-banner[hidden] + .test-block { margin-top: 0; padding-top: 28px; }
+body.page-test .test-card {
+  display: block;
+  padding: 30px 34px 34px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 10px 34px rgba(107, 74, 53, 0.12);
+  scroll-margin-top: 100px;
+}
+body.page-test .test-card:focus { outline: none; }
+body.page-test .test-head { display: flex; align-items: center; gap: 16px; }
+body.page-test .test-head .soft-icon { width: 52px; height: 52px; border-radius: 14px; }
+body.page-test .test-head .soft-icon svg { width: 26px; height: 26px; }
+body.page-test .test-head h2 { margin: 0; color: var(--l-ink); font-size: 1.75rem; line-height: 1.25; }
+body.page-test .test-count { margin: 0 0 0 auto; color: var(--l-ink-2); font-size: 1rem; white-space: nowrap; }
+
+/* Отрезки хода теста */
+body.page-test .test-progress { display: flex; gap: 8px; margin: 22px 0 28px; }
+body.page-test .test-progress span { flex: 1 1 0; height: 8px; border-radius: 4px; background: #F1E4DC; }
+body.page-test .test-progress .is-done { background: #F4A47F; }
+
+/* Вопрос и варианты */
+body.page-test .question { min-width: 0; margin: 0; }
+body.page-test .question legend {
+  margin: 0 0 6px;
+  padding: 0;
+  color: var(--l-ink);
+  font-size: 2rem;
+  font-weight: bold;
+  line-height: 1.25;
+}
+body.page-test .test-hint { margin: 0 0 20px; color: var(--l-ink-2); font-size: 1rem; }
+body.page-test .option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 14px;
+  padding: 16px 30px;
+  min-height: 64px;
+  border: 2px solid #EADBD2;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--l-ink);
+  font-size: 1.25rem;
+  font-weight: bold;
+  line-height: 1.3;
+  cursor: pointer;
+}
+body.page-test .option:hover { border-color: #D9C0B2; }
+body.page-test .option:has(input:checked) { border-color: var(--l-coral); background: var(--l-beige); color: var(--l-coral); }
+body.page-test .option:has(input:focus-visible) { outline: 3px solid var(--l-coral); outline-offset: 3px; }
+body.page-test .option input {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 2px solid #D9C7BC;
+  border-radius: 50%;
+  background: #fff;
+}
+body.page-test .option input:checked {
+  border-color: var(--l-coral);
+  background: var(--l-coral);
+  box-shadow: inset 0 0 0 4px var(--l-beige);
+}
+body.page-test .option input:focus-visible { outline: none; }
+body.page-test .option span { min-width: 0; overflow-wrap: anywhere; }
+body.page-test #test-error { margin: 0 0 8px; }
+body.page-test #test-error:empty { display: none; }
+body.page-test .test-nav { display: flex; justify-content: flex-end; margin-top: 18px; }
+body.page-test .test-next {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 58px;
+  padding: 0 34px;
+  border-radius: 999px;
+  font-size: 1.25rem;
+}
+body.page-test .test-next:disabled { border-color: #F6C3AD; background: #F6C3AD; color: #fff; opacity: 0.8; cursor: not-allowed; }
+
+/* Результат */
+body.page-test .test-result { text-align: center; }
+body.page-test .test-result .test-head { justify-content: center; margin-bottom: 8px; }
+body.page-test .test-result p.test-percent { margin: 10px 0 4px; color: var(--l-ink); font-size: 4rem; font-weight: bold; line-height: 1.1; }
+body.page-test .test-result p.test-verdict {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 4px 22px;
+  border-radius: 999px;
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+body.page-test .test-result.is-passed { border: 0; }
+body.page-test .test-result.is-passed p.test-verdict { background: #E8F5E9; color: #1B5E20; }
+body.page-test .test-result.is-failed { border: 0; }
+body.page-test .test-result.is-failed p.test-verdict { background: var(--l-beige); color: var(--l-coral); }
+body.page-test .test-result p { font-size: 1.1rem; }
+body.page-test .test-result .muted { color: var(--l-ink-2); }
+body.page-test .test-result .hint { margin: 12px auto; max-width: 640px; background: var(--l-beige); border-color: #F6C3AD; font-size: 1rem; }
+body.page-test .test-result .hint a { color: var(--l-blue); }
+body.page-test .test-result .buttons { justify-content: center; gap: 12px; margin-top: 18px; }
+body.page-test .test-result .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 0 30px;
+  border-radius: 999px;
+  font-size: 1.15rem;
+}
+body.page-test .test-result .btn-secondary.test-again { border-color: var(--l-coral); background: #fff; color: var(--l-coral); }
+body.page-test .test-result .btn-secondary.test-again:hover { background: var(--l-beige); }
+body.page-test .test-result .btn-secondary.test-lesson { border-color: var(--l-blue); background: #fff; color: var(--l-blue); }
+body.page-test .test-result .btn-secondary.test-lesson:hover { background: var(--l-blue-soft); }
+
+/* Разбор ответов: верно — зелёная плашка, неверно — красноватая, как в практике */
+body.page-test .lesson-h2 { margin: 36px 0 14px; color: var(--l-navy); font-size: 1.6rem; }
+body.page-test .test-review { padding-left: 0; list-style: none; counter-reset: review; }
+body.page-test .review-item {
+  position: relative;
+  margin-bottom: 12px;
+  padding: 18px 24px 18px 64px;
+  border-width: 1px;
+  border-radius: 20px;
+  counter-increment: review;
+  font-size: 1rem;
+}
+body.page-test .review-item::before {
+  content: counter(review);
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  font-size: 0.95rem;
+  font-weight: bold;
+  line-height: 1;
+}
+body.page-test .review-item.is-right { border-color: #C5E3BD; border-left-width: 1px; background: #E9F5E6; }
+body.page-test .review-item.is-right::before { color: #2E7D32; }
+body.page-test .review-item.is-wrong { border-color: #F3C2BD; border-left-width: 1px; background: #FDECEA; }
+body.page-test .review-item.is-wrong::before { color: #C62828; }
+body.page-test .review-item.is-right .review-mark { color: #1B5E20; }
+body.page-test .review-item.is-wrong .review-mark { color: #A61F1F; }
+body.page-test .review-explanation { color: var(--l-ink-2); }
+
+@media (max-width: 900px) {
+  body.page-test .test-wrap { padding: 0 16px; }
+  body.page-test .test-banner { min-height: 0; padding: 18px 0 56px; }
+  body.page-test .test-banner h1 { font-size: 2.25rem; }
+  body.page-test .test-banner .lead { font-size: 1.05rem; }
+  body.page-test .test-block { margin-top: -36px; }
+  body.page-test .test-card { padding: 20px 18px 22px; border-radius: 22px; }
+  body.page-test .test-head { gap: 12px; flex-wrap: wrap; }
+  body.page-test .test-head .soft-icon { width: 44px; height: 44px; }
+  body.page-test .test-head h2 { font-size: 1.35rem; }
+  body.page-test .test-count { font-size: 1rem; }
+  body.page-test .test-progress { gap: 5px; margin: 16px 0 20px; }
+  body.page-test .question legend { font-size: 1.5rem; }
+  body.page-test .option { gap: 12px; padding: 12px 18px; margin-bottom: 10px; font-size: 1.1rem; }
+  body.page-test .test-next { width: 100%; }
+  body.page-test .test-result p.test-percent { font-size: 3rem; }
+  body.page-test .test-result .buttons { flex-direction: column; align-items: stretch; }
+  body.page-test .review-item { padding: 16px 16px 16px 54px; }
+  body.page-test .review-item::before { left: 14px; top: 16px; }
 }

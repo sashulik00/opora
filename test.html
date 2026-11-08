@@ -8,15 +8,20 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <!-- data-page="lessons" — чтобы в меню подсвечивался пункт «Уроки» -->
-<body data-page="lessons">
+<body data-page="lessons" class="page-test soft-page">
 
   <header id="site-header" class="site-header"></header>
 
   <main>
-    <section class="block">
+    <!-- Баннер: фото и дымка в css/style.css, ссылку, ярлык, название и число вопросов заполняет js/main.js -->
+    <section class="soft-banner test-banner" id="test-banner">
+      <div class="test-wrap" id="test-head"></div>
+    </section>
+
+    <section class="test-block">
       <!-- Тест строится из js/main.js: тема берётся из адреса (test.html?topic=burns),
            вопросы — из поля quiz этой темы в js/data.js -->
-      <div class="container lesson-container" id="test-page"></div>
+      <div class="test-wrap" id="test-page"></div>
     </section>
   </main>
 

@@ -3524,6 +3524,7 @@ function renderTestPage() {
   const topic = TOPICS.find(function (t) { return t.id === id; });
 
   if (!topic) {
+    document.getElementById("test-banner").hidden = true;
     page.innerHTML =
       '<div class="card"><h1>Тест не найден</h1>' +
       "<p>Возможно, ссылка устарела.</p>" +
@@ -3531,6 +3532,7 @@ function renderTestPage() {
     return;
   }
   if (!isLesson(topic)) {
+    document.getElementById("test-banner").hidden = true;
     page.innerHTML = renderNotALesson(topic);
     return;
   }
@@ -3539,11 +3541,14 @@ function renderTestPage() {
   const next = nextLesson(topic);
   document.title = "Тест: " + topic.title + " — Опора";
 
-  page.innerHTML =
+  document.getElementById("test-head").innerHTML =
     '<a href="' + lessonHref + '" class="back-link">← Вернуться к материалу</a>' +
     '<p class="lesson-num">Тест · Урок ' + (LESSONS.indexOf(topic) + 1) + "</p>" +
     "<h1>" + escapeHtml(topic.title) + "</h1>" +
-    '<div id="test-body"></div>';
+    '<p class="lead">' + topic.quiz.length + " " + plural(topic.quiz.length, "вопрос", "вопроса", "вопросов") +
+      " · зачёт от " + Math.round(PASS_RATE * 100) + "% правильных ответов</p>";
+
+  page.innerHTML = '<div id="test-body"></div>';
 
   const body = document.getElementById("test-body");
   let questions = [];
@@ -3572,16 +3577,20 @@ function renderTestPage() {
     const isLast = current === total - 1;
 
     body.innerHTML =
-      '<div class="test-progress">' +
-        '<p class="progress-text">Вопрос <strong>' + (current + 1) + "</strong> из " + total + "</p>" +
-        '<div class="progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + total +
-          '" aria-valuenow="' + (current + 1) + '" aria-label="Ход теста">' +
-          '<div class="progress-fill" style="width:' + Math.round((current + 1) / total * 100) + '%"></div>' +
+      '<form id="test-form" class="test-card">' +
+        '<div class="test-head">' +
+          '<span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span>' +
+          "<h2>Проверьте себя</h2>" +
+          '<p class="test-count">Вопрос ' + (current + 1) + " из " + total + "</p>" +
         "</div>" +
-      "</div>" +
-      '<form id="test-form" class="card">' +
+        // Отрезки по числу вопросов: пройденные и текущий светло-коралловые, остальные бледно-бежевые
+        '<div class="test-progress" role="progressbar" aria-valuemin="1" aria-valuemax="' + total +
+          '" aria-valuenow="' + (current + 1) + '" aria-label="Ход теста">' +
+          questions.map(function (item, i) { return '<span class="' + (i <= current ? "is-done" : "") + '"></span>'; }).join("") +
+        "</div>" +
         '<fieldset class="question">' +
           '<legend tabindex="-1">' + escapeHtml(q.question) + "</legend>" +
+          '<p class="test-hint">Выберите один ответ</p>' +
           q.options.map(function (o, oi) {
             return (
               '<label class="option">' +
@@ -3592,8 +3601,12 @@ function renderTestPage() {
           }).join("") +
         "</fieldset>" +
         '<p id="test-error" class="error" role="alert"></p>' +
-        '<button type="submit" class="btn btn-primary">' + (isLast ? "Показать результат" : "Далее") + "</button>" +
+        '<div class="test-nav"><button type="submit" class="btn btn-primary test-next" disabled>' + (isLast ? "Завершить тест" : "Дальше →") + "</button></div>" +
       "</form>";
+
+    // Пока ответ не выбран, кнопка бледная и не нажимается
+    const nextButton = body.querySelector(".test-next");
+    body.querySelector(".question").addEventListener("change", function () { nextButton.disabled = false; });
 
     // Для перехода с клавиатуры и программ чтения с экрана — фокус на новый вопрос
     if (current > 0) body.querySelector("legend").focus();
@@ -3622,18 +3635,22 @@ function renderTestPage() {
     saveTestResult(topic.id, correct, total); // если не вошли — функция ничего не сохранит
 
     body.innerHTML =
-      '<div class="card test-result ' + (passed ? "is-passed" : "is-failed") + '" tabindex="-1">' +
-        '<p class="test-percent">' + percent + "%</p>" +
-        '<p class="test-verdict">' + (passed ? "Зачтено ✓" : "Не зачтено") + "</p>" +
-        "<p>Верно " + correct + " из " + total + ". Для зачёта нужно " + needed + " из " + total +
+      '<div class="test-card test-result ' + (passed ? "is-passed" : "is-failed") + '" tabindex="-1">' +
+        '<div class="test-head">' +
+          '<span class="soft-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg></span>' +
+          "<h2>Результат теста</h2>" +
+        "</div>" +
+        '<p class="test-percent">' + correct + " из " + total + "</p>" +
+        '<p class="test-verdict">' + (passed ? "Тест сдан ✓" : "Не хватило баллов") + "</p>" +
+        "<p>Это " + percent + "%. Для зачёта нужно " + needed + " из " + total +
           " (" + Math.round(PASS_RATE * 100) + "%).</p>" +
         (passed ? "" : '<p class="muted">Пересмотрите материал урока и попробуйте ещё раз.</p>') +
         (!getCurrentUser()
           ? '<p class="hint">Результат не сохранён: вы не вошли. <a href="' + loginLinkBack() + '">Войти</a></p>'
           : "") +
         '<div class="buttons">' +
-          '<button type="button" id="test-again" class="btn btn-secondary">Пройти ещё раз</button>' +
-          '<a href="' + lessonHref + '" class="btn btn-secondary">Вернуться к уроку</a>' +
+          '<button type="button" id="test-again" class="btn btn-secondary test-again">Пройти ещё раз</button>' +
+          '<a href="' + lessonHref + '" class="btn ' + (next ? "btn-secondary test-lesson" : "btn-primary") + '">К уроку</a>' +
           (next ? '<a href="' + topicLink("lesson.html", next) + '" class="btn btn-primary">К следующему уроку</a>' : "") +
         "</div>" +
       "</div>" +
